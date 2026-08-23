@@ -1,0 +1,107 @@
+import { cookies, headers } from "next/headers";
+import { db } from "@/db";
+import { users, apiKeys } from "@/db/schema";
+import { eq, or } from "drizzle-orm";
+import { validateSession } from "@/lib/security";
+import { hasPermission } from "@/lib/auth";
+import { hashApiKey, legacyApiKeyHash } from "@/lib/api-keys";
+
+export type ApiScope = "read" | "write" | "inspect" | "admin";
+
+type AuthOptions = {
+  scopes?: ApiScope[];
+  permission?: string;
+};
+
+type Authenticated = {
+  ok: true;
+  user: typeof users.$inferSelect;
+  authType: "api_key" | "session";
+  scopes: string[];
+};
+
+type AuthFailure = { ok: false; status: number; message: string };
+
+function scopesAllowed(granted: string[] | null | undefined, required: ApiScope[] = []): boolean {
+  if (!required.length) return true;
+  const set = new Set(granted || []);
+  if (set.has("admin")) return true;
+  return required.every((scope) => set.has(scope));
+}
+
+function userAllowed(user: typeof users.$inferSelect, permission?: string): boolean {
+  return !permission || hasPermission(user, permission);
+}
+
+export async function authenticateApiRequest(options: AuthOptions = {}): Promise<Authenticated | AuthFailure> {
+  try {
+    const h = await headers();
+    const authHeader = h.get("authorization") || "";
+    const apiKeyHeader = h.get("x-api-key") || "";
+    const apiKey = apiKeyHeader || authHeader.replace(/^Bearer\s+/i, "").trim();
+
+    if (apiKey) {
+      const currentHash = hashApiKey(apiKey);
+      const legacyHash = legacyApiKeyHash(apiKey);
+      const [keyRow] = await db
+        .select()
+        .from(apiKeys)
+        .where(or(eq(apiKeys.keyHash, currentHash), eq(apiKeys.keyHash, legacyHash)))
+        .limit(1);
+
+      if (!keyRow) return { ok: false, status: 401, message: "Invalid API key" };
+      if (!keyRow.isActive) return { ok: false, status: 401, message: "API key revoked" };
+      if (keyRow.expiresAt && new Date(keyRow.expiresAt) <= new Date()) {
+        return { ok: false, status: 401, message: "API key expired" };
+      }
+      if (!scopesAllowed(keyRow.scopes, options.scopes)) {
+        return { ok: false, status: 403, message: "API key does not have the required scope" };
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.id, keyRow.userId));
+      if (!user || !user.isActive) return { ok: false, status: 401, message: "API key owner is inactive" };
+      if (!userAllowed(user, options.permission)) {
+        return { ok: false, status: 403, message: "User does not have permission for this resource" };
+      }
+
+      await db
+        .update(apiKeys)
+        .set({
+          lastUsedAt: new Date(),
+          // Transparently upgrade legacy unsalted hashes after a successful use.
+          ...(keyRow.keyHash === legacyHash && currentHash !== legacyHash ? { keyHash: currentHash } : {}),
+        })
+        .where(eq(apiKeys.id, keyRow.id));
+
+      return { ok: true, user, authType: "api_key", scopes: keyRow.scopes || [] };
+    }
+
+    const jar = await cookies();
+    const sessionToken = jar.get("rsl_session_token")?.value;
+    if (sessionToken) {
+      const session = await validateSession(sessionToken);
+      if (session.valid && session.userId) {
+        const [user] = await db.select().from(users).where(eq(users.id, session.userId));
+        if (user?.isActive) {
+          if (!userAllowed(user, options.permission)) {
+            return { ok: false, status: 403, message: "You do not have permission for this resource" };
+          }
+          // Browser sessions inherit the user's permissions rather than API-key scopes.
+          return { ok: true, user, authType: "session", scopes: ["read", "write", "inspect"] };
+        }
+      }
+    }
+
+    return { ok: false, status: 401, message: "Authentication required" };
+  } catch {
+    return { ok: false, status: 500, message: "Authentication error" };
+  }
+}
+
+export function json(data: unknown, status = 200) {
+  return Response.json(data, { status });
+}
+
+export function apiError(status: number, message: string, details?: unknown) {
+  return Response.json({ error: { status, message, details } }, { status });
+}
