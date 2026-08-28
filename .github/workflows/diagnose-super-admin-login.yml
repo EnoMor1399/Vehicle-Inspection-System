@@ -1,0 +1,26 @@
+name: Diagnose production Super Admin login
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify administrator and recent login results
+        run: node scripts/diagnose-super-admin-login.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPER_ADMIN_EMAIL: morganenoch1@gmail.com
+          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
