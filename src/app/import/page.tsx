@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { importJobs, vehicles, inspections } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { dailyInspections, importJobs, vehicles, inspections } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
@@ -30,19 +30,42 @@ const ENTITY_TYPES = [
     fields: ["inspection_number", "registration_number", "inspection_date", "inspector_name", "station", "overall_result", "inspector_remarks", "next_inspection_date"],
     required: ["registration_number", "inspection_date", "overall_result"],
   },
+  {
+    value: "pre_trip_inspections",
+    label: "Pre-Trip / Safe-To-Load Inspections",
+    fields: ["source_reference", "registration_number", "inspection_date", "pre_trip_result", "cleared_for_trip", "driver_name", "odometer", "trip_purpose", "route_description", "product", "capacity", "transporter_name", "notes"],
+    required: ["registration_number", "inspection_date", "pre_trip_result"],
+  },
 ];
 
 export default async function ImportPage() {
   const user = await requireInternalUser();
   const canDo = canImport(user);
 
-  const [jobs, vehicleExportRows, inspectionExportRows] = await Promise.all([
+  const [jobs, vehicleExportRows, inspectionExportRows, preTripExportRows] = await Promise.all([
     db.select().from(importJobs).orderBy(desc(importJobs.createdAt)).limit(25),
     db.select({ registrationNumber: vehicles.registrationNumber, make: vehicles.make, model: vehicles.model, status: vehicles.status, vin: vehicles.vin, updatedAt: vehicles.updatedAt }).from(vehicles).orderBy(desc(vehicles.updatedAt)),
     db.select({ inspectionNumber: inspections.inspectionNumber, vehicleId: inspections.vehicleId, inspectionDate: inspections.inspectionDate, overallResult: inspections.overallResult, workflowStatus: inspections.workflowStatus, inspectorName: inspections.inspectorName, station: inspections.station }).from(inspections).orderBy(desc(inspections.inspectionDate)),
+    db
+      .select({
+        registrationNumber: vehicles.registrationNumber,
+        inspectionDate: dailyInspections.inspectionDate,
+        preTripResult: dailyInspections.status,
+        clearedForTrip: dailyInspections.clearedForTrip,
+        driverName: dailyInspections.driverName,
+        odometer: dailyInspections.odometer,
+        tripPurpose: dailyInspections.tripPurpose,
+        routeDescription: dailyInspections.routeDescription,
+        notes: dailyInspections.notes,
+        completedAt: dailyInspections.completedAt,
+      })
+      .from(dailyInspections)
+      .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
+      .orderBy(desc(dailyInspections.inspectionDate), desc(dailyInspections.completedAt)),
   ]);
   const vehicleExport = vehicleExportRows.map((row) => ({ ...row, updatedAt: row.updatedAt?.toISOString?.() || String(row.updatedAt || "") }));
   const inspectionExport = inspectionExportRows.map((row) => ({ ...row, inspectionDate: row.inspectionDate?.toISOString?.() || String(row.inspectionDate || "") }));
+  const preTripExport = preTripExportRows.map((row) => ({ ...row, completedAt: row.completedAt?.toISOString?.() || String(row.completedAt || "") }));
 
   return (
     <div className="p-6 lg:p-10">
@@ -51,9 +74,10 @@ export default async function ImportPage() {
         title="Import & Export"
         description="Validated XLSX / XLS / CSV migration with explicit column mapping, duplicate checks and import history. Imports are additive and are not presented as reversible unless a dedicated rollback ledger exists."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ExportMenu data={vehicleExport} filename="vims-vehicles" title="Vehicle Registry" label="Export Vehicles" />
             <ExportMenu data={inspectionExport} filename="vims-inspections" title="Inspection Register" label="Export Inspections" />
+            <ExportMenu data={preTripExport} filename="vims-pre-trip-inspections" title="Pre-Trip Inspection Register" label="Export Pre-Trip" />
           </div>
         }
       />
