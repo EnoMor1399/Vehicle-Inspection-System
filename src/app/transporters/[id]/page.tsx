@@ -14,6 +14,7 @@ export default async function TransporterDetailPage({ params }: { params: Promis
   const { id } = await params;
   const user = await getCurrentUser();
   const editable = canEditTransporters(user);
+  if (!editable) notFound();
 
   const [t] = await db
     .select()

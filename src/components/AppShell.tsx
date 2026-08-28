@@ -32,10 +32,25 @@ import {
 
 const NO_SHELL_PATHS = ["/login"];
 
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Administrator",
+  admin: "Administrator",
+  operations_manager: "Operations Manager",
+  supervisor: "Supervisor",
+  inspector: "Inspector",
+  data_entry: "Data Entry Officer",
+  auditor: "Auditor",
+  compliance_officer: "Compliance Officer",
+  viewer: "Viewer",
+  transporter_user: "Transporter Portal User",
+};
+
 type NavItem = {
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
+  resource?: string;
+  superAdminOnly?: boolean;
 };
 
 type NavGroup = {
@@ -48,39 +63,39 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/vehicles", label: "Vehicles", icon: Car },
-      { href: "/transporters", label: "Transporters", icon: Truck },
-      { href: "/inspections", label: "Inspections", icon: ClipboardCheck },
-      { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck },
-      { href: "/locations", label: "Stations", icon: MapPin },
+      { href: "/vehicles", label: "Vehicles", icon: Car, resource: "vehicles" },
+      { href: "/transporters", label: "Transporters", icon: Truck, resource: "transporters" },
+      { href: "/inspections", label: "Inspections", icon: ClipboardCheck, resource: "inspections" },
+      { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck, resource: "inspections" },
+      { href: "/locations", label: "Stations", icon: MapPin, resource: "locations" },
     ],
   },
   {
     label: "Intelligence",
     items: [
-      { href: "/reports", label: "Reports & Analytics", icon: FileBarChart },
-      { href: "/predictive", label: "Maintenance Risk", icon: Activity },
-      { href: "/powerbi", label: "Power BI", icon: BarChart3 },
-      { href: "/rfid", label: "RFID Operations", icon: Radio },
+      { href: "/reports", label: "Reports & Analytics", icon: FileBarChart, resource: "reports" },
+      { href: "/predictive", label: "Maintenance Risk", icon: Activity, resource: "reports" },
+      { href: "/powerbi", label: "Power BI", icon: BarChart3, resource: "reports" },
+      { href: "/rfid", label: "RFID Operations", icon: Radio, resource: "vehicles" },
     ],
   },
   {
     label: "Administration",
     items: [
-      { href: "/users", label: "Users & Roles", icon: Users },
-      { href: "/documents", label: "Documents", icon: FileText },
-      { href: "/notifications", label: "Notifications", icon: Bell },
-      { href: "/import", label: "Import / Export", icon: Upload },
-      { href: "/settings", label: "Settings", icon: SettingsIcon },
-      { href: "/audit", label: "Audit Log", icon: ScrollText },
+      { href: "/users", label: "Users & Roles", icon: Users, resource: "users" },
+      { href: "/documents", label: "Documents", icon: FileText, resource: "documents" },
+      { href: "/notifications", label: "Notifications", icon: Bell, resource: "notifications" },
+      { href: "/import", label: "Import / Export", icon: Upload, resource: "import" },
+      { href: "/settings", label: "Settings", icon: SettingsIcon, resource: "settings" },
+      { href: "/audit", label: "Audit Log", icon: ScrollText, resource: "audit" },
     ],
   },
   {
     label: "Access & Support",
     items: [
-      { href: "/portal", label: "Transporter Portal", icon: Truck },
+      { href: "/portal", label: "Transporter Portal", icon: Truck, superAdminOnly: true },
       { href: "/apps", label: "App Access", icon: Smartphone },
-      { href: "/api-docs", label: "API & Integrations", icon: FileBarChart },
+      { href: "/api-docs", label: "API & Integrations", icon: FileBarChart, resource: "settings" },
       { href: "/guide", label: "User Guide", icon: BookOpen },
     ],
   },
@@ -89,9 +104,7 @@ const NAV_GROUPS: NavGroup[] = [
 const TRANSPORTER_NAV_GROUPS: NavGroup[] = [
   {
     label: "Your Workspace",
-    items: [
-      { href: "/portal", label: "Transporter Portal", icon: Truck },
-    ],
+    items: [{ href: "/portal", label: "Transporter Portal", icon: Truck }],
   },
 ];
 
@@ -121,16 +134,35 @@ export function AppShell({
   branding = DEFAULT_BRANDING,
   userRole,
   userName,
+  allowedResources = [],
 }: {
   children: ReactNode;
   branding?: AppBranding;
   userRole?: string | null;
   userName?: string | null;
+  allowedResources?: string[];
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isTransporter = userRole === "transporter_user";
-  const navGroups = isTransporter ? TRANSPORTER_NAV_GROUPS : NAV_GROUPS;
+  const isSuperAdmin = userRole === "super_admin";
+  const roleLabel = ROLE_LABELS[userRole || ""] || "User";
+  const allowed = new Set(allowedResources);
+
+  const navGroups = isTransporter
+    ? TRANSPORTER_NAV_GROUPS
+    : NAV_GROUPS
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => {
+            if (!userRole) return false;
+            if (isSuperAdmin) return true;
+            if (item.superAdminOnly) return false;
+            if (!item.resource) return true;
+            return allowed.has(item.resource);
+          }),
+        }))
+        .filter((group) => group.items.length > 0);
 
   const activeContext = (() => {
     for (const group of navGroups) {
@@ -143,6 +175,19 @@ export function AppShell({
   if (NO_SHELL_PATHS.includes(pathname) || pathname.startsWith("/verify") || pathname.startsWith("/certificate")) {
     return <>{children}</>;
   }
+
+  const workspaceLabel = isTransporter
+    ? "Transporter Portal"
+    : isSuperAdmin
+      ? "Super Administrator Workspace"
+      : `${roleLabel} Workspace`;
+
+  const accessBadge = isSuperAdmin ? "FULL ACCESS" : isTransporter ? "SCOPED" : "ROLE BASED";
+  const sessionLabel = isSuperAdmin
+    ? `${userName || roleLabel} · Full system access`
+    : isTransporter
+      ? `${userName || "Transporter"} · Scoped access`
+      : `${userName || roleLabel} · ${roleLabel}`;
 
   return (
     <div data-app-shell className="app-shell min-h-screen lg:flex">
@@ -171,9 +216,7 @@ export function AppShell({
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                {isTransporter ? "Transporter Portal" : (branding.tagline || "Inspection Operations")}
-              </p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">{workspaceLabel}</p>
             </div>
             <button
               type="button"
@@ -186,22 +229,18 @@ export function AppShell({
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[11px] text-slate-400">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
-              {isTransporter ? "Transporter account" : "Secure workspace"}
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
+              <span className="truncate">{isSuperAdmin ? "Unrestricted administrator" : isTransporter ? "Transporter account" : roleLabel}</span>
             </span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5 font-medium text-slate-300">
-              {isTransporter ? "SCOPED" : "V2.3 UI"}
-            </span>
+            <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 font-medium text-slate-300">{accessBadge}</span>
           </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           {navGroups.map((group) => (
             <div key={group.label} className="mb-5 last:mb-0">
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {group.label}
-              </p>
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{group.label}</p>
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = isActivePath(pathname, item.href);
@@ -246,6 +285,18 @@ export function AppShell({
           </div>
         )}
 
+        {!isTransporter && !isSuperAdmin && userRole && (
+          <div className="mx-3 mb-3 rounded-xl border border-sky-400/15 bg-sky-400/[0.05] p-3 text-xs leading-relaxed text-slate-400">
+            Navigation is limited to the modules assigned to your role and any explicit permissions granted to your account.
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <div className="mx-3 mb-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] p-3 text-xs leading-relaxed text-slate-400">
+            Super Administrator access is unrestricted across user accounts, operational modules, administration and support tools.
+          </div>
+        )}
+
         <div className="border-t border-white/10 p-3">
           <form action="/api/auth/logout" method="POST">
             <button
@@ -283,12 +334,12 @@ export function AppShell({
 
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                <span>{isTransporter ? "TRANSPORTER" : "VIMS"}</span>
+                <span>{isTransporter ? "TRANSPORTER" : isSuperAdmin ? "SUPER ADMIN" : "VIMS"}</span>
                 <ChevronRight className="h-3 w-3" />
                 <span className="truncate">{activeContext?.group || (isTransporter ? "Your Workspace" : "Workspace")}</span>
               </div>
               <p className="mt-0.5 truncate text-[15px] font-semibold tracking-tight text-slate-950">
-                {activeContext?.item.label || (isTransporter ? "Transporter Workspace" : "Vehicle Inspection Management")}
+                {activeContext?.item.label || workspaceLabel}
               </p>
             </div>
 
@@ -296,7 +347,7 @@ export function AppShell({
               <div className="h-8 w-px bg-slate-200" />
               <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                {isTransporter ? `${userName || "Transporter"} · Scoped access` : "Protected session"}
+                {sessionLabel}
               </div>
             </div>
           </div>

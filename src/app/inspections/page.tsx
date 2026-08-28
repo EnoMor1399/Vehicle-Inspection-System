@@ -3,13 +3,13 @@ import { inspections, vehicles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { PageHeader } from "@/components/ui";
 import { canManageInspections } from "@/lib/auth";
-import { requireInternalUser } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 import { InspectionsList } from "./InspectionsList";
 
 export const dynamic = "force-dynamic";
 
 export default async function InspectionsPage() {
-  const user = await requireInternalUser();
+  const user = await requirePermission("inspections");
   const editable = canManageInspections(user);
 
   const rows = await db

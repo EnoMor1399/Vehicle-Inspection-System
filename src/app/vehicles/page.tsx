@@ -5,13 +5,13 @@ import Link from "next/link";
 import { PageHeader, Button } from "@/components/ui";
 import { Plus } from "lucide-react";
 import { canEditVehicles } from "@/lib/auth";
-import { requireInternalUser } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 import { VehiclesList } from "./VehiclesList";
 
 export const dynamic = "force-dynamic";
 
 export default async function VehiclesPage() {
-  const user = await requireInternalUser();
+  const user = await requirePermission("vehicles");
   const editable = canEditVehicles(user);
 
   const rows = await db

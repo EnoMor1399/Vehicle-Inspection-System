@@ -5,12 +5,12 @@ import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Bell, Calendar, Mail, MessageSquare, CheckCircle2, AlertTriangle, ShieldAlert, FileText, Activity } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { markAllRead, markRead } from "./actions";
-import { requireAuth } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
-  const user = await requireAuth();
+  const user = await requirePermission("notifications");
   const all = await db.select().from(notifications).where(eq(notifications.userId, user.id)).orderBy(desc(notifications.createdAt)).limit(100);
   const unread = all.filter((n) => !n.readAt).length;
   const byType: Record<string, number> = {};

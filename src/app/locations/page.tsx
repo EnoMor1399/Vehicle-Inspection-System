@@ -5,12 +5,12 @@ import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { StationEditor } from "./StationEditor";
 import { MapPin, Users, Wrench, Phone, Mail } from "lucide-react";
 import { canManageLocations } from "@/lib/auth";
-import { requireInternalUser } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function LocationsPage() {
-  const user = await requireInternalUser();
+  const user = await requirePermission("locations");
   const canManage = canManageLocations(user);
 
   const allLocations = await db.select().from(locations).orderBy(asc(locations.name));

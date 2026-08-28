@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requireAuth } from "@/lib/require-auth";
-import { canAccessTransporterScope, getCurrentUser, canApprove as canApproveInspection } from "@/lib/auth";
+import { canAccessTransporterScope, canManageInspections, getCurrentUser, canApprove as canApproveInspection } from "@/lib/auth";
 import { formatDateTime, formatDate } from "@/lib/utils";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import type { DailyChecklistCategory } from "@/db/schema";
@@ -32,6 +32,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default async function DailyInspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth();
   const user = await getCurrentUser();
+  if (user.role !== "transporter_user" && !canManageInspections(user)) notFound();
   const { id } = await params;
 
   const [row] = await db

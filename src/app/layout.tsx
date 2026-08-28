@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { PWAProvider } from "@/components/PWAProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getSettings } from "@/lib/settings";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +43,30 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const SHELL_RESOURCES = [
+  "vehicles",
+  "transporters",
+  "inspections",
+  "reports",
+  "users",
+  "documents",
+  "locations",
+  "import",
+  "notifications",
+  "audit",
+  "settings",
+] as const;
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const settings = await getSettings();
-  let shellUser: { role: string; name: string } | null = null;
+  let shellUser: { role: string; name: string; allowedResources: string[] } | null = null;
   try {
     const user = await getCurrentUser();
-    shellUser = { role: user.role, name: user.name };
+    shellUser = {
+      role: user.role,
+      name: user.name,
+      allowedResources: SHELL_RESOURCES.filter((resource) => hasPermission(user, resource)),
+    };
   } catch {
     // Public and login routes intentionally render without an authenticated shell identity.
   }
@@ -75,6 +93,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             }}
             userRole={shellUser?.role}
             userName={shellUser?.name}
+            allowedResources={shellUser?.allowedResources || []}
           >
             {children}
           </AppShell>

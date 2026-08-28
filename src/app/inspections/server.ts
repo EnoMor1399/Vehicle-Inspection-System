@@ -219,7 +219,6 @@ export async function approveInspection(id: string, input: { remarks?: string; s
 
     if (input.signature) {
       await tx.delete(signatures).where(eq(signatures.inspectionId, id));
-      // Re-create inspector signature row if it exists in the legacy inspection record.
       if (row.inspection.inspectorSignature) {
         await tx.insert(signatures).values({
           id: newId(),
@@ -270,6 +269,7 @@ export async function approveInspection(id: string, input: { remarks?: string; s
 
 export async function getInspectionDetail(id: string) {
   const user = await getCurrentUser();
+  if (user.role !== "transporter_user" && !canManageInspections(user)) return null;
   const [row] = await db
     .select({ inspection: inspections, vehicle: vehicles })
     .from(inspections)

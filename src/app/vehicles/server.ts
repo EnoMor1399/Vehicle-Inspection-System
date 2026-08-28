@@ -184,6 +184,7 @@ export async function decommissionVehicle(id: string) {
 
 export async function getVehicleDetail(id: string) {
   const user = await getCurrentUser();
+  if (user.role !== "transporter_user" && !canEditVehicles(user)) return null;
   const [v] = await db.select().from(vehicles).where(eq(vehicles.id, id));
   if (!v || !canAccessTransporterScope(user, v.transporterId)) return null;
   const insp = await db

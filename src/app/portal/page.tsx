@@ -1,10 +1,11 @@
 import { db } from "@/db";
 import { dailyInspections, inspections, transporters, vehicles } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { PageHeader, Card, Badge, StatCard } from "@/components/ui";
 import {
   Activity,
+  ArrowLeft,
   Calendar,
   Car,
   CheckCircle2,
@@ -19,22 +20,95 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default async function PortalPage() {
+export default async function PortalPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ transporterId?: string }>;
+}) {
   const user = await getCurrentUser();
-  if (user.role !== "transporter_user") {
+  const isTransporterUser = user.role === "transporter_user";
+  const isSuperAdmin = user.role === "super_admin";
+
+  if (!isTransporterUser && !isSuperAdmin) {
     return (
       <div className="p-6 lg:p-10">
-        <PageHeader title="Transporter Portal" description="This portal is reserved for transporter portal accounts." />
+        <PageHeader title="Transporter Portal" description="This portal is reserved for transporter portal accounts and Super Administrator oversight." />
         <Card className="p-8">
           <p className="text-slate-700">
-            You are signed in as <strong>{user.name}</strong>. Use the main VIMS workspace for your assigned staff functions.
+            You are signed in as <strong>{user.name}</strong>. Use the main VIMS workspace for the modules assigned to your role.
           </p>
         </Card>
       </div>
     );
   }
 
-  if (!user.transporterId) {
+  const params = searchParams ? await searchParams : {};
+  const requestedTransporterId = isSuperAdmin ? params.transporterId?.trim() || null : null;
+
+  if (isSuperAdmin && !requestedTransporterId) {
+    const transporterDirectory = await db
+      .select({
+        id: transporters.id,
+        companyName: transporters.companyName,
+        region: transporters.region,
+        district: transporters.district,
+        contactPerson: transporters.contactPerson,
+      })
+      .from(transporters)
+      .where(isNull(transporters.deletedAt))
+      .orderBy(asc(transporters.companyName));
+
+    return (
+      <div className="p-4 sm:p-6 lg:p-10">
+        <PageHeader
+          eyebrow="Super Administrator"
+          title="Transporter Portal Directory"
+          description="Open any transporter workspace for unrestricted administrative oversight without changing your Super Administrator privileges."
+        />
+
+        <Card className="mb-6 border-amber-200 bg-amber-50/70 p-5">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <p className="font-semibold text-slate-950">Full oversight mode</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                Selecting a transporter opens the same scoped portal that transporter users see, while your full Super Administrator navigation and account-management privileges remain available.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {transporterDirectory.length === 0 ? (
+          <Card className="p-8 text-center text-sm text-slate-500">No active transporter profiles are available.</Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {transporterDirectory.map((transporter) => (
+              <Link key={transporter.id} href={`/portal?transporterId=${encodeURIComponent(transporter.id)}`}>
+                <Card className="h-full p-5 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+                  <div className="flex items-start gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white">
+                      <Truck className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-950">{transporter.companyName}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {[transporter.region, transporter.district].filter(Boolean).join(" · ") || "Location not specified"}
+                      </p>
+                      {transporter.contactPerson && <p className="mt-2 text-sm text-slate-600">{transporter.contactPerson}</p>}
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">Open transporter workspace →</p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const transporterId = isSuperAdmin ? requestedTransporterId : user.transporterId;
+  if (!transporterId) {
     return (
       <div className="p-6 lg:p-10">
         <PageHeader title="Transporter Portal" description="Your account is not yet linked to a transporter profile." />
@@ -45,11 +119,11 @@ export default async function PortalPage() {
     );
   }
 
-  const [matchedTransporter] = await db.select().from(transporters).where(eq(transporters.id, user.transporterId));
+  const [matchedTransporter] = await db.select().from(transporters).where(eq(transporters.id, transporterId));
   if (!matchedTransporter || matchedTransporter.deletedAt) {
     return (
       <div className="p-6 lg:p-10">
-        <Card className="p-8"><p>The linked transporter profile is unavailable. Contact a VIMS administrator.</p></Card>
+        <Card className="p-8"><p>The selected transporter profile is unavailable.</p></Card>
       </div>
     );
   }
@@ -105,16 +179,26 @@ export default async function PortalPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-10">
+      {isSuperAdmin && (
+        <Link href="/portal" className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-950">
+          <ArrowLeft className="h-4 w-4" /> Back to transporter directory
+        </Link>
+      )}
+
       <PageHeader
-        eyebrow="Transporter Portal"
+        eyebrow={isSuperAdmin ? "Super Admin · Transporter Preview" : "Transporter Portal"}
         title={matchedTransporter.companyName}
-        description="Your fleet, inspection status, Pre-Trip clearance and compliance documents in one restricted workspace."
+        description={
+          isSuperAdmin
+            ? "Administrative preview of this transporter's fleet, inspections, Pre-Trip clearance and compliance documents."
+            : "Your fleet, inspection status, Pre-Trip clearance and compliance documents in one restricted workspace."
+        }
       />
 
       <nav className="mb-6 flex flex-wrap gap-2" aria-label="Transporter portal sections">
         {[
           ["#overview", "Overview"],
-          ["#fleet", "My Fleet"],
+          ["#fleet", "Fleet"],
           ["#inspections", "Inspection History"],
           ["#pre-trip", "Pre-Trip / Safe-To-Load"],
           ["#documents", "Expiring Documents"],
@@ -139,20 +223,24 @@ export default async function PortalPage() {
           <StatCard label="Expiring ≤ 60 Days" value={expiringDocuments.length} tone="amber" icon={<Calendar className="h-5 w-5" />} />
         </div>
 
-        <Card className="mt-6 overflow-hidden border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-teal-50 p-5 sm:p-6">
+        <Card className={`mt-6 overflow-hidden p-5 sm:p-6 ${isSuperAdmin ? "border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50" : "border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-teal-50"}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white">
-                <Truck className="h-5 w-5" />
+              <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white ${isSuperAdmin ? "bg-amber-600" : "bg-emerald-600"}`}>
+                {isSuperAdmin ? <ShieldCheck className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-950">Restricted transporter access</p>
+                <p className="text-sm font-semibold text-slate-950">{isSuperAdmin ? "Super Administrator oversight" : "Restricted transporter access"}</p>
                 <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-600">
-                  This portal shows only records linked to <strong>{matchedTransporter.companyName}</strong>. Administrative configuration, other transporters, internal analytics controls and staff functions are not available to this account.
+                  {isSuperAdmin ? (
+                    <>You are previewing records linked to <strong>{matchedTransporter.companyName}</strong>. Your full VIMS navigation and authority over all user accounts remain active.</>
+                  ) : (
+                    <>This portal shows only records linked to <strong>{matchedTransporter.companyName}</strong>. Administrative configuration, other transporters, internal analytics controls and staff functions are not available to this account.</>
+                  )}
                 </p>
               </div>
             </div>
-            <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Signed in as</p>
               <p className="mt-0.5 font-semibold text-slate-900">{user.name}</p>
             </div>
@@ -164,7 +252,7 @@ export default async function PortalPage() {
         <div className="mb-3 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Fleet</p>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">My Vehicles</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-950">{isSuperAdmin ? "Fleet Vehicles" : "My Vehicles"}</h2>
           </div>
           <Badge tone="blue">{fleet.length} vehicles</Badge>
         </div>
@@ -186,7 +274,9 @@ export default async function PortalPage() {
                 <tbody>
                   {fleet.map((vehicle) => (
                     <tr key={vehicle.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-3 font-semibold text-slate-950">{vehicle.registrationNumber}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-950">
+                        <Link href={`/vehicles/${vehicle.id}`} className="hover:text-emerald-700">{vehicle.registrationNumber}</Link>
+                      </td>
                       <td className="px-4 py-3 text-slate-700">{vehicle.make} {vehicle.model || ""}</td>
                       <td className="px-4 py-3 text-slate-600">{vehicle.vehicleClass || vehicle.category || "—"}</td>
                       <td className="px-4 py-3">
@@ -217,7 +307,7 @@ export default async function PortalPage() {
         </div>
         <Card className="overflow-hidden">
           {technicalInspections.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">No technical inspections are on record for your fleet.</p>
+            <p className="p-8 text-center text-sm text-slate-500">No technical inspections are on record for this fleet.</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {technicalInspections.slice(0, 25).map((row) => (
@@ -250,7 +340,7 @@ export default async function PortalPage() {
         </div>
         <Card className="overflow-hidden">
           {preTripInspections.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">No Pre-Trip inspections are on record for your fleet.</p>
+            <p className="p-8 text-center text-sm text-slate-500">No Pre-Trip inspections are on record for this fleet.</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {preTripInspections.slice(0, 30).map((row) => (
@@ -317,7 +407,9 @@ export default async function PortalPage() {
         <div className="flex items-start gap-3">
           <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
           <p>
-            Need a vehicle, transporter profile or inspection record corrected? Contact the VIMS operations team. Transporter accounts intentionally cannot edit master records or system configuration.
+            {isSuperAdmin
+              ? "You are in Super Administrator oversight mode. Use the full VIMS navigation to edit master records, user access, configuration or operational data as required."
+              : "Need a vehicle, transporter profile or inspection record corrected? Contact the VIMS operations team. Transporter accounts intentionally cannot edit master records or system configuration."}
           </p>
         </div>
       </Card>
