@@ -47,7 +47,7 @@ export function InspectionForm({
   const [attachedDocuments, setAttachedDocuments] = useState<InspectionDocument[]>([]);
   const [gpsLocation, setGpsLocation] = useState<{ latitude: number; longitude: number; accuracy: number; timestamp: string } | null>(null);
   const [sections, setSections] = useState<SectionForm[]>(() => buildDefaultSectionData() as SectionForm[]);
-  const [activeSection, setActiveSection] = useState("B");
+  const [activeSection, setActiveSection] = useState("A");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -114,8 +114,10 @@ export function InspectionForm({
     });
   }
 
-  const active = sections.find((s) => s.section === activeSection)!;
-  const activeSummary = summarizeSection(active);
+  // Sections A and P are dedicated form steps and are intentionally not
+  // included in the B-O checklist data. Guard the lookup before summarizing.
+  const active = sections.find((s) => s.section === activeSection);
+  const activeSummary = active ? summarizeSection(active) : null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
@@ -127,6 +129,7 @@ export function InspectionForm({
             <button
               type="button"
               onClick={() => setActiveSection("A")}
+              aria-current={activeSection === "A" ? "step" : undefined}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${activeSection === "A" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
               <span><strong className="font-mono">A</strong> · Identification</span>
@@ -140,6 +143,7 @@ export function InspectionForm({
                   key={s.section}
                   type="button"
                   onClick={() => setActiveSection(s.section)}
+                  aria-current={isActive ? "step" : undefined}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${isActive ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
                 >
                   <span>
@@ -158,6 +162,7 @@ export function InspectionForm({
             <button
               type="button"
               onClick={() => setActiveSection("P")}
+              aria-current={activeSection === "P" ? "step" : undefined}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${activeSection === "P" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
               <span><strong className="font-mono">P</strong> · Final Decision</span>
@@ -169,8 +174,9 @@ export function InspectionForm({
 
       {/* Main form */}
       <div className="space-y-6">
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold text-slate-950 mb-4">Section A · Vehicle Identification</h2>
+        {activeSection === "A" && (
+          <Card className="p-6">
+            <h2 className="text-lg font-semibold text-slate-950 mb-4">Section A · Vehicle Identification</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Vehicle" required>
               <Select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
@@ -209,9 +215,10 @@ export function InspectionForm({
           <div className="mt-4">
             <GpsCapture value={gpsLocation} onChange={setGpsLocation} />
           </div>
-        </Card>
+          </Card>
+        )}
 
-        {activeSection !== "A" && activeSection !== "P" && (
+        {activeSection !== "A" && activeSection !== "P" && active && activeSummary && (
           <Card className="p-6">
             <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
               <div>
