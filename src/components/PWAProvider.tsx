@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -16,11 +16,45 @@ function detectStandaloneMode(): boolean {
   );
 }
 
+function getNetworkSnapshot(): boolean {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function getServerNetworkSnapshot(): boolean {
+  return true;
+}
+
+function subscribeToNetworkStatus(onStoreChange: () => void) {
+  const refresh = () => onStoreChange();
+
+  window.addEventListener("online", refresh);
+  window.addEventListener("offline", refresh);
+  window.addEventListener("focus", refresh);
+  window.addEventListener("pageshow", refresh);
+  document.addEventListener("visibilitychange", refresh);
+
+  // Browsers can occasionally miss a connectivity event while a tab or
+  // installed PWA is suspended. Re-check periodically so the warning cannot
+  // remain stale after connectivity has returned.
+  const intervalId = window.setInterval(refresh, 15_000);
+
+  return () => {
+    window.removeEventListener("online", refresh);
+    window.removeEventListener("offline", refresh);
+    window.removeEventListener("focus", refresh);
+    window.removeEventListener("pageshow", refresh);
+    document.removeEventListener("visibilitychange", refresh);
+    window.clearInterval(intervalId);
+  };
+}
+
 export function PWAProvider() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState<boolean>(detectStandaloneMode);
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true
+  const isOnline = useSyncExternalStore(
+    subscribeToNetworkStatus,
+    getNetworkSnapshot,
+    getServerNetworkSnapshot
   );
 
   useEffect(() => {
@@ -41,19 +75,12 @@ export function PWAProvider() {
       setInstallPrompt(null);
     };
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     window.addEventListener("appinstalled", handleAppInstalled);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
       window.removeEventListener("appinstalled", handleAppInstalled);
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
@@ -69,7 +96,11 @@ export function PWAProvider() {
   return (
     <>
       {!isOnline && (
-        <div className="fixed bottom-4 left-4 z-50 flex max-w-sm items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm text-white shadow-lg">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 left-4 z-50 flex max-w-sm items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm text-white shadow-lg"
+        >
           <div className="h-2 w-2 shrink-0 rounded-full bg-white" />
           Offline — protected records and transactions require a network connection.
         </div>
