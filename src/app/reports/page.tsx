@@ -68,14 +68,14 @@ export default async function ReportsPage() {
   ]);
 
   return (
-    <div className="min-h-full bg-slate-50/70 p-4 sm:p-6 lg:p-10">
-      <section className="relative mb-6 overflow-hidden rounded-[28px] bg-slate-950 px-5 py-6 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] sm:px-7 sm:py-8 lg:px-9">
-        <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-teal-400/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+    <div className="min-h-full bg-gradient-to-br from-slate-50 via-blue-50/40 to-violet-50/50 p-4 sm:p-6 lg:p-10">
+      <section className="relative mb-6 overflow-hidden rounded-[28px] bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-700 px-5 py-6 text-white shadow-[0_22px_65px_rgba(79,70,229,0.28)] sm:px-7 sm:py-8 lg:px-9">
+        <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-cyan-300/35 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-fuchsia-400/25 blur-3xl" />
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
           <div className="max-w-3xl">
-            <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-teal-300">
-              <span className="h-px w-8 bg-teal-400" />
+            <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+              <span className="h-px w-8 bg-cyan-300" />
               Intelligence centre
             </div>
             <h1 className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl lg:text-[34px]">Reports &amp; Analytics</h1>
@@ -84,11 +84,11 @@ export default async function ReportsPage() {
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-slate-300">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1.5 ring-1 ring-inset ring-white/10">
-                <Activity className="h-3.5 w-3.5 text-teal-300" />
+                <Activity className="h-3.5 w-3.5 text-cyan-200" />
                 Live database view
               </span>
               <span className="inline-flex items-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-teal-300" />
+                <ShieldCheck className="h-3.5 w-3.5 text-cyan-200" />
                 Role-controlled reporting scope
               </span>
             </div>
@@ -106,7 +106,7 @@ export default async function ReportsPage() {
           value={stats.passRate + "%"}
           hint="Year-to-date outcome"
           icon={<CheckCircle2 className="h-5 w-5" />}
-          tone="teal"
+          tone="emerald"
           progress={stats.passRate}
         />
         <ReportMetricCard
@@ -114,21 +114,21 @@ export default async function ReportsPage() {
           value={stats.monthlyInspections}
           hint="Completed this month"
           icon={<ClipboardCheck className="h-5 w-5" />}
-          tone="navy"
+          tone="blue"
         />
         <ReportMetricCard
           label="Pending re-inspections"
           value={stats.pendingReinspections}
           hint="Awaiting follow-up"
           icon={<RefreshCcw className="h-5 w-5" />}
-          tone="amber"
+          tone="orange"
         />
         <ReportMetricCard
           label="Compliance score"
           value={stats.complianceRate + "%"}
           hint="Fleet policy alignment"
           icon={<ShieldCheck className="h-5 w-5" />}
-          tone="indigo"
+          tone="violet"
           progress={stats.complianceRate}
         />
       </section>
@@ -144,7 +144,7 @@ export default async function ReportsPage() {
             icon={<Activity className="h-5 w-5" />}
             title="Annual outcome trend"
             description="Monthly pass, fail and conditional inspection outcomes"
-            accent="teal"
+            accent="emerald"
           >
             <TrendChart data={trend as any} />
           </AnalyticsPanel>
@@ -152,7 +152,7 @@ export default async function ReportsPage() {
             icon={<Building2 className="h-5 w-5" />}
             title="Station comparison"
             description="Total inspection outcomes by operating station"
-            accent="navy"
+            accent="blue"
           >
             <StationChart data={stations as any} />
           </AnalyticsPanel>
@@ -170,7 +170,7 @@ export default async function ReportsPage() {
             icon={<BarChart3 className="h-5 w-5" />}
             title="Transporter performance"
             description="Leading transporters ranked by inspection outcome"
-            accent="indigo"
+            accent="violet"
           >
             <TransporterChart data={transportersPerf as any} />
           </AnalyticsPanel>
@@ -186,7 +186,7 @@ export default async function ReportsPage() {
             icon={<UsersRound className="h-5 w-5" />}
             title="Inspector productivity"
             description="Completed inspection outcomes by inspector"
-            accent="navy"
+            accent="cyan"
           >
             <InspectorChart data={inspectors as any} />
           </AnalyticsPanel>
@@ -194,7 +194,7 @@ export default async function ReportsPage() {
             icon={<MapPinned className="h-5 w-5" />}
             title="Regional compliance"
             description="Pass-rate distribution across operating regions"
-            accent="teal"
+            accent="amber"
           >
             <RegionHeatMap data={regions as any} />
           </AnalyticsPanel>
@@ -231,7 +231,7 @@ export default async function ReportsPage() {
             </div>
             <div className="flex items-center gap-3">
               <Badge tone="slate">{recent.length} records</Badge>
-              <Link href="/inspections" className="text-sm font-semibold text-teal-700 transition hover:text-teal-900">View all inspections →</Link>
+              <Link href="/inspections" className="text-sm font-semibold text-blue-700 transition hover:text-indigo-800">View all inspections →</Link>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -270,7 +270,7 @@ export default async function ReportsPage() {
   );
 }
 
-type MetricTone = "teal" | "navy" | "amber" | "indigo";
+type MetricTone = "emerald" | "blue" | "orange" | "violet";
 
 function ReportMetricCard({
   label,
@@ -288,10 +288,10 @@ function ReportMetricCard({
   progress?: number;
 }) {
   const toneStyles: Record<MetricTone, { icon: string; bar: string }> = {
-    teal: { icon: "bg-teal-50 text-teal-700 ring-teal-100", bar: "bg-teal-600" },
-    navy: { icon: "bg-slate-100 text-slate-700 ring-slate-200", bar: "bg-slate-700" },
-    amber: { icon: "bg-amber-50 text-amber-700 ring-amber-100", bar: "bg-amber-500" },
-    indigo: { icon: "bg-indigo-50 text-indigo-700 ring-indigo-100", bar: "bg-indigo-600" },
+    emerald: { icon: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "bg-gradient-to-r from-emerald-500 to-teal-400" },
+    blue: { icon: "bg-blue-50 text-blue-700 ring-blue-200", bar: "bg-gradient-to-r from-blue-600 to-cyan-400" },
+    orange: { icon: "bg-orange-50 text-orange-700 ring-orange-200", bar: "bg-gradient-to-r from-amber-400 to-orange-500" },
+    violet: { icon: "bg-violet-50 text-violet-700 ring-violet-200", bar: "bg-gradient-to-r from-violet-600 to-fuchsia-500" },
   };
   const styles = toneStyles[tone];
   const safeProgress = progress === undefined ? undefined : Math.max(0, Math.min(100, progress));
@@ -326,7 +326,7 @@ function SectionHeading({ eyebrow, title, description }: { eyebrow: string; titl
   return (
     <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-700">{eyebrow}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-700">{eyebrow}</p>
         <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">{title}</h2>
       </div>
       <p className="max-w-2xl text-sm leading-6 text-slate-500">{description}</p>
@@ -334,7 +334,7 @@ function SectionHeading({ eyebrow, title, description }: { eyebrow: string; titl
   );
 }
 
-type PanelAccent = "teal" | "navy" | "indigo" | "rose";
+type PanelAccent = "emerald" | "blue" | "violet" | "rose" | "cyan" | "amber";
 
 function AnalyticsPanel({
   icon,
@@ -350,10 +350,12 @@ function AnalyticsPanel({
   children: ReactNode;
 }) {
   const accents: Record<PanelAccent, string> = {
-    teal: "bg-teal-50 text-teal-700 ring-teal-100",
-    navy: "bg-slate-100 text-slate-700 ring-slate-200",
-    indigo: "bg-indigo-50 text-indigo-700 ring-indigo-100",
-    rose: "bg-rose-50 text-rose-700 ring-rose-100",
+    emerald: "bg-gradient-to-br from-emerald-50 to-teal-100 text-emerald-700 ring-emerald-200",
+    blue: "bg-gradient-to-br from-blue-50 to-cyan-100 text-blue-700 ring-blue-200",
+    violet: "bg-gradient-to-br from-violet-50 to-fuchsia-100 text-violet-700 ring-violet-200",
+    rose: "bg-gradient-to-br from-rose-50 to-pink-100 text-rose-700 ring-rose-200",
+    cyan: "bg-gradient-to-br from-cyan-50 to-sky-100 text-cyan-700 ring-cyan-200",
+    amber: "bg-gradient-to-br from-amber-50 to-orange-100 text-amber-700 ring-amber-200",
   };
 
   return (
