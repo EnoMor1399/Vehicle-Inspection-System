@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { RELEASE_VERSION } from "@/lib/version";
 import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export async function GET() {
       {
         status: "healthy",
         timestamp: new Date().toISOString(),
-        version: process.env.APP_VERSION || "2.2.0",
+        version: RELEASE_VERSION,
         responseTimeMs: Date.now() - started,
       },
       { headers: { "Cache-Control": "no-store" } }
