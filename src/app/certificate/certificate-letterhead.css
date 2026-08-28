@@ -1,5 +1,11 @@
 /* Certificate letterhead emphasis overrides.
-   Kept separate so the one-page A4 certificate layout remains stable. */
+   The certificate is sized as a real A4 sheet so screen and print preview share the same layout. */
+
+.certificate-document {
+  box-sizing: border-box;
+  width: min(100%, 210mm);
+  min-height: 297mm;
+}
 
 .cert-letterhead {
   gap: 18px;
@@ -71,6 +77,11 @@
 }
 
 @media (max-width: 760px) {
+  .certificate-document {
+    width: 100%;
+    min-height: 0;
+  }
+
   .cert-logo {
     width: 58px;
     height: 58px;
@@ -83,27 +94,135 @@
   }
 }
 
+/* Print parity: do not reflow, resize or restyle the generated certificate.
+   Only remove non-document UI and place the same A4 certificate on the paper. */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
 @media print {
-  /* Preserve one-page A4 output after increasing the letterhead. */
+  html,
+  body {
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .certificate-screen {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .certificate-document {
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 !important;
+    padding: 8mm 9mm 7mm !important;
+    overflow: hidden !important;
+    border: 1px solid #d7dee4 !important;
+    box-shadow: none !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-before: avoid-page !important;
+    break-after: avoid-page !important;
+  }
+
+  /* Keep the exact generated letterhead and title dimensions. */
   .cert-letterhead {
-    min-height: 21mm;
+    gap: 18px !important;
+    min-height: 23mm !important;
+    padding-bottom: 1mm !important;
   }
 
   .cert-logo {
-    width: 58px;
-    height: 58px;
-    flex-basis: 58px;
+    width: 64px !important;
+    height: 64px !important;
+    flex: 0 0 64px !important;
+  }
+
+  .cert-logo svg {
+    width: 46px !important;
+    height: 46px !important;
   }
 
   .cert-brand h2 {
-    font-size: 22px;
+    max-width: 108mm !important;
+    font-size: 24px !important;
+    line-height: 1.02 !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.012em !important;
   }
 
   .cert-brand p {
-    font-size: 7.9px;
+    margin-top: 4px !important;
+    font-size: 8.5px !important;
+    font-weight: 800 !important;
+  }
+
+  .cert-contact-list {
+    width: 55mm !important;
+    padding-left: 12px !important;
+  }
+
+  .cert-contact-line p {
+    font-size: 6.9px !important;
+    font-weight: 700 !important;
+  }
+
+  .cert-top-rule {
+    margin-top: 0.5mm !important;
+    margin-bottom: 1.6mm !important;
+  }
+
+  .cert-top-rule p {
+    font-size: 7px !important;
+    font-weight: 900 !important;
+  }
+
+  .cert-title {
+    margin-bottom: 1.7mm !important;
   }
 
   .cert-title h1 {
-    font-size: 21px;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  .cert-title p {
+    font-weight: 700 !important;
+  }
+
+  .certificate-document,
+  .certificate-document *,
+  .certificate-document::before {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .cert-letterhead,
+  .cert-main-band,
+  .cert-checklist-summary,
+  .cert-lower-grid,
+  .cert-authorization-row,
+  .cert-footer {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }
