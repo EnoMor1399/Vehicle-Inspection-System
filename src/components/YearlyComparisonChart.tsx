@@ -23,7 +23,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-5 min-w-[280px]">
         <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
           <div>
-            <p className="text-lg font-bold text-slate-900">{label}</p>
+            <p className="text-base font-semibold text-slate-900">{label}</p>
             <p className="text-xs text-slate-500">Annual Performance Summary</p>
           </div>
           <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -148,7 +148,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
             cx={x + width / 2}
             cy={y - 8}
             r={4}
-            fill="#f59e0b"
+            fill="#d97706"
             stroke="#fff"
             strokeWidth={2}
           />
@@ -162,7 +162,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
       {/* Summary Statistics */}
       {showStats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 border border-emerald-200">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               <p className="text-xs text-emerald-700 font-medium">Total Passed</p>
@@ -171,7 +171,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
             <p className="text-xs text-emerald-600 mt-1">{avgPassRate}% avg pass rate</p>
           </div>
 
-          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <XCircle className="h-4 w-4 text-red-600" />
               <p className="text-xs text-red-700 font-medium">Total Failed</p>
@@ -180,18 +180,18 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
             <p className="text-xs text-red-600 mt-1">Requires attention</p>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
-              <Award className="h-4 w-4 text-blue-600" />
-              <p className="text-xs text-blue-700 font-medium">Pass Rate Trend</p>
+              <Award className="h-4 w-4 text-indigo-600" />
+              <p className="text-xs text-indigo-700 font-medium">Pass Rate Trend</p>
             </div>
             <p className={`text-2xl font-bold ${passRateTrend >= 0 ? "text-emerald-600" : "text-red-600"}`}>
               {passRateTrend >= 0 ? "+" : ""}{passRateTrend}%
             </p>
-            <p className="text-xs text-blue-600 mt-1">Since {earliestYear.year}</p>
+            <p className="text-xs text-indigo-600 mt-1">Since {earliestYear.year}</p>
           </div>
 
-          <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 border border-amber-200">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <BarChart3 className="h-4 w-4 text-amber-600" />
               <p className="text-xs text-amber-700 font-medium">Volume Growth</p>
@@ -205,10 +205,10 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
       )}
 
       {/* Main Chart */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <Calendar className="h-5 w-5 text-amber-600" />
               Year-over-Year Performance
             </h3>
@@ -230,7 +230,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
               <span className="text-slate-600">Conditional</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-6 h-0.5 bg-blue-500" />
+              <div className="w-6 h-0.5 bg-indigo-600" />
               <span className="text-slate-600">Pass Rate %</span>
             </div>
           </div>
@@ -240,15 +240,15 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
           <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <defs>
               <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#0f766e" stopOpacity={1} />
+                <stop offset="100%" stopColor="#14b8a6" stopOpacity={0.8} />
               </linearGradient>
               <linearGradient id="failGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
-                <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#dc5a5a" stopOpacity={1} />
+                <stop offset="100%" stopColor="#be123c" stopOpacity={0.8} />
               </linearGradient>
               <linearGradient id="conditionalGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity={1} />
+                <stop offset="0%" stopColor="#d97706" stopOpacity={1} />
                 <stop offset="100%" stopColor="#d97706" stopOpacity={0.8} />
               </linearGradient>
             </defs>
@@ -275,21 +275,21 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 11, fill: "#3b82f6" }}
-              axisLine={{ stroke: "#3b82f6" }}
-              tickLine={{ stroke: "#3b82f6" }}
+              tick={{ fontSize: 11, fill: "#4f46e5" }}
+              axisLine={{ stroke: "#4f46e5" }}
+              tickLine={{ stroke: "#4f46e5" }}
               domain={[0, 100]}
               label={{
                 value: "Pass Rate %",
                 angle: 90,
                 position: "insideRight",
-                style: { fontSize: 12, fill: "#3b82f6" },
+                style: { fontSize: 12, fill: "#4f46e5" },
               }}
             />
 
             <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f1f5f9", opacity: 0.5 }} />
 
-            <ReferenceLine yAxisId="right" y={80} stroke="#10b981" strokeDasharray="5 5" opacity={0.3} />
+            <ReferenceLine yAxisId="right" y={80} stroke="#0f766e" strokeDasharray="5 5" opacity={0.3} />
 
             <Bar yAxisId="left" dataKey="pass" fill="url(#passGradient)" stackId="stack" name="Passed">
               {data.map((entry, index) => (
@@ -311,17 +311,17 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
               yAxisId="right"
               type="monotone"
               dataKey="passRate"
-              stroke="#3b82f6"
+              stroke="#4f46e5"
               strokeWidth={3}
               dot={{
-                fill: "#3b82f6",
+                fill: "#4f46e5",
                 r: 6,
                 stroke: "#fff",
                 strokeWidth: 2,
               }}
               activeDot={{
                 r: 8,
-                fill: "#3b82f6",
+                fill: "#4f46e5",
                 stroke: "#fff",
                 strokeWidth: 3,
               }}
@@ -332,7 +332,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
       </div>
 
       {/* Year Details Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
           <h3 className="font-bold text-slate-900 flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-amber-600" />
