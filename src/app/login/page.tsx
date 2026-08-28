@@ -1,6 +1,3 @@
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { sql } from "drizzle-orm";
 import { AuthForm } from "./AuthForm";
 import { getSettings } from "@/lib/settings";
 import { CheckCircle2, ClipboardCheck, QrCode, ShieldCheck } from "lucide-react";
@@ -9,11 +6,7 @@ import type { ReactNode } from "react";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const [[userCount], settings] = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(users),
-    getSettings(),
-  ]);
-  const hasUsers = (userCount?.n || 0) > 0;
+  const settings = await getSettings();
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#eef2f6] p-3 sm:p-6 lg:p-8">
@@ -93,7 +86,7 @@ export default async function LoginPage() {
               </div>
             </div>
 
-            <AuthForm hasUsers={hasUsers} showDemoAccounts={process.env.NODE_ENV !== "production"} />
+            <AuthForm />
 
             <p className="mt-7 text-center text-[11px] leading-5 text-slate-400">
               By signing in, you are accessing a controlled business system. Activity may be logged for security and audit purposes.
