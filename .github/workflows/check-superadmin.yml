@@ -1,0 +1,44 @@
+name: Check production Super Admin
+
+on:
+  push:
+    branches:
+      - ops/check-superadmin
+    paths:
+      - '.github/workflows/check-superadmin.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Query Super Admin accounts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const { Client } = pg;
+          if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL secret is missing');
+          const client = new Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          const result = await client.query(`
+            select name, email, is_active
+            from users
+            where role = 'super_admin'
+            order by created_at asc
+          `);
+          console.log('SUPER_ADMIN_COUNT=' + result.rowCount);
+          for (const row of result.rows) {
+            console.log(`SUPER_ADMIN name=${row.name} email=${row.email} active=${row.is_active}`);
+          }
+          await client.end();
+          NODE
