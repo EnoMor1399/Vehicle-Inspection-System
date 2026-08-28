@@ -148,7 +148,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
             cx={x + width / 2}
             cy={y - 8}
             r={4}
-            fill="#d97706"
+            fill="#f59e0b"
             stroke="#fff"
             strokeWidth={2}
           />
@@ -205,7 +205,7 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
       )}
 
       {/* Main Chart */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-6">
+      <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/70 via-white to-violet-50/70 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -240,16 +240,16 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
           <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <defs>
               <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0f766e" stopOpacity={1} />
-                <stop offset="100%" stopColor="#14b8a6" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                <stop offset="100%" stopColor="#34d399" stopOpacity={0.8} />
               </linearGradient>
               <linearGradient id="failGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#dc5a5a" stopOpacity={1} />
-                <stop offset="100%" stopColor="#be123c" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#f43f5e" stopOpacity={1} />
+                <stop offset="100%" stopColor="#e11d48" stopOpacity={0.8} />
               </linearGradient>
               <linearGradient id="conditionalGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#d97706" stopOpacity={1} />
-                <stop offset="100%" stopColor="#d97706" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity={1} />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.8} />
               </linearGradient>
             </defs>
 
@@ -275,21 +275,21 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 11, fill: "#4f46e5" }}
-              axisLine={{ stroke: "#4f46e5" }}
-              tickLine={{ stroke: "#4f46e5" }}
+              tick={{ fontSize: 11, fill: "#2563eb" }}
+              axisLine={{ stroke: "#2563eb" }}
+              tickLine={{ stroke: "#2563eb" }}
               domain={[0, 100]}
               label={{
                 value: "Pass Rate %",
                 angle: 90,
                 position: "insideRight",
-                style: { fontSize: 12, fill: "#4f46e5" },
+                style: { fontSize: 12, fill: "#2563eb" },
               }}
             />
 
             <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f1f5f9", opacity: 0.5 }} />
 
-            <ReferenceLine yAxisId="right" y={80} stroke="#0f766e" strokeDasharray="5 5" opacity={0.3} />
+            <ReferenceLine yAxisId="right" y={80} stroke="#10b981" strokeDasharray="5 5" opacity={0.3} />
 
             <Bar yAxisId="left" dataKey="pass" fill="url(#passGradient)" stackId="stack" name="Passed">
               {data.map((entry, index) => (
@@ -311,17 +311,17 @@ export function YearlyComparisonChart({ data, showStats = true }: YearlyComparis
               yAxisId="right"
               type="monotone"
               dataKey="passRate"
-              stroke="#4f46e5"
+              stroke="#2563eb"
               strokeWidth={3}
               dot={{
-                fill: "#4f46e5",
+                fill: "#2563eb",
                 r: 6,
                 stroke: "#fff",
                 strokeWidth: 2,
               }}
               activeDot={{
                 r: 8,
-                fill: "#4f46e5",
+                fill: "#2563eb",
                 stroke: "#fff",
                 strokeWidth: 3,
               }}
