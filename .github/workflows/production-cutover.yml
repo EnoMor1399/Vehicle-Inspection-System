@@ -1,0 +1,55 @@
+name: Production account cutover
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type RESET_OPERATIONAL_DATA:morganenoch1@gmail.com"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-account-cutover
+  cancel-in-progress: false
+
+jobs:
+  cutover:
+    name: Reset operational data and create Super Administrator
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Validate confirmation
+        shell: bash
+        run: |
+          if [[ "$RESET_CONFIRMATION" != "RESET_OPERATIONAL_DATA:morganenoch1@gmail.com" ]]; then
+            echo "Confirmation does not match the required production cutover phrase."
+            exit 1
+          fi
+        env:
+          RESET_CONFIRMATION: ${{ inputs.confirmation }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run guarded production cutover
+        run: node scripts/reset-production-data.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPER_ADMIN_NAME: Enoch Morgan
+          SUPER_ADMIN_EMAIL: morganenoch1@gmail.com
+          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
+          RESET_CONFIRMATION: ${{ inputs.confirmation }}
+          PASSWORD_BCRYPT_ROUNDS: "12"
