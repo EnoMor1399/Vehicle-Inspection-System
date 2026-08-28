@@ -7,7 +7,7 @@ import { Eye, EyeOff, Mail, Lock, User, Shield, Phone, AlertCircle, Loader2, Key
 
 type Mode = "login" | "signup";
 
-export function AuthForm({ hasUsers, showDemoAccounts = false }: { hasUsers: boolean; showDemoAccounts?: boolean }) {
+export function AuthForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
@@ -64,14 +64,6 @@ export function AuthForm({ hasUsers, showDemoAccounts = false }: { hasUsers: boo
         setError(err.message || "An unexpected error occurred");
       }
     });
-  }
-
-  function fillDemo(email: string) {
-    setEmail(email);
-    setPassword("Demo-Only@2026!");
-    setMode("login");
-    setError(null);
-    setFieldError(null);
   }
 
   return (
@@ -313,33 +305,6 @@ export function AuthForm({ hasUsers, showDemoAccounts = false }: { hasUsers: boo
         )}
       </form>
 
-      {/* Demo credentials */}
-      {hasUsers && showDemoAccounts && (
-        <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-slate-200">
-          <p className="text-xs sm:text-sm uppercase tracking-wider text-slate-500 font-semibold mb-3 sm:mb-4">
-            Demo Accounts <span className="text-slate-400 font-normal normal-case">(password: Demo-Only@2026!)</span>
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-            <DemoButton label="Super Admin" email="ceo@rsl.gh" onClick={fillDemo} />
-            <DemoButton label="Inspector" email="john@rsl.gh" onClick={fillDemo} />
-            <DemoButton label="Supervisor" email="grace@rsl.gh" onClick={fillDemo} />
-            <DemoButton label="Auditor" email="nana@rsl.gh" onClick={fillDemo} />
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-function DemoButton({ label, email, onClick }: { label: string; email: string; onClick: (email: string) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onClick(email)}
-      className="text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition active:scale-95"
-    >
-      <p className="text-sm sm:text-base font-semibold text-slate-900">{label}</p>
-      <p className="text-xs sm:text-sm text-slate-500 font-mono mt-0.5">{email}</p>
-    </button>
   );
 }
