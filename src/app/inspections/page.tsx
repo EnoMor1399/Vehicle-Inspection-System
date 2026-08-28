@@ -1,9 +1,7 @@
 import { db } from "@/db";
 import { inspections, vehicles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import Link from "next/link";
-import { PageHeader, Button } from "@/components/ui";
-import { Plus } from "lucide-react";
+import { PageHeader } from "@/components/ui";
 import { canManageInspections } from "@/lib/auth";
 import { requireInternalUser } from "@/lib/require-auth";
 import { InspectionsList } from "./InspectionsList";
@@ -36,18 +34,9 @@ export default async function InspectionsPage() {
         eyebrow="Inspections"
         title="Vehicle Inspections"
         description="16-section checklist covering documentation, brakes, emissions and final decision."
-        action={
-          editable ? (
-            <Link href="/inspections/new">
-              <Button>
-                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Inspection</span><span className="sm:hidden">New</span>
-              </Button>
-            </Link>
-          ) : undefined
-        }
       />
 
-      <InspectionsList rows={rows} />
+      <InspectionsList rows={rows} canCreate={editable} />
     </div>
   );
 }
