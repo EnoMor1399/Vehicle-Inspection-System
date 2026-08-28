@@ -216,12 +216,6 @@ export async function submitImport(input: {
         continue;
       }
 
-      const capacity = intOrNull(row.capacity);
-      if (row.capacity && (capacity === null || capacity < 0)) {
-        errors.push({ row: rowNumber, field: "capacity", message: "Capacity must be a non-negative whole number" });
-        continue;
-      }
-
       if (row.source_reference) {
         const sourceKey = `${registration}|${parsedDate.dateOnly}|${row.source_reference.toLowerCase()}`;
         if (seenSourceRefs.has(sourceKey)) {
@@ -253,7 +247,7 @@ export async function submitImport(input: {
           criticalDefects: [],
           driverSignature: null,
           clearedForTrip,
-          notes: buildPreTripNotes({ ...row, capacity: capacity === null ? "" : String(capacity) }),
+          notes: buildPreTripNotes(row),
         },
       });
     }
