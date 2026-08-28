@@ -1,51 +1,117 @@
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { AuthForm } from "./AuthForm";
+import { getSettings } from "@/lib/settings";
+import { CheckCircle2, ClipboardCheck, QrCode, ShieldCheck } from "lucide-react";
+import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  // Check if any users exist; if not, suggest seeding first
-  const [userCount] = await db.select({ n: sql<number>`count(*)::int` }).from(users);
+  const [[userCount], settings] = await Promise.all([
+    db.select({ n: sql<number>`count(*)::int` }).from(users),
+    getSettings(),
+  ]);
   const hasUsers = (userCount?.n || 0) > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 sm:p-6 md:p-8">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-0 bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[95vh] sm:max-h-none overflow-y-auto lg:overflow-y-visible">
-        {/* Left - Branding */}
-        <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 sm:p-8 lg:p-12 flex flex-col justify-between min-h-[200px] sm:min-h-[300px] lg:min-h-[640px]">
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: "radial-gradient(circle at 20% 30%, rgba(3,151,3,0.7) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(2,107,2,0.5) 0%, transparent 50%)"
-          }} />
+    <div className="relative min-h-screen overflow-hidden bg-[#eef2f6] p-3 sm:p-6 lg:p-8">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-slate-900/10 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto grid min-h-[calc(100vh-3rem)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.16)] lg:grid-cols-[0.92fr_1.08fr]">
+        <section className="relative hidden overflow-hidden bg-[#0b1525] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-12">
+          <div
+            className="absolute inset-x-0 top-0 h-1"
+            style={{ background: `linear-gradient(90deg, ${settings.themeColor}, ${settings.accentColor || settings.themeColor})` }}
+          />
+          <div className="pointer-events-none absolute inset-0 opacity-40" aria-hidden="true">
+            <div className="absolute -right-20 top-24 h-72 w-72 rounded-full border border-white/10" />
+            <div className="absolute -right-8 top-36 h-48 w-48 rounded-full border border-white/10" />
+            <div className="absolute bottom-0 left-0 h-56 w-56 bg-[radial-gradient(circle_at_bottom_left,rgba(16,185,129,.12),transparent_68%)]" />
+          </div>
+
           <div className="relative z-10">
-            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 lg:mb-8">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl grid place-items-center shadow-lg" style={{ background: "linear-gradient(135deg, #039703, #026b02)" }}>
-                <svg className="h-6 w-6 sm:h-7 sm:w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-base sm:text-lg font-bold">Road Safety Limited</p>
-                <p className="text-xs text-slate-300">Vehicle Inspection Management System</p>
+            <div className="flex items-center gap-3">
+              {settings.logoDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.logoDataUrl} alt={settings.companyName} className="h-12 w-12 rounded-xl bg-white object-contain p-1.5" />
+              ) : (
+                <div
+                  className="grid h-12 w-12 place-items-center rounded-xl shadow-lg"
+                  style={{ background: `linear-gradient(135deg, ${settings.themeColor}, ${settings.accentColor || settings.themeColor})` }}
+                >
+                  <ShieldCheck className="h-7 w-7" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{settings.companyName}</p>
+                <p className="mt-0.5 text-xs text-slate-400">{settings.tagline || "Vehicle Inspection Management System"}</p>
               </div>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
-              Enterprise-grade<br />
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(90deg, #039703, #026b02)" }}>
-                vehicle inspection
-              </span><br />
-              management
-            </h1>
-          </div>
-        </div>
+            <div className="mt-20 max-w-md">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Enterprise operations</p>
+              <h1 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-white xl:text-5xl">
+                Controlled inspection operations in one secure workspace.
+              </h1>
+              <p className="mt-5 max-w-sm text-sm leading-6 text-slate-300">
+                Manage vehicle records, inspections, approvals, certificates, compliance reporting, and audit history with clear operational controls.
+              </p>
+            </div>
 
-        {/* Right - Auth Form */}
-        <div className="p-5 sm:p-6 md:p-8 lg:p-12 flex flex-col justify-center">
-          <AuthForm hasUsers={hasUsers} showDemoAccounts={process.env.NODE_ENV !== "production"} />
-        </div>
+            <div className="mt-10 grid gap-3">
+              <Feature icon={<ClipboardCheck className="h-4 w-4" />} title="Structured inspection workflow" text="From inspection capture through review and authorization." />
+              <Feature icon={<QrCode className="h-4 w-4" />} title="Signed certificate verification" text="QR-based certificate validation with controlled status checks." />
+              <Feature icon={<CheckCircle2 className="h-4 w-4" />} title="Auditable administration" text="Roles, security events, approvals, and operational history." />
+            </div>
+          </div>
+
+          <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-5 text-[11px] text-slate-500">
+            <span>VIMS Enterprise</span>
+            <span>Authorized access only</span>
+          </div>
+        </section>
+
+        <section className="flex items-center justify-center px-5 py-8 sm:px-8 sm:py-10 lg:px-12 xl:px-16">
+          <div className="w-full max-w-lg">
+            <div className="mb-8 flex items-center gap-3 lg:hidden">
+              {settings.logoDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.logoDataUrl} alt={settings.companyName} className="h-11 w-11 rounded-xl border border-slate-200 bg-white object-contain p-1.5" />
+              ) : (
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-slate-950">{settings.companyName}</p>
+                <p className="text-xs text-slate-500">Secure VIMS access</p>
+              </div>
+            </div>
+
+            <AuthForm hasUsers={hasUsers} showDemoAccounts={process.env.NODE_ENV !== "production"} />
+
+            <p className="mt-7 text-center text-[11px] leading-5 text-slate-400">
+              By signing in, you are accessing a controlled business system. Activity may be logged for security and audit purposes.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">{icon}</div>
+      <div>
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-400">{text}</p>
       </div>
     </div>
   );

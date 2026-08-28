@@ -128,7 +128,7 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
           <button
             type="button"
             onClick={() => setShowMenu(!showMenu)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-xs text-slate-600 hover:border-amber-500 hover:text-amber-700 hover:bg-amber-50 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-xs text-slate-600 hover:border-[var(--brand-color)] hover:text-[var(--brand-accent)] hover:bg-emerald-50/40 transition"
           >
             <Camera className="h-3.5 w-3.5" />
             Add Photo ({value.length}/{maxPhotos})

@@ -1,10 +1,18 @@
 "use client";
 
-import { ArrowLeft, Printer, Share2, Download, ExternalLink, Copy, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Printer, Share2, ExternalLink, Copy, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-export function CertificateToolbar({ inspectionId, verifyUrl }: { inspectionId: string; verifyUrl: string }) {
+export function CertificateToolbar({
+  inspectionId,
+  vehicleRegistration,
+  verifyUrl,
+}: {
+  inspectionId: string;
+  vehicleRegistration?: string;
+  verifyUrl: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function copyUrl() {
@@ -13,50 +21,56 @@ export function CertificateToolbar({ inspectionId, verifyUrl }: { inspectionId: 
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore
+      // ignore clipboard failures
     }
   }
 
   function share() {
     if (navigator.share) {
-      navigator.share({
-        title: "Vehicle Inspection Certificate",
-        text: "View the inspection certificate",
-        url: verifyUrl,
-      }).catch(() => {});
+      navigator
+        .share({
+          title: vehicleRegistration
+            ? `Vehicle Inspection Certificate — ${vehicleRegistration}`
+            : "Vehicle Inspection Certificate",
+          text: "View and verify this vehicle inspection certificate.",
+          url: verifyUrl,
+        })
+        .catch(() => {});
     } else {
       copyUrl();
     }
   }
 
-  function downloadPdf() {
-    // Trigger print dialog — user can "Save as PDF"
+  function printCertificate() {
     window.print();
   }
 
   return (
-    <div className="no-print sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+    <div className="no-print sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur shadow-sm">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href={`/inspections/${inspectionId}`}
-            className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to inspection
           </Link>
-          <div className="h-4 w-px bg-slate-300" />
-          <p className="text-sm font-medium text-slate-900">Certificate Preview</p>
+          <div className="hidden h-4 w-px bg-slate-300 sm:block" />
+          <p className="truncate text-sm font-semibold text-slate-900">
+            Certificate Preview{vehicleRegistration ? ` • ${vehicleRegistration}` : ""}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-50 ring-1 ring-slate-200 text-xs">
-            <ExternalLink className="h-3 w-3 text-slate-400" />
-            <span className="font-mono text-slate-600 max-w-[200px] truncate">{verifyUrl}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex max-w-[320px] items-center gap-1 rounded-lg bg-slate-50 px-3 py-1.5 text-xs ring-1 ring-slate-200">
+            <ExternalLink className="h-3 w-3 shrink-0 text-slate-400" />
+            <span className="truncate font-mono text-slate-600">{verifyUrl}</span>
             <button
               onClick={copyUrl}
-              className="ml-1 p-1 rounded hover:bg-slate-200 text-slate-500"
-              title="Copy URL"
+              className="ml-1 rounded p-1 text-slate-500 hover:bg-slate-200"
+              title="Copy verification URL"
+              type="button"
             >
               {copied ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
             </button>
@@ -64,15 +78,17 @@ export function CertificateToolbar({ inspectionId, verifyUrl }: { inspectionId: 
 
           <button
             onClick={share}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white ring-1 ring-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 transition hover:bg-slate-50"
           >
             <Share2 className="h-4 w-4" />
             Share
           </button>
 
           <button
-            onClick={downloadPdf}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
+            onClick={printCertificate}
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             <Printer className="h-4 w-4" />
             Print / Save PDF

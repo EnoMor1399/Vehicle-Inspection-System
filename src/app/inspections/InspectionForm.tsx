@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { createInspection, type InspectionFormData } from "./server";
 import { useRouter, useSearchParams } from "next/navigation";
-import { INSPECTION_SECTIONS, buildDefaultSectionData, summarizeSection } from "@/lib/sections";
+import { buildDefaultSectionData, summarizeSection } from "@/lib/sections";
 import { SignaturePad } from "@/components/SignaturePad";
 import { PhotoCapture, DocumentUpload, type Photo } from "@/components/PhotoCapture";
 import { GpsCapture } from "@/components/GpsCapture";
@@ -31,7 +31,6 @@ export function InspectionForm({
   const [vehicleId, setVehicleId] = useState(initialVehicle);
   const [inspectionDate, setInspectionDate] = useState(() => new Date().toISOString().slice(0, 16));
   const [inspectorName, setInspectorName] = useState(currentUser.name);
-  const [supervisorName, setSupervisorName] = useState("");
   const [station, setStation] = useState("Accra Central Station");
   const [odometer, setOdometer] = useState("");
   const [serviceBrake, setServiceBrake] = useState("");
@@ -41,12 +40,10 @@ export function InspectionForm({
   const [opacity, setOpacity] = useState("");
   const [overallResult, setOverallResult] = useState<InspectionFormData["overallResult"]>("pass");
   const [inspectorRemarks, setInspectorRemarks] = useState("");
-  const [supervisorRemarks, setSupervisorRemarks] = useState("");
   const [nextDate, setNextDate] = useState("");
   const [reinspectDate, setReinspectDate] = useState("");
   const [templateType, setTemplateType] = useState("bus");
   const [inspectorSig, setInspectorSig] = useState("");
-  const [supervisorSig, setSupervisorSig] = useState("");
   const [attachedDocuments, setAttachedDocuments] = useState<InspectionDocument[]>([]);
   const [gpsLocation, setGpsLocation] = useState<{ latitude: number; longitude: number; accuracy: number; timestamp: string } | null>(null);
   const [sections, setSections] = useState<SectionForm[]>(() => buildDefaultSectionData() as SectionForm[]);
@@ -91,7 +88,6 @@ export function InspectionForm({
       vehicleId,
       inspectionDate: new Date(inspectionDate).toISOString(),
       inspectorName,
-      supervisorName,
       station,
       odometerReading: odometer,
       sectionData: sections as InspectionSectionData[],
@@ -102,12 +98,10 @@ export function InspectionForm({
       opacityTest: opacity,
       overallResult,
       inspectorRemarks,
-      supervisorRemarks,
       nextInspectionDate: nextDate,
       reinspectionDate: reinspectDate,
       templateType,
       inspectorSignature: inspectorSig,
-      supervisorSignature: supervisorSig,
       attachedDocuments,
     };
     startTransition(async () => {
@@ -192,9 +186,9 @@ export function InspectionForm({
             <Field label="Inspector Name" required>
               <TextInput value={inspectorName} onChange={(e) => setInspectorName(e.target.value)} />
             </Field>
-            <Field label="Supervisor Name">
-              <TextInput value={supervisorName} onChange={(e) => setSupervisorName(e.target.value)} />
-            </Field>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Supervisor authorization is completed after submission by an authorized approver, preserving separation of duties.
+            </div>
             <Field label="Inspection Station" required>
               <TextInput value={station} onChange={(e) => setStation(e.target.value)} />
             </Field>
@@ -339,7 +333,6 @@ export function InspectionForm({
               <Field label="Next Inspection Date"><TextInput type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} /></Field>
               <Field label="Re-inspection Date"><TextInput type="date" value={reinspectDate} onChange={(e) => setReinspectDate(e.target.value)} /></Field>
               <div className="md:col-span-2"><Field label="Inspector Remarks"><TextArea rows={3} value={inspectorRemarks} onChange={(e) => setInspectorRemarks(e.target.value)} /></Field></div>
-              <div className="md:col-span-2"><Field label="Supervisor Remarks"><TextArea rows={3} value={supervisorRemarks} onChange={(e) => setSupervisorRemarks(e.target.value)} /></Field></div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-slate-200">
@@ -354,9 +347,11 @@ export function InspectionForm({
               />
             </div>
 
-            <div className="mt-6 pt-6 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-6 pt-6 border-t border-slate-200">
               <SignaturePad label="Inspector Digital Signature" value={inspectorSig} onChange={setInspectorSig} />
-              <SignaturePad label="Supervisor Digital Signature" value={supervisorSig} onChange={setSupervisorSig} />
+              <p className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800 ring-1 ring-blue-100">
+                Supervisor approval and signature are captured on the inspection review screen after the inspector submits this record.
+              </p>
             </div>
           </Card>
         )}

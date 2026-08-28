@@ -1,14 +1,14 @@
-import { requireAuth } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { BarChart3, CheckCircle2, Database, Key, Link2, Shield, Code, Download } from "lucide-react";
 import { CopyButton } from "./CopyButton";
 
 export const dynamic = "force-dynamic";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vims.rsl.gh";
+const BASE_URL = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "") || "https://your-vims-domain.example";
 
 export default async function PowerBiPage() {
-  await requireAuth();
+  await requirePermission("reports");
 
   return (
     <div className="p-6 lg:p-10">

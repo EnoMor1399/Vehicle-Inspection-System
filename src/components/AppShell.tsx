@@ -2,57 +2,88 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
-
-// Pages that don't use the sidebar (public/auth pages)
-const NO_SHELL_PATHS = ["/login"];
-import {
-  LayoutDashboard,
-  Truck,
-  Car,
-  ClipboardCheck,
-  ScrollText,
-  ShieldCheck,
-  Menu,
-  X,
-  MapPin,
-  Users,
-  Bell,
-  Upload,
-  FileBarChart,
-  LogOut,
-  FileText,
-  Radio,
-  Activity,
-  Smartphone,
-  Settings as SettingsIcon,
-  BarChart3,
-  CalendarCheck,
-  BookOpen,
-} from "lucide-react";
+import type { ComponentType, ReactNode } from "react";
 import { useState } from "react";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CalendarCheck,
+  Car,
+  ChevronRight,
+  ClipboardCheck,
+  FileBarChart,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
+  Menu,
+  Radio,
+  ScrollText,
+  Settings as SettingsIcon,
+  ShieldCheck,
+  Smartphone,
+  Truck,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
 
-const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transporters", label: "Transporters", icon: Truck },
-  { href: "/vehicles", label: "Vehicles", icon: Car },
-  { href: "/inspections", label: "Inspections", icon: ClipboardCheck },
-  { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck },
-  { href: "/reports", label: "Reports & Analytics", icon: FileBarChart },
-  { href: "/locations", label: "Stations", icon: MapPin },
-  { href: "/users", label: "Users & Roles", icon: Users },
-  { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/import", label: "Import / Export", icon: Upload },
-  { href: "/portal", label: "Transporter Portal", icon: Truck },
-  { href: "/rfid", label: "RFID Scanner", icon: Radio },
-  { href: "/predictive", label: "Predictive Maint.", icon: Activity },
-  { href: "/apps", label: "Get the App", icon: Smartphone },
-  { href: "/powerbi", label: "Power BI", icon: BarChart3 },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
-  { href: "/api-docs", label: "API Docs", icon: FileBarChart },
-  { href: "/audit", label: "Audit Log", icon: ScrollText },
-  { href: "/guide", label: "User Guide", icon: BookOpen },
+const NO_SHELL_PATHS = ["/login"];
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Operations",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/vehicles", label: "Vehicles", icon: Car },
+      { href: "/transporters", label: "Transporters", icon: Truck },
+      { href: "/inspections", label: "Inspections", icon: ClipboardCheck },
+      { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck },
+      { href: "/locations", label: "Stations", icon: MapPin },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { href: "/reports", label: "Reports & Analytics", icon: FileBarChart },
+      { href: "/predictive", label: "Maintenance Risk", icon: Activity },
+      { href: "/powerbi", label: "Power BI", icon: BarChart3 },
+      { href: "/rfid", label: "RFID Operations", icon: Radio },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      { href: "/users", label: "Users & Roles", icon: Users },
+      { href: "/documents", label: "Documents", icon: FileText },
+      { href: "/notifications", label: "Notifications", icon: Bell },
+      { href: "/import", label: "Import / Export", icon: Upload },
+      { href: "/settings", label: "Settings", icon: SettingsIcon },
+      { href: "/audit", label: "Audit Log", icon: ScrollText },
+    ],
+  },
+  {
+    label: "Access & Support",
+    items: [
+      { href: "/portal", label: "Transporter Portal", icon: Truck },
+      { href: "/apps", label: "App Access", icon: Smartphone },
+      { href: "/api-docs", label: "API & Integrations", icon: FileBarChart },
+      { href: "/guide", label: "User Guide", icon: BookOpen },
+    ],
+  },
 ];
 
 export interface AppBranding {
@@ -66,90 +97,181 @@ export interface AppBranding {
 
 const DEFAULT_BRANDING: AppBranding = {
   companyName: "Road Safety Limited",
-  tagline: "VIMS Enterprise",
-  footerText: "© 2026 Road Safety Limited · v2.0 Enterprise · ISO 27001",
+  tagline: "Vehicle Inspection Management System",
+  footerText: "© 2026 Road Safety Limited · VIMS Enterprise",
   themeColor: "#039703",
   accentColor: "#026b02",
 };
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || (href !== "/" && pathname.startsWith(href));
+}
 
 export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: ReactNode; branding?: AppBranding }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Don't render sidebar for auth pages or verify pages
-  if (NO_SHELL_PATHS.includes(pathname) || pathname.startsWith("/verify")) {
+  const activeContext = (() => {
+    for (const group of NAV_GROUPS) {
+      const item = group.items.find((candidate) => isActivePath(pathname, candidate.href));
+      if (item) return { group: group.label, item };
+    }
+    return null;
+  })();
+
+  if (NO_SHELL_PATHS.includes(pathname) || pathname.startsWith("/verify") || pathname.startsWith("/certificate")) {
     return <>{children}</>;
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-100">
-      {/* Sidebar */}
+    <div data-app-shell className="app-shell min-h-screen lg:flex">
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-40 w-72 bg-slate-950 text-slate-100 flex flex-col transform transition-transform ${
+        aria-label="Primary navigation"
+        className={`fixed inset-y-0 left-0 z-50 flex w-[18rem] flex-col border-r border-white/10 bg-[#0b1525] text-slate-100 shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
           open ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
+        }`}
       >
-        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3">
-          {branding.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={branding.logoUrl} alt={branding.companyName} className="h-10 w-10 rounded-xl object-contain bg-white p-0.5" />
-          ) : (
-            <div className="h-10 w-10 rounded-xl grid place-items-center" style={{ background: `linear-gradient(135deg, ${branding.themeColor}, ${branding.accentColor || "#026b02"})` }}>
-              <ShieldCheck className="h-6 w-6 text-white" />
+        <div className="border-b border-white/10 px-4 py-5">
+          <div className="flex items-center gap-3 rounded-2xl bg-white/[0.045] p-3 ring-1 ring-white/[0.06]">
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={branding.logoUrl}
+                alt={branding.companyName}
+                className="h-11 w-11 rounded-xl bg-white object-contain p-1.5 shadow-sm"
+              />
+            ) : (
+              <div
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${branding.themeColor}, ${branding.accentColor || "#026b02"})` }}
+              >
+                <ShieldCheck className="h-6 w-6 text-white" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">{branding.tagline || "Inspection Operations"}</p>
             </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-tight truncate">{branding.companyName}</p>
-            <p className="text-xs text-slate-400 leading-tight truncate">{branding.tagline}</p>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white lg:hidden"
+              aria-label="Close navigation"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button onClick={() => setOpen(false)} className="lg:hidden ml-auto p-1 rounded hover:bg-white/10">
-            <X className="h-5 w-5" />
-          </button>
+
+          <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[11px] text-slate-400">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
+              Secure workspace
+            </span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5 font-medium text-slate-300">V2.3 UI</span>
+          </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV.map((item) => {
-            const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  active ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-5 last:mb-0">
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const active = isActivePath(pathname, item.href);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={`group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                        active
+                          ? "bg-white text-slate-950 shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+                          : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
+                      }`}
+                    >
+                      {active && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-2 left-0 w-0.5 rounded-full"
+                          style={{ backgroundColor: branding.themeColor }}
+                        />
+                      )}
+                      <Icon
+                        className={`h-[18px] w-[18px] shrink-0 ${
+                          active ? "text-[var(--brand-color)]" : "text-slate-500 group-hover:text-slate-300"
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {active && <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="px-3 py-4 border-t border-white/10">
+        <div className="border-t border-white/10 p-3">
           <form action="/api/auth/logout" method="POST">
             <button
               type="submit"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-white/5 hover:text-white"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-red-500/10 hover:text-red-200"
             >
-              <LogOut className="h-5 w-5" /> Sign Out
+              <LogOut className="h-[18px] w-[18px]" />
+              Sign out securely
             </button>
           </form>
-          <div className="px-3 pt-3 text-xs text-slate-400">
-            <p className="truncate">{branding.footerText}</p>
-          </div>
+          <p className="mt-2 truncate px-3 text-[10px] text-slate-600">{branding.footerText}</p>
         </div>
       </aside>
 
-      {open && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setOpen(false)} />}
+      {open && (
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          className="fixed inset-0 z-40 bg-slate-950/65 backdrop-blur-[2px] lg:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
 
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setOpen(true)} className="p-1.5 rounded hover:bg-slate-100"><Menu className="h-5 w-5" /></button>
-          <p className="font-semibold">RSL VIMS</p>
+      <div className="min-w-0 flex-1 bg-[var(--surface-page)]">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-[1600px] items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm hover:bg-slate-50 lg:hidden"
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                <span>VIMS</span>
+                <ChevronRight className="h-3 w-3" />
+                <span className="truncate">{activeContext?.group || "Workspace"}</span>
+              </div>
+              <p className="mt-0.5 truncate text-[15px] font-semibold tracking-tight text-slate-950">
+                {activeContext?.item.label || "Vehicle Inspection Management"}
+              </p>
+            </div>
+
+            <div className="hidden items-center gap-3 md:flex">
+              <div className="h-8 w-px bg-slate-200" />
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                Protected session
+              </div>
+            </div>
+          </div>
         </header>
-        <main className="flex-1 overflow-x-hidden">{children}</main>
+
+        <main className="app-shell-content min-h-[calc(100vh-65px)] overflow-x-hidden">{children}</main>
       </div>
     </div>
   );

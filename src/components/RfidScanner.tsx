@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Radio, Scan, Loader2, Car, AlertCircle, CheckCircle2 } from "lucide-react";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Button } from "@/components/ui";
 
 export function RfidScanner() {
   const [tag, setTag] = useState("");

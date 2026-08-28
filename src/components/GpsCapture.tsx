@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MapPin, Navigation, Loader2 } from "lucide-react";
 
 interface GpsData {
@@ -74,7 +74,7 @@ export function GpsCapture({
             href={`https://www.google.com/maps?q=${value.latitude},${value.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-amber-700 hover:underline inline-flex items-center gap-1"
+            className="text-[var(--brand-accent)] hover:underline inline-flex items-center gap-1"
           >
             <MapPin className="h-3 w-3" /> View on map
           </a>

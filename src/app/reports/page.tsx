@@ -10,17 +10,18 @@ import {
 import { YearlyComparisonChart } from "@/components/YearlyComparisonChart";
 import { db } from "@/db";
 import { inspections, vehicles, transporters, locations } from "@/db/schema";
-import { sql, eq, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { formatDate } from "@/lib/utils";
 import { FileBarChart } from "lucide-react";
 import Link from "next/link";
-import { getCurrentUser, canViewReports, ROLE_LABEL } from "@/lib/auth";
+import { canViewReports } from "@/lib/auth";
+import { requireInternalUser } from "@/lib/require-auth";
 import { ReportsActions } from "./ReportsActions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const user = await getCurrentUser();
+  const user = await requireInternalUser();
   if (!canViewReports(user)) {
     return (
       <div className="p-10"><Card className="p-8"><p className="text-slate-700">You do not have permission to view reports.</p></Card></div>
@@ -58,23 +59,18 @@ export default async function ReportsPage() {
       <PageHeader
         eyebrow="Analytics & Reporting"
         title="Reports & Analytics"
-        description="Interactive dashboards, exportable reports, and scheduled summaries. Drill down into any KPI or export to PDF/Excel/CSV."
+        description="Operational analytics and exportable reporting based on the records available to your role. Export current report data to PDF, Excel, or CSV."
         action={
           <ReportsActions recentData={recent} stats={stats} />
         }
       />
 
-      <div className="rounded-xl bg-white ring-1 ring-slate-200 p-4 mb-6">
-        <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-3">Report Filters</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-sm">
-          <Filter label="Period" value="This Year" />
-          <Filter label="Region" value="All Regions" />
-          <Filter label="Station" value="All Stations" />
-          <Filter label="Transporter" value="All" />
-          <Filter label="Inspector" value="All" />
-          <Filter label="Result" value="All Results" />
-          <Filter label="Vehicle" value="All Categories" />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Current reporting scope</p>
+          <p className="text-xs text-slate-500">All reportable records permitted by your assigned role and access policy.</p>
         </div>
+        <Badge tone="blue">Live database view</Badge>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -129,7 +125,7 @@ export default async function ReportsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge tone="slate">{recent.length} records</Badge>
-            <Link href="/inspections" className="text-sm text-amber-700 font-medium">View all →</Link>
+            <Link href="/inspections" className="text-sm text-[var(--brand-accent)] font-semibold hover:opacity-75">View all →</Link>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -159,17 +155,6 @@ export default async function ReportsPage() {
           </table>
         </div>
       </Card>
-    </div>
-  );
-}
-
-function Filter({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-slate-500 mb-1">{label}</p>
-      <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none">
-        <option>{value}</option>
-      </select>
     </div>
   );
 }

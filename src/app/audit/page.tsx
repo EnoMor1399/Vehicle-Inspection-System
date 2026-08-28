@@ -4,10 +4,12 @@ import { desc } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { ScrollText, UserCheck, Plus, Pencil, Trash2, ClipboardCheck, CheckCircle2 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import { requirePermission } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
+  await requirePermission("audit");
   const logs = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(200);
 
   return (

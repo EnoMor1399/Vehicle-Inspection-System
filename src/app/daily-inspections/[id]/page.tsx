@@ -1,11 +1,11 @@
 import { db } from "@/db";
-import { dailyInspections, vehicles, signatures } from "@/db/schema";
+import { dailyInspections, vehicles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Minus, Car,
-  Calendar, User, Gauge, MapPin, FileText, ClipboardCheck, AlertOctagon,
+  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Minus,
+  User, MapPin, ClipboardCheck, AlertOctagon,
 } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requireAuth } from "@/lib/require-auth";

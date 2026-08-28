@@ -6,7 +6,7 @@ import { transporters, vehicles, inspections } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
-import { getCurrentUser, canEditTransporters } from "@/lib/auth";
+import { getCurrentUser, canEditTransporters, canAccessTransporterScope } from "@/lib/auth";
 
 export type TransporterFormData = {
   companyName: string;
@@ -123,6 +123,8 @@ export async function deleteTransporter(id: string) {
 }
 
 export async function getTransporterDetail(id: string) {
+  const user = await getCurrentUser();
+  if (!canAccessTransporterScope(user, id)) return null;
   const [t] = await db.select().from(transporters).where(
     and(eq(transporters.id, id), isNull(transporters.deletedAt))
   );

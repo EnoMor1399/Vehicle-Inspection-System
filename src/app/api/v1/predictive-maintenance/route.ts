@@ -1,10 +1,11 @@
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
-// Predictive maintenance endpoint
-// Predicts when a vehicle is likely to fail based on inspection patterns
+// Historical maintenance-risk endpoint.
+// This endpoint intentionally reports evidence-based risk indicators rather than
+// claiming to predict an exact component failure date.
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) return apiError(auth.status, auth.message);
@@ -13,22 +14,30 @@ export async function GET(request: Request) {
   const vehicleId = url.searchParams.get("vehicle_id");
 
   if (!vehicleId) {
-    // Fleet-wide predictions
     const allVehicles = await db.select().from(vehicles).limit(100);
-    const predictions = [];
-    for (const v of allVehicles) {
-      const pred = await predictForVehicle(v.id);
-      if (pred) predictions.push({ vehicle: v, prediction: pred });
+    const assessments = [];
+    for (const vehicle of allVehicles) {
+      const assessment = await assessVehicleRisk(vehicle.id);
+      if (assessment) assessments.push({ vehicle, assessment });
     }
-    predictions.sort((a, b) => (a.prediction.days_to_failure ?? 99999) - (b.prediction.days_to_failure ?? 99999));
-    return json({ data: predictions.slice(0, 20) });
+    assessments.sort((a, b) => b.assessment.risk_score - a.assessment.risk_score);
+    return json({
+      methodology: "deterministic_historical_heuristic_v2",
+      disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
+      data: assessments.slice(0, 20),
+    });
   }
 
-  const prediction = await predictForVehicle(vehicleId);
-  return json({ data: prediction });
+  const assessment = await assessVehicleRisk(vehicleId);
+  if (!assessment) return apiError(404, "Vehicle not found");
+  return json({
+    methodology: "deterministic_historical_heuristic_v2",
+    disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
+    data: assessment,
+  });
 }
 
-async function predictForVehicle(vehicleId: string) {
+async function assessVehicleRisk(vehicleId: string) {
   const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId));
   if (!vehicle) return null;
 
@@ -47,80 +56,54 @@ async function predictForVehicle(vehicleId: string) {
     return {
       vehicle_id: vehicleId,
       registration: vehicle.registrationNumber,
-      status: "unknown",
-      risk_score: 0.5,
-      days_to_failure: null,
-      recommended_action: "Insufficient data. Schedule baseline inspection.",
-      at_risk_components: [],
+      status: "insufficient_data",
+      risk_score: 0,
+      recommended_review_days: 30,
+      recommended_action: "Establish a baseline inspection before relying on historical risk indicators.",
+      recurring_defects: [],
+      historical_stats: { total_inspections: 0, passes: 0, failures: 0, conditionals: 0, pass_rate: null },
     };
   }
 
-  // Calculate failure rate over time
-  const failures = history.filter((h) => h.overallResult === "fail").length;
-  const conditionals = history.filter((h) => h.overallResult === "conditional_pass").length;
-  const passes = history.filter((h) => h.overallResult === "pass").length;
+  const failures = history.filter((item) => item.overallResult === "fail" || item.overallResult === "reinspection_required").length;
+  const conditionals = history.filter((item) => item.overallResult === "conditional_pass").length;
+  const passes = history.filter((item) => item.overallResult === "pass").length;
 
-  // Identify recurring defect components
   const componentFailures: Record<string, number> = {};
-  for (const insp of history) {
-    const sections = (insp.sectionData || []) as any[];
-    for (const s of sections) {
-      for (const item of s.items || []) {
-        if (item.result === "fail") {
-          const key = `${s.title}: ${item.name}`;
+  for (const record of history) {
+    const sections = Array.isArray(record.sectionData) ? record.sectionData : [];
+    for (const section of sections) {
+      const items = Array.isArray(section?.items) ? section.items : [];
+      for (const item of items) {
+        if (item?.result === "fail") {
+          const key = `${section?.title || section?.section || "Inspection"}: ${item?.name || "Unnamed item"}`;
           componentFailures[key] = (componentFailures[key] || 0) + 1;
         }
       }
     }
   }
 
-  const atRiskComponents = Object.entries(componentFailures)
+  const recurringDefects = Object.entries(componentFailures)
     .filter(([, count]) => count >= 2)
-    .map(([component, count]) => ({ component, occurrences: count }))
+    .map(([component, occurrences]) => ({ component, occurrences }))
     .sort((a, b) => b.occurrences - a.occurrences)
     .slice(0, 5);
 
-  // Calculate risk score (0-1)
   const failureRate = failures / history.length;
   const conditionalRate = conditionals / history.length;
-  const riskScore = Math.min(0.99, failureRate * 0.6 + conditionalRate * 0.3 + (atRiskComponents.length * 0.05));
+  const recurrenceFactor = Math.min(0.25, recurringDefects.length * 0.05);
+  const riskScore = Math.min(1, failureRate * 0.6 + conditionalRate * 0.3 + recurrenceFactor);
 
-  // Estimate days to failure based on odometer usage pattern
-  const odometer = vehicle.odometerReading || 0;
-  const mfgYear = vehicle.manufacturingYear || new Date().getFullYear() - 5;
-  const age = new Date().getFullYear() - mfgYear;
-  const ageFactor = Math.min(1.5, 1 + age * 0.05);
+  const status = riskScore >= 0.7 ? "high" : riskScore >= 0.4 ? "elevated" : riskScore >= 0.2 ? "monitor" : "low";
+  const recommendedReviewDays = status === "high" ? 30 : status === "elevated" ? 90 : status === "monitor" ? 180 : 365;
 
-  // Base prediction: higher risk = sooner failure
-  const baseDays = 365;
-  const daysToFailure = riskScore > 0.7
-    ? Math.round(baseDays * (1 - riskScore) * ageFactor)
-    : riskScore > 0.4
-    ? Math.round(baseDays * (1 - riskScore * 0.8))
-    : null;
-
-  // Determine status
-  const status =
-    riskScore > 0.7
-      ? "critical"
-      : riskScore > 0.4
-      ? "warning"
-      : riskScore > 0.2
-      ? "monitor"
-      : "healthy";
-
-  // Recommended action
-  let recommendedAction = "Continue regular inspection schedule";
-  if (status === "critical") {
-    recommendedAction = `Schedule preventive maintenance within 30 days. At-risk: ${
-      atRiskComponents[0]?.component || "critical systems"
-    }`;
-  } else if (status === "warning") {
-    recommendedAction = `Schedule preventive maintenance within 90 days. Monitor: ${
-      atRiskComponents.slice(0, 2).map((c) => c.component).join(", ") || "vehicle systems"
-    }`;
+  let recommendedAction = "Continue the normal inspection and preventive-maintenance schedule.";
+  if (status === "high") {
+    recommendedAction = `Prioritize qualified maintenance review within 30 days${recurringDefects[0] ? `; recurring concern: ${recurringDefects[0].component}` : ""}.`;
+  } else if (status === "elevated") {
+    recommendedAction = `Schedule a maintenance review within 90 days${recurringDefects.length ? ` and monitor ${recurringDefects.slice(0, 2).map((item) => item.component).join(", ")}` : ""}.`;
   } else if (status === "monitor") {
-    recommendedAction = "Increase inspection frequency. Minor issues detected historically.";
+    recommendedAction = "Consider increased inspection frequency and review recurring historical defects.";
   }
 
   return {
@@ -128,9 +111,9 @@ async function predictForVehicle(vehicleId: string) {
     registration: vehicle.registrationNumber,
     status,
     risk_score: Math.round(riskScore * 100) / 100,
-    days_to_failure: daysToFailure,
+    recommended_review_days: recommendedReviewDays,
     recommended_action: recommendedAction,
-    at_risk_components: atRiskComponents,
+    recurring_defects: recurringDefects,
     historical_stats: {
       total_inspections: history.length,
       passes,
@@ -138,7 +121,5 @@ async function predictForVehicle(vehicleId: string) {
       conditionals,
       pass_rate: Math.round((passes / history.length) * 100),
     },
-    odometer,
-    age_years: age,
   };
 }

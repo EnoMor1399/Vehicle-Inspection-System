@@ -2,10 +2,10 @@
 
 import { useState, useTransition, useRef } from "react";
 import { updateSettingsAction } from "./server";
-import { Card, Button, Field, TextInput, TextArea, Select } from "@/components/ui";
+import { Card, Button, Field, TextInput, TextArea } from "@/components/ui";
 import {
   Building2, Paintbrush, FileText, Bell, Shield, Save, Loader2,
-  CheckCircle2, AlertCircle, Upload, X, MapPin, Globe, Phone, Mail,
+  CheckCircle2, AlertCircle, Upload, X, Globe, Phone, Mail,
 } from "lucide-react";
 
 type SettingsData = {
@@ -487,26 +487,26 @@ export function SettingsForm({ settings, canEdit }: { settings: SettingsData; ca
 
           {activeTab === "notifications" && (
             <div className="space-y-6">
-              <SectionTitle icon={Bell} title="Notification Settings" description="Email and SMS delivery options" />
+              <SectionTitle icon={Bell} title="Notification Policy" description="Policy flags and reminder lead time; external delivery providers must be configured separately" />
 
               <div className="space-y-3">
                 <Toggle
                   label="Email Notifications"
-                  description="Send reminders and alerts via email"
+                  description="Enable email-delivery policy after an approved SMTP/email provider is configured and tested"
                   checked={data.emailNotificationsEnabled}
                   onChange={(v) => update("emailNotificationsEnabled", v)}
                   disabled={disabled}
                 />
                 <Toggle
                   label="SMS Notifications"
-                  description="Send urgent alerts via SMS (requires SMS gateway)"
+                  description="Enable SMS-delivery policy only after an approved SMS gateway is configured and tested"
                   checked={data.smsNotificationsEnabled}
                   onChange={(v) => update("smsNotificationsEnabled", v)}
                   disabled={disabled}
                 />
               </div>
 
-              <Field label="Reminder Lead Time (days)" hint="Days before expiry to start sending reminders">
+              <Field label="Reminder Lead Time (days)" hint="Policy lead time for reminder generation; delivery depends on configured channels">
                 <TextInput
                   type="number"
                   min={1}

@@ -1,15 +1,17 @@
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { desc, sql, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Bell, Calendar, Mail, MessageSquare, CheckCircle2, AlertTriangle, ShieldAlert, FileText, Activity } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { markAllRead, markRead } from "./actions";
+import { requireAuth } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
-  const all = await db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(100);
+  const user = await requireAuth();
+  const all = await db.select().from(notifications).where(eq(notifications.userId, user.id)).orderBy(desc(notifications.createdAt)).limit(100);
   const unread = all.filter((n) => !n.readAt).length;
   const byType: Record<string, number> = {};
   all.forEach((n) => { byType[n.type] = (byType[n.type] || 0) + 1; });
@@ -38,7 +40,7 @@ export default async function NotificationsPage() {
       <PageHeader
         eyebrow="Alerts"
         title="Notifications & Reminders"
-        description="Automatic reminders for expiring certificates, upcoming inspections, failed results and monthly summaries. Channels: in-app, email, SMS."
+        description="Your account alerts and operational reminders. Delivery channels shown here reflect the notification records configured for your account."
         action={
           unread > 0 ? (
             <form action={markAllRead}>

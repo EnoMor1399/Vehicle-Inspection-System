@@ -448,11 +448,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Download sample template from the Import page",
           "Auto-mapping matches column names intelligently",
           "Invalid rows are skipped with detailed error messages",
-          "Import history shows all past imports with rollback option",
+          "Import history records past import jobs and their outcomes",
         ],
         warnings: [
           "Duplicate registration numbers are rejected",
-          "Large imports (>1000 rows) may take several minutes",
+          "Imports are intentionally bounded to 500 rows per job; split larger files into controlled batches",
         ],
       },
       {
@@ -473,11 +473,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       },
       {
         id: "rollback",
-        title: "Rollback Imports",
-        content: "Administrators can rollback completed imports to undo accidental data entry.",
+        title: "Import Recovery",
+        content: "Imports are additive and are not automatically reversible. Correct or decommission imported records through their normal controlled workflows, and restore the database from an approved backup only when a full recovery is required.",
         warnings: [
-          "Rollback permanently deletes imported records",
-          "Cannot rollback if imported records have been modified",
+          "Review mapping and validation results before committing an import",
+          "Do not assume an import can be safely reversed after dependent records are created",
         ],
       },
     ],
@@ -490,7 +490,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       {
         id: "reports-overview",
         title: "Analytics Dashboard",
-        content: "Comprehensive analytics with 7+ chart types, filters, and export options for data-driven decision making.",
+        content: "Operational analytics with multiple chart types and export options for evidence-based decision making.",
       },
       {
         id: "chart-types",
@@ -499,7 +499,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         tips: [
           "Hover over chart elements for detailed tooltips",
           "Click legend items to toggle data series",
-          "Use filters to focus on specific time periods or stations",
+          "Use the dedicated list pages when you need record-level filtering or drill-down",
         ],
       },
       {
@@ -507,7 +507,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         title: "Exporting Reports",
         content: "Export complete reports with summary statistics and charts to PDF, Excel, CSV, or email.",
         steps: [
-          "Apply desired filters",
+          "Review the current reporting scope and metrics",
           "Click export button (PDF, Excel, CSV)",
           "Or click 'Email Report' to send summary via email",
           "Use 'Print' for hard copies",
@@ -515,13 +515,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       },
       {
         id: "filters",
-        title: "Report Filters",
-        content: "Filter reports by date range, region, station, transporter, vehicle, inspector, and result status.",
-        tips: [
-          "Filters apply to all charts simultaneously",
-          "Clear filters to reset to full dataset",
-          "Save frequent filter combinations as presets",
-        ],
+        title: "Reporting Scope",
+        content: "The Reports page presents the live reportable dataset permitted by your role. Record-level filtering is available on operational list pages; global cross-chart filters are not currently implemented.",
       },
     ],
   },
@@ -548,11 +543,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       {
         id: "channels",
         title: "Delivery Channels",
-        content: "Notifications are delivered via in-app, email, and SMS based on user preferences and notification type.",
+        content: "The current release provides an in-app notification center. Email and SMS settings are configuration placeholders until approved delivery providers are connected and tested.",
         tips: [
-          "Critical alerts (failed inspections) use all channels",
+          "Treat the in-app notification center as the authoritative built-in channel in this release",
           "Configure preferences in Settings",
-          "Push notifications work on mobile devices with PWA",
+          "Browser push delivery is not enabled in the current secure PWA configuration",
         ],
       },
     ],
@@ -565,21 +560,19 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       {
         id: "users-overview",
         title: "Managing Users",
-        content: "Administrators can view, create, edit, and deactivate user accounts with role assignments and station linking.",
+        content: "Administrators can review user accounts and update role, status, station, and transporter linkage. New users onboard through the controlled registration flow rather than an unimplemented invite-email workflow.",
         roles: ["Super Administrator", "Administrator"],
       },
       {
         id: "create-user",
         title: "Creating Users",
         steps: [
-          "Navigate to 'Users & Roles'",
-          "Click 'Invite User'",
-          "Enter name, email, and phone",
-          "Select role from the 10 available roles",
-          "Assign to inspection station",
-          "Set initial password or send invite email",
-          "Configure custom permissions if needed",
-          "Click 'Create User'",
+          "Configure BOOTSTRAP_ADMIN_EMAIL before the first production administrator registers",
+          "New users register through the Sign Up screen and receive the Viewer role by default",
+          "Open 'Users & Roles' as an administrator",
+          "Edit the user and assign the approved role",
+          "Link the user to an inspection station or transporter when required",
+          "Activate or deactivate access as governance requires",
         ],
       },
       {
@@ -663,7 +656,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       {
         id: "notifications-settings",
         title: "Notification Settings",
-        content: "Enable email and SMS notifications, set reminder lead times for certificate expiries.",
+        content: "Configure notification policy flags and reminder lead times. Email/SMS delivery requires a separately configured and tested provider before it should be relied upon.",
       },
     ],
   },
@@ -698,7 +691,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       {
         id: "datasets",
         title: "Available Datasets",
-        content: "Inspections, Vehicles, Transporters, Stations, Defects, Documents, Audit Logs, and Users - all with full field documentation.",
+        content: "Core reporting datasets include Inspections, Vehicles, Transporters, Stations, and Defects. Documents, Audit Logs, and Users are exposed only when the API-key owner has the corresponding permission.",
       },
     ],
   },
@@ -738,36 +731,36 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     subsections: [
       {
         id: "predictive-overview",
-        title: "AI-Powered Predictions",
-        content: "Machine learning analyzes inspection history to predict when vehicles are likely to fail, enabling proactive maintenance.",
+        title: "Historical Maintenance Risk",
+        content: "A deterministic historical-risk model summarizes prior inspection outcomes and recurring defects. It does not predict an exact future failure date and does not replace qualified maintenance assessment.",
       },
       {
         id: "risk-levels",
         title: "Risk Levels",
-        content: "Vehicles are classified as Critical (red), Warning (amber), Monitor (blue), or Healthy (green) based on risk score.",
+        content: "Vehicles are grouped into High, Elevated, Monitor, or Low historical-risk bands based on recorded inspection outcomes and recurring defects.",
         tips: [
-          "Critical vehicles need maintenance within 30 days",
-          "Warning vehicles should be serviced within 90 days",
+          "High-risk vehicles are recommended for qualified maintenance review within 30 days",
+          "Elevated-risk vehicles are recommended for review within 90 days",
           "Monitor vehicles have minor trends to watch",
-          "Healthy vehicles have no concerning patterns",
+          "Low-risk status means the recorded history has fewer concerning patterns; normal inspection obligations still apply",
         ],
       },
       {
         id: "at-risk-components",
         title: "At-Risk Components",
-        content: "The system identifies specific components likely to fail based on historical inspection patterns.",
+        content: "The system highlights recurring failed checklist items so maintenance teams can prioritize review; it does not assert that a specific component will fail in the future.",
       },
     ],
   },
   {
     id: "apps",
-    title: "Mobile Apps",
+    title: "App Access",
     icon: "📱",
     subsections: [
       {
         id: "apps-overview",
         title: "Available Platforms",
-        content: "RSL VIMS is available as iOS app, Android app, Progressive Web App (PWA), and desktop web app.",
+        content: "RSL VIMS is delivered as a responsive web application and installable Progressive Web App (PWA). Dedicated native iOS/Android packages are not included in this repository.",
       },
       {
         id: "pwa-install",
@@ -780,18 +773,18 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Launch from home screen for app-like experience",
         ],
         tips: [
-          "PWA works offline with auto-sync when reconnected",
-          "Updates automatically without app store",
+          "The PWA shell can open offline, but protected records and transactions require a network connection",
+          "Web/PWA updates are delivered through normal application deployment rather than an app store",
           "Full-screen experience without browser chrome",
         ],
       },
       {
         id: "offline-mode",
-        title: "Offline Capabilities",
-        content: "Continue inspections, capture photos, and view cached data while offline. All changes sync automatically when connection returns.",
+        title: "Offline Behavior",
+        content: "For privacy and data integrity, authenticated inspection records are not cached for offline editing in this release. The offline shell explains that protected operations require connectivity.",
         warnings: [
-          "Some features require connection (e.g., certificate verification)",
-          "Sync happens automatically when online",
+          "Inspection creation, edits, uploads, and authenticated records require connectivity",
+          "No background record synchronization is claimed or performed by the current PWA",
         ],
       },
     ],
@@ -836,13 +829,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         tips: [
           "API keys can be scoped (read, write, inspect)",
           "Keys can be revoked if compromised",
-          "Rate limit: 1000 requests per minute",
+          "Rate limits are deployment-configurable; see API & Integrations for the current configured value",
         ],
       },
       {
         id: "endpoints",
         title: "Available Endpoints",
-        content: "Vehicles, Transporters, Inspections, Locations, Stats, AI Defect Detection, Predictive Maintenance, RFID, Power BI OData, and Webhooks.",
+        content: "Vehicles, Transporters, Inspections, Locations, Stats, RFID, Power BI OData, Webhooks, historical defect-risk signals, and historical maintenance-risk indicators.",
       },
     ],
   },

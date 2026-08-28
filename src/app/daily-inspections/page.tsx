@@ -1,16 +1,16 @@
 import { db } from "@/db";
-import { dailyInspections, vehicles, transporters } from "@/db/schema";
+import { dailyInspections, vehicles } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Card, Badge, Button, StatCard, EmptyState } from "@/components/ui";
-import { requireAuth } from "@/lib/require-auth";
-import { formatDate, formatDateTime } from "@/lib/utils";
-import { Plus, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, Calendar, Truck, Activity } from "lucide-react";
+import { requirePermission } from "@/lib/require-auth";
+import { formatDate } from "@/lib/utils";
+import { Plus, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, Calendar, Activity } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function DailyInspectionsPage() {
-  await requireAuth();
+  await requirePermission("inspections");
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -189,7 +189,7 @@ function InspectionTable({ rows }: { rows: any[] }) {
                 )}
               </td>
               <td className="py-3 text-right">
-                <Link href={`/daily-inspections/${r.id}`} className="text-sm text-amber-700 hover:text-amber-800 font-medium">
+                <Link href={`/daily-inspections/${r.id}`} className="text-sm text-[var(--brand-accent)] hover:opacity-75 font-semibold">
                   View →
                 </Link>
               </td>

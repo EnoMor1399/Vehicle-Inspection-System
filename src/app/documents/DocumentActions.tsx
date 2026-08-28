@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui";
 import { Download, Loader2, Eye } from "lucide-react";
 
 interface DocumentActionsProps {

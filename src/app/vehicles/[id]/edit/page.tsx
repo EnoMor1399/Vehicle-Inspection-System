@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { PageHeader, Card, Button, Field, TextInput, TextArea, Select } from "@/components/ui";
-import { getVehicleDetail, updateVehicle, deleteVehicle, createVehicle, VehicleFormData } from "../../server";
+import { PageHeader, Card, Button, Field, TextInput, Select } from "@/components/ui";
+import { getVehicleDetail, updateVehicle, decommissionVehicle, createVehicle, VehicleFormData } from "../../server";
 import { canEditVehicles, getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { transporters } from "@/db/schema";
@@ -91,10 +91,10 @@ export default async function VehicleFormPage({ params }: { params: Promise<{ id
     }
   }
 
-  async function deleteAction() {
+  async function decommissionAction() {
     "use server";
     if (editing) {
-      await deleteVehicle(id!);
+      await decommissionVehicle(id!);
       redirect("/vehicles");
     }
   }
@@ -211,7 +211,7 @@ export default async function VehicleFormPage({ params }: { params: Promise<{ id
           <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
             <Button type="submit">{editing ? "Save Changes" : "Create Vehicle"}</Button>
             <Link href={editing ? `/vehicles/${id}` : "/vehicles"}><Button variant="secondary" type="button">Cancel</Button></Link>
-            {editing && <Button variant="danger" formAction={deleteAction} type="submit" className="ml-auto">Delete Vehicle</Button>}
+            {editing && <Button variant="danger" formAction={decommissionAction} type="submit" className="ml-auto">Decommission Vehicle</Button>}
           </div>
         </Card>
       </form>

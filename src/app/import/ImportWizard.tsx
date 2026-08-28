@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { Button, Card, Field, Select, Badge } from "@/components/ui";
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, X, ArrowRight } from "lucide-react";
+import { Upload, AlertTriangle, CheckCircle2, ArrowRight } from "lucide-react";
 import { submitImport } from "./server";
 
 type Step = "upload" | "mapping" | "preview" | "complete";
 
-export function ImportWizard({ entityTypes }: { entityTypes: { value: string; label: string; fields: string[] }[] }) {
+export function ImportWizard({ entityTypes }: { entityTypes: { value: string; label: string; fields: string[]; required: string[] }[] }) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>("upload");
@@ -57,12 +57,10 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
   function validate() {
     const errs: { row: number; field: string; message: string }[] = [];
     rawData.forEach((row, idx) => {
-      selected.fields.forEach((f) => {
+      selected.required.forEach((f) => {
         const col = mapping[f];
         if (!col) {
-          if (!errs.find((e) => e.row === 0 && e.field === f)) {
-            errs.push({ row: 0, field: f, message: `Column "${f}" not mapped` });
-          }
+          if (!errs.find((e) => e.row === 0 && e.field === f)) errs.push({ row: 0, field: f, message: `Required column "${f}" is not mapped` });
         } else if (!row[col]) {
           errs.push({ row: idx + 1, field: f, message: "Missing required value" });
         }
@@ -119,7 +117,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
             onDragOver={(e) => { e.preventDefault(); }}
             onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
             onClick={() => fileInput.current?.click()}
-            className="mt-6 border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:border-amber-500 hover:bg-amber-50/50 cursor-pointer transition"
+            className="mt-6 border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:border-[var(--brand-color)] hover:bg-emerald-50/40 cursor-pointer transition"
           >
             <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
             <p className="font-medium text-slate-900">Drop XLSX, XLS or CSV here</p>
@@ -150,7 +148,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {selected.fields.map((f) => (
               <div key={f} className="flex items-center gap-2 text-sm">
-                <span className="w-40 font-medium">{f}</span>
+                <span className="w-40 font-medium">{f}{selected.required.includes(f) ? <span className="text-red-500"> *</span> : null}</span>
                 <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
                 <select
                   value={mapping[f] || ""}
@@ -213,7 +211,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
 
           <div className="mt-6 flex items-center gap-2">
             <Button variant="secondary" onClick={() => setStep("mapping")}>Back</Button>
-            <Button onClick={runImport} disabled={pending}>
+            <Button onClick={runImport} disabled={pending || errors.length > 0}>
               {pending ? "Importing..." : `Import ${rawData.length} records`}
             </Button>
           </div>

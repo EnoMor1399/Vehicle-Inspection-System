@@ -1,168 +1,93 @@
+import type { ReactNode } from "react";
 import { Card, Badge } from "@/components/ui";
-import { ShieldCheck, Smartphone, Tablet, Monitor, Download, Wifi, WifiOff, QrCode, Fingerprint } from "lucide-react";
+import { ShieldCheck, Smartphone, Monitor, Wifi, LockKeyhole, RefreshCw, Globe2 } from "lucide-react";
 import Link from "next/link";
+import { requireInternalUser } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
-export default function AppsPage() {
+export default async function AppsPage() {
+  await requireInternalUser();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 lg:p-10">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="inline-flex h-20 w-20 rounded-3xl bg-gradient-to-br from-amber-400 to-red-500 grid place-items-center mb-4 shadow-2xl">
-            <ShieldCheck className="h-10 w-10 text-white" />
+    <div className="p-6 lg:p-10">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8 overflow-hidden rounded-3xl bg-slate-950 px-6 py-8 text-white shadow-xl sm:px-10">
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div>
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">Secure access</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">VIMS across your approved devices</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                Use the responsive web application on desktop, tablet, or mobile. Supported browsers can install the same web application as a PWA for a focused app-like experience.
+              </p>
+            </div>
+            <Badge tone="emerald" className="w-fit">Enterprise Web + PWA</Badge>
           </div>
-          <h1 className="text-4xl lg:text-5xl font-bold text-white mb-3">
-            RSL VIMS on{" "}
-            <span className="bg-gradient-to-r from-amber-400 to-red-400 bg-clip-text text-transparent">
-              Every Device
-            </span>
-          </h1>
-          <p className="text-slate-300 max-w-2xl mx-auto">
-            Inspect vehicles anywhere — from your phone, tablet, or desktop. Works online and offline with automatic sync.
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <PlatformCard
-            icon={<Smartphone className="h-8 w-8" />}
-            title="iOS App"
-            subtitle="iPhone & iPad"
-            features={["Native camera integration", "Offline inspections", "Face ID login"]}
-            cta="App Store"
-            color="from-slate-700 to-slate-900"
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <AccessCard
+            icon={<Monitor className="h-6 w-6" />}
+            title="Desktop Web"
+            description="Full operational workspace for administration, analytics, certificates, approvals and reporting."
+            action={<Link href="/" className="text-sm font-semibold text-blue-700 hover:underline">Open workspace →</Link>}
           />
-          <PlatformCard
-            icon={<Smartphone className="h-8 w-8" />}
-            title="Android App"
-            subtitle="Phones & Tablets"
-            features={["Hardware RFID support", "Offline mode", "Fingerprint login"]}
-            cta="Google Play"
-            color="from-emerald-700 to-emerald-900"
+          <AccessCard
+            icon={<Smartphone className="h-6 w-6" />}
+            title="Mobile & Tablet Web"
+            description="Responsive inspection workflows, evidence capture, signatures and QR verification in a modern browser."
+            action={<span className="text-xs font-medium text-slate-500">No separate mobile download required</span>}
           />
-          <PlatformCard
-            icon={<Tablet className="h-8 w-8" />}
-            title="PWA"
-            subtitle="Any browser"
-            features={["Installable", "Offline-first", "Auto-update"]}
-            cta="Install Now"
-            color="from-amber-600 to-amber-800"
-            highlight
-          />
-          <PlatformCard
-            icon={<Monitor className="h-8 w-8" />}
-            title="Desktop"
-            subtitle="Windows · Mac · Linux"
-            features={["Full analytics", "Reports export", "Admin tools"]}
-            cta="Open Web App"
-            href="/"
-            color="from-blue-700 to-blue-900"
+          <AccessCard
+            icon={<Globe2 className="h-6 w-6" />}
+            title="Progressive Web App"
+            description="Install VIMS from a supported browser. The install prompt appears automatically when browser requirements are met."
+            action={<span className="text-xs font-medium text-slate-500">Install from your browser prompt</span>}
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-          <FeatureCard
-            icon={<WifiOff className="h-5 w-5" />}
-            title="Offline Inspections"
-            desc="Continue inspections without internet. Auto-sync when reconnected."
-          />
-          <FeatureCard
-            icon={<QrCode className="h-5 w-5" />}
-            title="QR Scanner Built-in"
-            desc="Scan vehicle QR codes and inspection certificates instantly."
-          />
-          <FeatureCard
-            icon={<Fingerprint className="h-5 w-5" />}
-            title="Biometric Login"
-            desc="Face ID, Touch ID, and fingerprint authentication."
-          />
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <FeatureCard icon={<LockKeyhole className="h-5 w-5" />} title="Protected operational data" desc="Authenticated pages and API records are not persisted by the service-worker cache on shared devices." />
+          <FeatureCard icon={<Wifi className="h-5 w-5" />} title="Connected transactions" desc="Creating, approving and changing inspection records requires a live network connection so the database remains authoritative." />
+          <FeatureCard icon={<RefreshCw className="h-5 w-5" />} title="Automatic web updates" desc="New production releases are delivered through the web deployment; users do not need to download application packages." />
         </div>
 
-        <Card className="p-6 bg-white/5 backdrop-blur border-white/10 text-white">
-          <h2 className="text-xl font-bold mb-4">Enterprise Integrations</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <IntegrationChip icon="🤖" label="AI Defect Detection" />
-            <IntegrationChip icon="📡" label="RFID Scanners" />
-            <IntegrationChip icon="📍" label="GPS Tracking" />
-            <IntegrationChip icon="📊" label="Power BI" />
-            <IntegrationChip icon="📑" label="Live Excel Sync" />
-            <IntegrationChip icon="🔗" label="REST API" />
-            <IntegrationChip icon="🎣" label="Webhooks" />
-            <IntegrationChip icon="📱" label="Push Notifications" />
+        <Card className="mt-6 p-6">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <h2 className="font-semibold text-slate-950">Native iOS and Android applications</h2>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">
+                Native App Store / Google Play packages, device biometrics and native RFID SDK integrations are not included in this repository. They should only be advertised after dedicated mobile applications and distribution accounts are implemented and verified.
+              </p>
+            </div>
+            <Badge tone="slate">Not included in V2.2</Badge>
           </div>
         </Card>
-
-        <div className="text-center mt-8 text-sm text-slate-400">
-          <p>© 2026 Road Safety Limited · VIMS v2.0</p>
-        </div>
       </div>
     </div>
   );
 }
 
-function PlatformCard({
-  icon,
-  title,
-  subtitle,
-  features,
-  cta,
-  color,
-  href = "#",
-  highlight,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  features: string[];
-  cta: string;
-  color: string;
-  href?: string;
-  highlight?: boolean;
-}) {
+function AccessCard({ icon, title, description, action }: { icon: ReactNode; title: string; description: string; action: ReactNode }) {
   return (
-    <div className={`relative rounded-2xl p-6 bg-gradient-to-br ${color} text-white shadow-xl ${highlight ? "ring-2 ring-amber-400" : ""}`}>
-      {highlight && (
-        <Badge tone="amber" className="absolute top-3 right-3">Recommended</Badge>
-      )}
-      <div className="mb-4 opacity-90">{icon}</div>
-      <h3 className="text-xl font-bold mb-1">{title}</h3>
-      <p className="text-sm text-white/70 mb-4">{subtitle}</p>
-      <ul className="space-y-1.5 mb-5">
-        {features.map((f) => (
-          <li key={f} className="flex items-center gap-2 text-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            {f}
-          </li>
-        ))}
-      </ul>
-      <a
-        href={href}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition"
-      >
-        <Download className="h-4 w-4" />
-        {cta}
-      </a>
-    </div>
+    <Card className="p-5">
+      <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-slate-900 text-white">{icon}</div>
+      <h2 className="font-semibold text-slate-950">{title}</h2>
+      <p className="mt-2 min-h-16 text-sm leading-6 text-slate-600">{description}</p>
+      <div className="mt-4 border-t border-slate-100 pt-4">{action}</div>
+    </Card>
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function FeatureCard({ icon, title, desc }: { icon: ReactNode; title: string; desc: string }) {
   return (
-    <div className="rounded-xl bg-white/5 backdrop-blur border border-white/10 p-5 text-white">
-      <div className="h-10 w-10 rounded-lg bg-amber-500/20 text-amber-400 grid place-items-center mb-3">
-        {icon}
-      </div>
-      <h3 className="font-semibold mb-1">{title}</h3>
-      <p className="text-sm text-slate-300">{desc}</p>
-    </div>
-  );
-}
-
-function IntegrationChip({ icon, label }: { icon: string; label: string }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-      <span className="text-lg">{icon}</span>
-      <span className="text-sm font-medium">{label}</span>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 grid h-9 w-9 place-items-center rounded-lg bg-amber-50 text-amber-700">{icon}</div>
+      <h3 className="font-semibold text-slate-950">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-slate-600">{desc}</p>
     </div>
   );
 }

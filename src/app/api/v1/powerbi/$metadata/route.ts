@@ -3,7 +3,6 @@ import { authenticateApiRequest } from "@/lib/api-auth";
 // OData v4 $metadata endpoint — returns EDMX XML schema
 // Power BI uses this to discover the data model
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vims.rsl.gh";
 
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
@@ -116,7 +115,7 @@ export async function GET(request: Request) {
       </EntityType>
 
       <EntityType Name="Defect">
-        <Key><PropertyRef Name="InspectionNumber" PropertyRef2="ItemName"/></Key>
+        <Key><PropertyRef Name="InspectionNumber"/><PropertyRef Name="ItemName"/></Key>
         <Property Name="InspectionNumber" Type="Edm.String"/>
         <Property Name="InspectionDate" Type="Edm.DateTimeOffset"/>
         <Property Name="InspectionResult" Type="Edm.String"/>

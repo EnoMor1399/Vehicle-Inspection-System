@@ -1,9 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/db";
-import { systemSettings } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { getSettings, updateSettings, type SystemSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";

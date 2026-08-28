@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { dailyInspections, vehicles } from "@/db/schema";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
-import { getCurrentUser, canApprove } from "@/lib/auth";
+import { getCurrentUser, canApprove, canManageInspections, canAccessTransporterScope } from "@/lib/auth";
 import type { DailyChecklistCategory } from "@/db/schema";
 import { summarizeDailyChecklist } from "@/lib/daily-checklist";
 
@@ -24,6 +24,7 @@ export type DailyInspectionInput = {
 
 export async function submitDailyInspection(input: DailyInspectionInput) {
   const user = await getCurrentUser();
+  if (!canManageInspections(user)) throw new Error("You do not have permission to submit daily inspections");
   if (!input.vehicleId) throw new Error("Vehicle is required");
   if (!input.inspectionDate) throw new Error("Inspection date is required");
 
@@ -102,6 +103,7 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
 }
 
 export async function getDailyInspectionDetail(id: string) {
+  const user = await getCurrentUser();
   const [row] = await db
     .select({
       inspection: dailyInspections,
@@ -110,10 +112,14 @@ export async function getDailyInspectionDetail(id: string) {
     .from(dailyInspections)
     .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
     .where(eq(dailyInspections.id, id));
-  return row || null;
+  if (!row || !canAccessTransporterScope(user, row.vehicle.transporterId)) return null;
+  return row;
 }
 
 export async function getTodaysInspection(vehicleId: string, date: string) {
+  const user = await getCurrentUser();
+  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId));
+  if (!vehicle || !canAccessTransporterScope(user, vehicle.transporterId)) return null;
   const [row] = await db
     .select()
     .from(dailyInspections)

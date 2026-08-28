@@ -3,7 +3,7 @@ import { vehicles, transporters } from "@/db/schema";
 import { eq, isNull, asc } from "drizzle-orm";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { getCurrentUser, canManageInspections } from "@/lib/auth";
 import { InspectionForm } from "../InspectionForm";
 import { redirect } from "next/navigation";

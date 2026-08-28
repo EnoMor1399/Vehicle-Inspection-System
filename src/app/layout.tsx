@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "RSL — Vehicle Inspection Management System",
-  description: "Road Safety Limited — Enterprise-grade vehicle inspection management. Available as PWA, Android, and iOS app.",
+  description: "Road Safety Limited — secure vehicle inspection, compliance, reporting, and fleet operations management.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

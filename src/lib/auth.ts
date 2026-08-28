@@ -264,3 +264,16 @@ export function canManageUsers(user: UserLike) { return hasPermission(user, "use
 export function canManageLocations(user: UserLike) { return hasPermission(user, "locations"); }
 export function canViewReports(user: UserLike) { return hasPermission(user, "reports"); }
 export function canViewAudit(user: UserLike) { return hasPermission(user, "audit"); }
+
+/**
+ * Returns true when a user may access records belonging to a transporter.
+ * Internal users are governed by their normal role/resource permissions.
+ * External transporter users are always restricted to their explicitly linked transporter.
+ */
+export function canAccessTransporterScope(
+  user: { role: string; transporterId?: string | null },
+  transporterId?: string | null
+): boolean {
+  if (user.role !== "transporter_user") return true;
+  return Boolean(user.transporterId && transporterId && user.transporterId === transporterId);
+}

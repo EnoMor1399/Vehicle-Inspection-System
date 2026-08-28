@@ -1,0 +1,2 @@
+src/app/certificate/[id]/CertificateToolbar.tsx
+tsconfig.tsbuildinfo

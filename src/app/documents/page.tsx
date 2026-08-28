@@ -1,15 +1,15 @@
 import { db } from "@/db";
 import { documents, users } from "@/db/schema";
-import { desc, sql, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge } from "@/components/ui";
-import { Upload, AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, ShieldCheck } from "lucide-react";
 import { DocumentsList } from "./DocumentsList";
-import { requireAuth } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function DocumentsPage() {
-  await requireAuth();
+  await requirePermission("documents");
   
   const rows = await db
     .select({
@@ -41,15 +41,16 @@ export default async function DocumentsPage() {
       <PageHeader
         eyebrow="Document Management"
         title="Documents & Certificates"
-        description="Versioned document storage with expiry monitoring, preview, download, and secure access. Covers insurance, registration, roadworthy, permits, photos, and driver licenses."
-        action={
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">
-            <Upload className="h-4 w-4" /> Upload Document
-          </button>
-        }
+        description="Controlled document registry with expiry monitoring, preview, and download for records already stored in approved locations."
+        action={<Badge tone="blue"><ShieldCheck className="h-3.5 w-3.5" /> Controlled registry</Badge>}
       />
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <p className="font-semibold">Document storage integration</p>
+        <p className="mt-1 text-xs leading-relaxed text-blue-800">Direct file upload is intentionally disabled until an approved object-storage provider is configured. This avoids storing unrestricted file payloads inside the application database. Existing registered documents remain available for preview and download.</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <Card className="p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-700 grid place-items-center">
             <Clock className="h-5 w-5" />

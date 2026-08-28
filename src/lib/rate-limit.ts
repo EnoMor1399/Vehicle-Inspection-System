@@ -1,7 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 
-type Policy = "login" | "twoFactor" | "api" | "verify";
+type Policy = "login" | "signup" | "twoFactor" | "api" | "verify" | "error";
 type Window = `${number} ${"s" | "m" | "h" | "d"}`;
 
 type LimitResult = {
@@ -23,9 +23,11 @@ const apiWindow: Window = `${Math.max(1, Math.ceil(apiWindowMs / 1000))} s`;
 
 const policyConfig: Record<Policy, { limit: number; windowMs: number; window: Window }> = {
   login: { limit: 10, windowMs: 15 * 60_000, window: "15 m" },
+  signup: { limit: 5, windowMs: 60 * 60_000, window: "1 h" },
   twoFactor: { limit: 5, windowMs: 5 * 60_000, window: "5 m" },
   api: { limit: apiLimit, windowMs: apiWindowMs, window: apiWindow },
   verify: { limit: 60, windowMs: 60_000, window: "1 m" },
+  error: { limit: 20, windowMs: 60_000, window: "1 m" },
 };
 
 const url = process.env.UPSTASH_REDIS_REST_URL;
