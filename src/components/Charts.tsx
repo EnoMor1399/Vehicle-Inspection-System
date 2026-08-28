@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, AreaChart, Area,
 } from "recharts";
 
-const COLORS = ["#0f172a", "#f59e0b", "#ef4444", "#10b981", "#6366f1", "#8b5cf6", "#ec4899"];
+const COLORS = ["#0f766e", "#334155", "#d97706", "#4f46e5", "#be123c", "#0369a1", "#7c3aed"];
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -40,13 +40,6 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function TrendChart({ data }: { data: { month: string; pass: number; fail: number; conditional: number }[] }) {
-  // Calculate summary stats
-  const totalPass = data.reduce((sum, d) => sum + d.pass, 0);
-  const totalFail = data.reduce((sum, d) => sum + d.fail, 0);
-  const totalConditional = data.reduce((sum, d) => sum + d.conditional, 0);
-  const totalInspections = totalPass + totalFail + totalConditional;
-  const passRate = totalInspections > 0 ? ((totalPass / totalInspections) * 100).toFixed(1) : "0";
-
   // Format month labels (YYYY-MM -> Month Year)
   const formatMonth = (month: string) => {
     const [year, m] = month.split("-");
@@ -55,61 +48,33 @@ export function TrendChart({ data }: { data: { month: string; pass: number; fail
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-3 border border-emerald-200">
-          <p className="text-xs text-emerald-700 font-medium mb-1">Total Passed</p>
-          <p className="text-2xl font-bold text-emerald-600">{totalPass}</p>
-        </div>
-        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-3 border border-red-200">
-          <p className="text-xs text-red-700 font-medium mb-1">Total Failed</p>
-          <p className="text-2xl font-bold text-red-600">{totalFail}</p>
-        </div>
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-3 border border-amber-200">
-          <p className="text-xs text-amber-700 font-medium mb-1">Conditional</p>
-          <p className="text-2xl font-bold text-amber-600">{totalConditional}</p>
-        </div>
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 border border-blue-200">
-          <p className="text-xs text-blue-700 font-medium mb-1">Pass Rate</p>
-          <p className="text-2xl font-bold text-blue-600">{passRate}%</p>
-        </div>
-      </div>
-
       {/* Chart */}
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={330}>
         <AreaChart data={data} margin={{ top: 20, right: 30, bottom: 20, left: 10 }}>
           <defs>
             {/* Vibrant Pass Gradient */}
             <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
-              <stop offset="50%" stopColor="#34d399" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#6ee7b7" stopOpacity={0.1} />
+              <stop offset="0%" stopColor="#0f766e" stopOpacity={0.8} />
+              <stop offset="50%" stopColor="#2dd4bf" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#99f6e4" stopOpacity={0.1} />
             </linearGradient>
             
             {/* Vibrant Fail Gradient */}
             <linearGradient id="failGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8} />
-              <stop offset="50%" stopColor="#f87171" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#fca5a5" stopOpacity={0.1} />
+              <stop offset="0%" stopColor="#dc5a5a" stopOpacity={0.8} />
+              <stop offset="50%" stopColor="#f08a8a" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#fecaca" stopOpacity={0.1} />
             </linearGradient>
             
             {/* Conditional Gradient */}
             <linearGradient id="conditionalGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.6} />
+              <stop offset="0%" stopColor="#d97706" stopOpacity={0.6} />
               <stop offset="100%" stopColor="#fbbf24" stopOpacity={0.2} />
             </linearGradient>
 
-            {/* Glow filters */}
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
-            </filter>
           </defs>
           
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
+          <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" opacity={0.8} />
           
           <XAxis 
             dataKey="month" 
@@ -136,37 +101,35 @@ export function TrendChart({ data }: { data: { month: string; pass: number; fail
           <Area 
             type="monotone" 
             dataKey="pass" 
-            stroke="#10b981" 
-            strokeWidth={3}
+            stroke="#0f766e" 
+            strokeWidth={2.5}
             fill="url(#passGradient)" 
             name="Pass"
-            dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 6, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
-            filter="url(#glow)"
+            dot={{ fill: "#0f766e", r: 4, strokeWidth: 2, stroke: "#fff" }}
+            activeDot={{ r: 6, fill: "#0f766e", stroke: "#fff", strokeWidth: 2 }}
           />
           
           <Area 
             type="monotone" 
             dataKey="fail" 
-            stroke="#ef4444" 
-            strokeWidth={3}
+            stroke="#dc5a5a" 
+            strokeWidth={2.5}
             fill="url(#failGradient)" 
             name="Fail"
-            dot={{ fill: "#ef4444", r: 4, strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 6, fill: "#ef4444", stroke: "#fff", strokeWidth: 2 }}
-            filter="url(#glow)"
+            dot={{ fill: "#dc5a5a", r: 4, strokeWidth: 2, stroke: "#fff" }}
+            activeDot={{ r: 6, fill: "#dc5a5a", stroke: "#fff", strokeWidth: 2 }}
           />
           
           <Area 
             type="monotone" 
             dataKey="conditional" 
-            stroke="#f59e0b" 
+            stroke="#d97706" 
             strokeWidth={2.5}
             fill="url(#conditionalGradient)" 
             name="Conditional"
             strokeDasharray="5 5"
-            dot={{ fill: "#f59e0b", r: 3, strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
+            dot={{ fill: "#d97706", r: 3, strokeWidth: 2, stroke: "#fff" }}
+            activeDot={{ r: 5, fill: "#d97706", stroke: "#fff", strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -176,15 +139,22 @@ export function TrendChart({ data }: { data: { month: string; pass: number; fail
 
 export function StationChart({ data }: { data: { station: string; pass: number; fail: number; passRate: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 10, right: 20, bottom: 40, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-        <XAxis dataKey="station" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" />
-        <YAxis tick={{ fontSize: 12 }} />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="pass" stackId="a" fill="#10b981" name="Pass" />
-        <Bar dataKey="fail" stackId="a" fill="#ef4444" name="Fail" />
+    <ResponsiveContainer width="100%" height={330}>
+      <BarChart data={data} layout="vertical" margin={{ top: 8, right: 16, bottom: 8, left: 28 }}>
+        <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" horizontal={false} />
+        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
+        <YAxis
+          type="category"
+          dataKey="station"
+          width={118}
+          tick={{ fontSize: 10, fill: "#475569" }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip cursor={{ fill: "#f8fafc" }} />
+        <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: "14px", fontSize: "12px" }} />
+        <Bar dataKey="pass" stackId="outcome" fill="#0f766e" name="Pass" radius={[4, 4, 0, 0]} radius={[4, 0, 0, 4]} />
+        <Bar dataKey="fail" stackId="outcome" fill="#dc5a5a" name="Fail" radius={[4, 4, 0, 0]} radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -200,8 +170,8 @@ export function TransporterChart({ data }: { data: { transporter: string; pass: 
         <YAxis type="category" dataKey="transporter" tick={{ fontSize: 11 }} width={95} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="pass" fill="#10b981" name="Pass" />
-        <Bar dataKey="fail" fill="#ef4444" name="Fail" />
+        <Bar dataKey="pass" fill="#0f766e" name="Pass" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="fail" fill="#dc5a5a" name="Fail" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -215,7 +185,7 @@ export function DefectsChart({ data }: { data: { item: string; failures: number 
         <XAxis type="number" tick={{ fontSize: 12 }} />
         <YAxis type="category" dataKey="item" tick={{ fontSize: 11 }} width={145} />
         <Tooltip />
-        <Bar dataKey="failures" fill="#ef4444" />
+        <Bar dataKey="failures" fill="#be123c" radius={[0, 5, 5, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -236,15 +206,30 @@ export function CategoryPie({ data }: { data: { category: string; count: number 
 
 export function RegionHeatMap({ data }: { data: { region: string; vehicles: number; inspections: number; passRate: number }[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      {data.map((r) => {
-        const intensity = Math.min(1, (r.passRate || 0) / 100);
-        const bg = `rgba(16, 185, 129, ${0.15 + intensity * 0.6})`;
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      {data.map((region) => {
+        const passRate = Math.max(0, Math.min(100, region.passRate || 0));
+        const tone = passRate >= 80
+          ? "bg-teal-50 text-teal-700 ring-teal-100"
+          : passRate >= 60
+            ? "bg-amber-50 text-amber-700 ring-amber-100"
+            : "bg-rose-50 text-rose-700 ring-rose-100";
+        const bar = passRate >= 80 ? "bg-teal-600" : passRate >= 60 ? "bg-amber-500" : "bg-rose-600";
+
         return (
-          <div key={r.region} className="rounded-xl p-4 text-white" style={{ background: bg }}>
-            <p className="text-sm font-semibold truncate">{r.region}</p>
-            <p className="text-2xl font-bold mt-1">{r.passRate}%</p>
-            <p className="text-xs opacity-80">{r.vehicles} vehicles · {r.inspections} inspections</p>
+          <div key={region.region} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{region.region}</p>
+                <p className="mt-1 text-xs text-slate-500">{region.vehicles} vehicles · {region.inspections} inspections</p>
+              </div>
+              <span className={"rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset " + tone}>
+                {passRate}%
+              </span>
+            </div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-label={region.region + " pass rate " + passRate + "%"}>
+              <div className={"h-full rounded-full " + bar} style={{ width: passRate + "%" }} />
+            </div>
           </div>
         );
       })}
@@ -262,8 +247,8 @@ export function InspectorChart({ data }: { data: { inspector: string; inspection
         <YAxis tick={{ fontSize: 12 }} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="pass" fill="#10b981" name="Pass" />
-        <Bar dataKey="fail" fill="#ef4444" name="Fail" />
+        <Bar dataKey="pass" fill="#0f766e" name="Pass" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="fail" fill="#dc5a5a" name="Fail" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
