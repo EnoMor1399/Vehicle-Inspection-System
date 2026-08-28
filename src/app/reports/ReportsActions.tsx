@@ -155,11 +155,11 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 no-print">
+    <div className="flex flex-wrap items-center gap-2 no-print">
       <button
         onClick={() => handleExport("pdf")}
         disabled={!!action}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white ring-1 ring-slate-300 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
         {action === "pdf" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -171,7 +171,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       <button
         onClick={() => handleExport("excel")}
         disabled={!!action}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white ring-1 ring-slate-300 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
         {action === "excel" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -183,7 +183,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       <button
         onClick={() => handleExport("csv")}
         disabled={!!action}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white ring-1 ring-slate-300 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
         {action === "csv" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -195,7 +195,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       <button
         onClick={handlePrint}
         disabled={!!action}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white ring-1 ring-slate-300 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
         {action === "print" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -207,7 +207,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       <button
         onClick={handleEmail}
         disabled={!!action}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-50"
       >
         {action === "email" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
