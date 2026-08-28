@@ -86,6 +86,15 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+const TRANSPORTER_NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Your Workspace",
+    items: [
+      { href: "/portal", label: "Transporter Portal", icon: Truck },
+    ],
+  },
+];
+
 export interface AppBranding {
   logoUrl?: string | null;
   companyName: string;
@@ -107,12 +116,24 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || (href !== "/" && pathname.startsWith(href));
 }
 
-export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: ReactNode; branding?: AppBranding }) {
+export function AppShell({
+  children,
+  branding = DEFAULT_BRANDING,
+  userRole,
+  userName,
+}: {
+  children: ReactNode;
+  branding?: AppBranding;
+  userRole?: string | null;
+  userName?: string | null;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const isTransporter = userRole === "transporter_user";
+  const navGroups = isTransporter ? TRANSPORTER_NAV_GROUPS : NAV_GROUPS;
 
   const activeContext = (() => {
-    for (const group of NAV_GROUPS) {
+    for (const group of navGroups) {
       const item = group.items.find((candidate) => isActivePath(pathname, candidate.href));
       if (item) return { group: group.label, item };
     }
@@ -150,7 +171,9 @@ export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: 
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-400">{branding.tagline || "Inspection Operations"}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                {isTransporter ? "Transporter Portal" : (branding.tagline || "Inspection Operations")}
+              </p>
             </div>
             <button
               type="button"
@@ -165,14 +188,16 @@ export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: 
           <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[11px] text-slate-400">
             <span className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
-              Secure workspace
+              {isTransporter ? "Transporter account" : "Secure workspace"}
             </span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5 font-medium text-slate-300">V2.3 UI</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5 font-medium text-slate-300">
+              {isTransporter ? "SCOPED" : "V2.3 UI"}
+            </span>
           </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div key={group.label} className="mb-5 last:mb-0">
               <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {group.label}
@@ -215,6 +240,12 @@ export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: 
           ))}
         </nav>
 
+        {isTransporter && (
+          <div className="mx-3 mb-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.06] p-3 text-xs leading-relaxed text-slate-400">
+            Your account is limited to the fleet, inspections and compliance records linked to your transporter profile.
+          </div>
+        )}
+
         <div className="border-t border-white/10 p-3">
           <form action="/api/auth/logout" method="POST">
             <button
@@ -252,12 +283,12 @@ export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: 
 
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                <span>VIMS</span>
+                <span>{isTransporter ? "TRANSPORTER" : "VIMS"}</span>
                 <ChevronRight className="h-3 w-3" />
-                <span className="truncate">{activeContext?.group || "Workspace"}</span>
+                <span className="truncate">{activeContext?.group || (isTransporter ? "Your Workspace" : "Workspace")}</span>
               </div>
               <p className="mt-0.5 truncate text-[15px] font-semibold tracking-tight text-slate-950">
-                {activeContext?.item.label || "Vehicle Inspection Management"}
+                {activeContext?.item.label || (isTransporter ? "Transporter Workspace" : "Vehicle Inspection Management")}
               </p>
             </div>
 
@@ -265,7 +296,7 @@ export function AppShell({ children, branding = DEFAULT_BRANDING }: { children: 
               <div className="h-8 w-px bg-slate-200" />
               <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                Protected session
+                {isTransporter ? `${userName || "Transporter"} · Scoped access` : "Protected session"}
               </div>
             </div>
           </div>

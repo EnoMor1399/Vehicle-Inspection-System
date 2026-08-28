@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { PWAProvider } from "@/components/PWAProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getSettings } from "@/lib/settings";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,14 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const settings = await getSettings();
+  let shellUser: { role: string; name: string } | null = null;
+  try {
+    const user = await getCurrentUser();
+    shellUser = { role: user.role, name: user.name };
+  } catch {
+    // Public and login routes intentionally render without an authenticated shell identity.
+  }
+
   return (
     <html lang="en">
       <head>
@@ -55,14 +64,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body className="bg-slate-100 text-slate-900 antialiased">
         <ErrorBoundary>
-          <AppShell branding={{
-            logoUrl: settings.logoDataUrl,
-            companyName: settings.companyName,
-            tagline: settings.tagline || "",
-            footerText: settings.footerText || "",
-            themeColor: settings.themeColor,
-            accentColor: settings.accentColor,
-          }}>
+          <AppShell
+            branding={{
+              logoUrl: settings.logoDataUrl,
+              companyName: settings.companyName,
+              tagline: settings.tagline || "",
+              footerText: settings.footerText || "",
+              themeColor: settings.themeColor,
+              accentColor: settings.accentColor,
+            }}
+            userRole={shellUser?.role}
+            userName={shellUser?.name}
+          >
             {children}
           </AppShell>
           <PWAProvider />
