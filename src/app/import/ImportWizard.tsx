@@ -22,6 +22,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
   const [pending, startTransition] = useTransition();
 
   const selected = entityTypes.find((e) => e.value === entityType)!;
+  const maxRows = entityType === "pre_trip_inspections" ? 5000 : 500;
 
   function handleFile(f: File) {
     setFile(f);
@@ -29,21 +30,38 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
+        const wb = XLSX.read(data, { type: "array", cellDates: true });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
+          defval: "",
+          raw: false,
+          dateNF: "yyyy-mm-dd",
+        });
         const normalized = rows.map((r) =>
-          Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v == null ? "" : String(v)]))
+          Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v == null ? "" : String(v).trim()]))
         );
-        setRawData(normalized.slice(0, 500));
-        // Auto-map columns by name similarity
+
+        if (normalized.length === 0) {
+          alert("No data rows were found in the first worksheet.");
+          setFile(null);
+          return;
+        }
+        if (normalized.length > maxRows) {
+          alert(`${selected.label} imports support up to ${maxRows.toLocaleString()} rows per file. This file contains ${normalized.length.toLocaleString()} rows.`);
+          setFile(null);
+          return;
+        }
+
+        setRawData(normalized);
+        // Auto-map columns by name similarity.
         const headers = Object.keys(normalized[0] || {});
         const autoMap: Record<string, string> = {};
-        selected.fields.forEach((f) => {
-          const match = headers.find((h) => h.toLowerCase().replace(/[^a-z]/g, "") === f.toLowerCase().replace(/[^a-z]/g, ""));
-          if (match) autoMap[f] = match;
+        selected.fields.forEach((field) => {
+          const match = headers.find((header) => header.toLowerCase().replace(/[^a-z0-9]/g, "") === field.toLowerCase().replace(/[^a-z0-9]/g, ""));
+          if (match) autoMap[field] = match;
         });
         setMapping(autoMap);
+        setErrors([]);
         setStep("mapping");
       } catch (err) {
         alert("Failed to read file: " + (err as Error).message);
@@ -57,12 +75,12 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
   function validate() {
     const errs: { row: number; field: string; message: string }[] = [];
     rawData.forEach((row, idx) => {
-      selected.required.forEach((f) => {
-        const col = mapping[f];
+      selected.required.forEach((field) => {
+        const col = mapping[field];
         if (!col) {
-          if (!errs.find((e) => e.row === 0 && e.field === f)) errs.push({ row: 0, field: f, message: `Required column "${f}" is not mapped` });
+          if (!errs.find((e) => e.row === 0 && e.field === field)) errs.push({ row: 0, field, message: `Required column "${field}" is not mapped` });
         } else if (!row[col]) {
-          errs.push({ row: idx + 1, field: f, message: "Missing required value" });
+          errs.push({ row: idx + 1, field, message: "Missing required value" });
         }
       });
     });
@@ -109,7 +127,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
       {step === "upload" && (
         <Card className="p-8">
           <Field label="Entity Type">
-            <Select value={entityType} onChange={(e) => setEntityType(e.target.value)}>
+            <Select value={entityType} onChange={(e) => { setEntityType(e.target.value); setFile(null); setRawData([]); setMapping({}); setErrors([]); }}>
               {entityTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
           </Field>
@@ -121,7 +139,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
           >
             <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
             <p className="font-medium text-slate-900">Drop XLSX, XLS or CSV here</p>
-            <p className="text-sm text-slate-500 mt-1">or click to browse — up to 10MB</p>
+            <p className="text-sm text-slate-500 mt-1">or click to browse — up to 10MB · max {maxRows.toLocaleString()} rows</p>
             <input
               ref={fileInput}
               type="file"
@@ -131,7 +149,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
             />
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Historical data from the existing Excel workbook can be imported to preserve operational history and analytics.
+            Historical data can be imported to preserve operational history and analytics. Pre-Trip / Safe-To-Load imports may contain up to 5,000 rows; checklist item answers are not invented when the historical source only records trip clearance.
           </p>
         </Card>
       )}
@@ -141,18 +159,18 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-semibold">Column Mapping</h2>
-              <p className="text-sm text-slate-500">{file?.name} — {rawData.length} rows detected</p>
+              <p className="text-sm text-slate-500">{file?.name} — {rawData.length.toLocaleString()} rows detected</p>
             </div>
             <Badge tone="blue">{headers.length} columns</Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {selected.fields.map((f) => (
-              <div key={f} className="flex items-center gap-2 text-sm">
-                <span className="w-40 font-medium">{f}{selected.required.includes(f) ? <span className="text-red-500"> *</span> : null}</span>
+            {selected.fields.map((field) => (
+              <div key={field} className="flex items-center gap-2 text-sm">
+                <span className="w-40 font-medium">{field}{selected.required.includes(field) ? <span className="text-red-500"> *</span> : null}</span>
                 <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
                 <select
-                  value={mapping[f] || ""}
-                  onChange={(e) => setMapping({ ...mapping, [f]: e.target.value })}
+                  value={mapping[field] || ""}
+                  onChange={(e) => setMapping({ ...mapping, [field]: e.target.value })}
                   className="flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
                 >
                   <option value="">— skip —</option>
@@ -174,7 +192,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
             <div>
               <h2 className="text-lg font-semibold">Preview & Validation</h2>
               <p className="text-sm text-slate-500">
-                {rawData.length} rows · {errors.length === 0 ? "No validation errors" : `${errors.length} issues detected`}
+                {rawData.length.toLocaleString()} rows · {errors.length === 0 ? "No required-field validation errors" : `${errors.length} issues detected`}
               </p>
             </div>
             {errors.length > 0 ? <Badge tone="red">{errors.length} errors</Badge> : <Badge tone="emerald">Ready</Badge>}
@@ -196,13 +214,13 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
             <table className="w-full text-xs">
               <thead className="bg-slate-50 sticky top-0">
                 <tr>
-                  {selected.fields.map((f) => <th key={f} className="px-2 py-1 text-left font-medium">{f}</th>)}
+                  {selected.fields.map((field) => <th key={field} className="px-2 py-1 text-left font-medium">{field}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {rawData.slice(0, 20).map((row, i) => (
                   <tr key={i} className="border-t border-slate-100">
-                    {selected.fields.map((f) => <td key={f} className="px-2 py-1">{row[mapping[f] || ""] || "—"}</td>)}
+                    {selected.fields.map((field) => <td key={field} className="px-2 py-1">{row[mapping[field] || ""] || "—"}</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -212,7 +230,7 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
           <div className="mt-6 flex items-center gap-2">
             <Button variant="secondary" onClick={() => setStep("mapping")}>Back</Button>
             <Button onClick={runImport} disabled={pending || errors.length > 0}>
-              {pending ? "Importing..." : `Import ${rawData.length} records`}
+              {pending ? "Importing..." : `Import ${rawData.length.toLocaleString()} records`}
             </Button>
           </div>
         </Card>
@@ -223,12 +241,12 @@ export function ImportWizard({ entityTypes }: { entityTypes: { value: string; la
           <CheckCircle2 className="h-14 w-14 text-emerald-600 mx-auto mb-3" />
           <h2 className="text-xl font-semibold text-slate-950">Import Complete</h2>
           <p className="text-slate-600 mt-2">
-            <span className="font-semibold text-emerald-600">{result.imported}</span> records imported ·{" "}
-            <span className="font-semibold text-red-600">{result.invalid}</span> invalid
+            <span className="font-semibold text-emerald-600">{result.imported.toLocaleString()}</span> records imported ·{" "}
+            <span className="font-semibold text-red-600">{result.invalid.toLocaleString()}</span> invalid
           </p>
           <p className="text-xs text-slate-500 mt-1 font-mono">Job ID: {result.jobId}</p>
           <div className="mt-6 flex items-center justify-center gap-2">
-            <Button variant="secondary" onClick={() => { setStep("upload"); setRawData([]); setFile(null); setResult(null); }}>
+            <Button variant="secondary" onClick={() => { setStep("upload"); setRawData([]); setFile(null); setResult(null); setMapping({}); setErrors([]); }}>
               New Import
             </Button>
             <Button onClick={() => router.push("/")}>Done</Button>
