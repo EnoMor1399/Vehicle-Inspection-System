@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, AreaChart, Area,
 } from "recharts";
 
-const COLORS = ["#0f766e", "#334155", "#d97706", "#4f46e5", "#be123c", "#0369a1", "#7c3aed"];
+const COLORS = ["#10b981", "#2563eb", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4", "#ec4899"];
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -54,21 +54,21 @@ export function TrendChart({ data }: { data: { month: string; pass: number; fail
           <defs>
             {/* Vibrant Pass Gradient */}
             <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0f766e" stopOpacity={0.8} />
-              <stop offset="50%" stopColor="#2dd4bf" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#99f6e4" stopOpacity={0.1} />
+              <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
+              <stop offset="50%" stopColor="#34d399" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#a7f3d0" stopOpacity={0.1} />
             </linearGradient>
             
             {/* Vibrant Fail Gradient */}
             <linearGradient id="failGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#dc5a5a" stopOpacity={0.8} />
-              <stop offset="50%" stopColor="#f08a8a" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#fecaca" stopOpacity={0.1} />
+              <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.8} />
+              <stop offset="50%" stopColor="#fb7185" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#fecdd3" stopOpacity={0.1} />
             </linearGradient>
             
             {/* Conditional Gradient */}
             <linearGradient id="conditionalGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#d97706" stopOpacity={0.6} />
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.6} />
               <stop offset="100%" stopColor="#fbbf24" stopOpacity={0.2} />
             </linearGradient>
 
@@ -101,35 +101,35 @@ export function TrendChart({ data }: { data: { month: string; pass: number; fail
           <Area 
             type="monotone" 
             dataKey="pass" 
-            stroke="#0f766e" 
+            stroke="#10b981" 
             strokeWidth={2.5}
             fill="url(#passGradient)" 
             name="Pass"
-            dot={{ fill: "#0f766e", r: 4, strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 6, fill: "#0f766e", stroke: "#fff", strokeWidth: 2 }}
+            dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
+            activeDot={{ r: 6, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
           />
           
           <Area 
             type="monotone" 
             dataKey="fail" 
-            stroke="#dc5a5a" 
+            stroke="#f43f5e" 
             strokeWidth={2.5}
             fill="url(#failGradient)" 
             name="Fail"
-            dot={{ fill: "#dc5a5a", r: 4, strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 6, fill: "#dc5a5a", stroke: "#fff", strokeWidth: 2 }}
+            dot={{ fill: "#f43f5e", r: 4, strokeWidth: 2, stroke: "#fff" }}
+            activeDot={{ r: 6, fill: "#f43f5e", stroke: "#fff", strokeWidth: 2 }}
           />
           
           <Area 
             type="monotone" 
             dataKey="conditional" 
-            stroke="#d97706" 
+            stroke="#f59e0b" 
             strokeWidth={2.5}
             fill="url(#conditionalGradient)" 
             name="Conditional"
             strokeDasharray="5 5"
-            dot={{ fill: "#d97706", r: 3, strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 5, fill: "#d97706", stroke: "#fff", strokeWidth: 2 }}
+            dot={{ fill: "#f59e0b", r: 3, strokeWidth: 2, stroke: "#fff" }}
+            activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -153,8 +153,8 @@ export function StationChart({ data }: { data: { station: string; pass: number; 
         />
         <Tooltip cursor={{ fill: "#f8fafc" }} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: "14px", fontSize: "12px" }} />
-        <Bar dataKey="pass" stackId="outcome" fill="#0f766e" name="Pass" radius={[4, 0, 0, 4]} />
-        <Bar dataKey="fail" stackId="outcome" fill="#dc5a5a" name="Fail" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="pass" stackId="outcome" fill="#10b981" name="Pass" radius={[4, 0, 0, 4]} />
+        <Bar dataKey="fail" stackId="outcome" fill="#f43f5e" name="Fail" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -170,8 +170,8 @@ export function TransporterChart({ data }: { data: { transporter: string; pass: 
         <YAxis type="category" dataKey="transporter" tick={{ fontSize: 11 }} width={95} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="pass" fill="#0f766e" name="Pass" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="fail" fill="#dc5a5a" name="Fail" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="pass" fill="#10b981" name="Pass" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="fail" fill="#f43f5e" name="Fail" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -185,7 +185,7 @@ export function DefectsChart({ data }: { data: { item: string; failures: number 
         <XAxis type="number" tick={{ fontSize: 12 }} />
         <YAxis type="category" dataKey="item" tick={{ fontSize: 11 }} width={145} />
         <Tooltip />
-        <Bar dataKey="failures" fill="#be123c" radius={[0, 5, 5, 0]} />
+        <Bar dataKey="failures" fill="#e11d48" radius={[0, 5, 5, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -210,24 +210,33 @@ export function RegionHeatMap({ data }: { data: { region: string; vehicles: numb
       {data.map((region) => {
         const passRate = Math.max(0, Math.min(100, region.passRate || 0));
         const tone = passRate >= 80
-          ? "bg-teal-50 text-teal-700 ring-teal-100"
+          ? "bg-white/80 text-emerald-700 ring-emerald-300"
           : passRate >= 60
-            ? "bg-amber-50 text-amber-700 ring-amber-100"
-            : "bg-rose-50 text-rose-700 ring-rose-100";
-        const bar = passRate >= 80 ? "bg-teal-600" : passRate >= 60 ? "bg-amber-500" : "bg-rose-600";
+            ? "bg-white/80 text-orange-700 ring-orange-300"
+            : "bg-white/80 text-rose-700 ring-rose-300";
+        const surface = passRate >= 80
+          ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/80"
+          : passRate >= 60
+            ? "border-orange-200 bg-gradient-to-br from-amber-50 to-orange-100/80"
+            : "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-100/80";
+        const bar = passRate >= 80
+          ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+          : passRate >= 60
+            ? "bg-gradient-to-r from-amber-400 to-orange-500"
+            : "bg-gradient-to-r from-rose-500 to-pink-500";
 
         return (
-          <div key={region.region} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div key={region.region} className={"rounded-xl border p-4 shadow-sm " + surface}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">{region.region}</p>
-                <p className="mt-1 text-xs text-slate-500">{region.vehicles} vehicles · {region.inspections} inspections</p>
+                <p className="mt-1 text-xs text-slate-600">{region.vehicles} vehicles · {region.inspections} inspections</p>
               </div>
-              <span className={"rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset " + tone}>
+              <span className={"rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ring-1 ring-inset " + tone}>
                 {passRate}%
               </span>
             </div>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-label={region.region + " pass rate " + passRate + "%"}>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80 shadow-inner" aria-label={region.region + " pass rate " + passRate + "%"}>
               <div className={"h-full rounded-full " + bar} style={{ width: passRate + "%" }} />
             </div>
           </div>
@@ -247,8 +256,8 @@ export function InspectorChart({ data }: { data: { inspector: string; inspection
         <YAxis tick={{ fontSize: 12 }} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="pass" fill="#0f766e" name="Pass" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="fail" fill="#dc5a5a" name="Fail" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="pass" fill="#10b981" name="Pass" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="fail" fill="#f43f5e" name="Fail" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
