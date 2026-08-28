@@ -4,6 +4,7 @@ import { ArrowLeft, Printer, Share2, ExternalLink, Copy, CheckCircle2 } from "lu
 import Link from "next/link";
 import { useState } from "react";
 
+// Keep print-time overrides last in the cascade so the generated A4 certificate is preserved exactly.
 const PRINT_STYLE_ID = "vims-certificate-exact-print";
 
 export function CertificateToolbar({
