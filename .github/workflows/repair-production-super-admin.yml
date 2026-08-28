@@ -1,0 +1,38 @@
+name: Repair production Super Admin
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type REPAIR_ADMIN:morganenoch1@gmail.com"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-production-super-admin
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Repair and verify production Super Administrator
+        run: node scripts/repair-production-super-admin.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPER_ADMIN_NAME: Enoch Morgan
+          SUPER_ADMIN_EMAIL: morganenoch1@gmail.com
+          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
+          REPAIR_CONFIRMATION: ${{ inputs.confirmation }}
+          PASSWORD_BCRYPT_ROUNDS: "12"
