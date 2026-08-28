@@ -35,6 +35,60 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Classify target database
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const pg = require('pg');
+          const cs = process.env.DATABASE_URL;
+          const client = new pg.Client({
+            connectionString: cs,
+            ssl: /sslmode=(require|verify-ca|verify-full)/i.test(cs) ? { rejectUnauthorized: false } : undefined,
+          });
+          (async () => {
+            await client.connect();
+            try {
+              const tables = await client.query(`
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema='public' AND table_type='BASE TABLE'
+                ORDER BY table_name
+              `);
+              const names = tables.rows.map((row) => row.table_name);
+              const required = ['users', 'transporters', 'vehicles', 'system_settings'];
+              const missing = required.filter((name) => !names.includes(name));
+
+              if (names.length === 0) {
+                fs.appendFileSync(process.env.GITHUB_OUTPUT, 'mode=fresh\n');
+                console.log('Target database is empty; fresh VIMS schema initialization is permitted.');
+                return;
+              }
+
+              if (missing.length === 0) {
+                fs.appendFileSync(process.env.GITHUB_OUTPUT, 'mode=existing\n');
+                console.log('Existing VIMS base schema verified.');
+                return;
+              }
+
+              console.error(`Refusing migration: database has ${names.length} public tables but is missing VIMS base tables: ${missing.join(', ')}`);
+              console.error(`Existing public tables: ${names.join(', ')}`);
+              process.exit(1);
+            } finally {
+              await client.end();
+            }
+          })().catch((error) => {
+            console.error(error.message);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Initialize fresh VIMS schema
+        if: steps.classify.outputs.mode == 'fresh'
+        run: npx drizzle-kit push --force
+
       - name: Verify expected VIMS base schema
         shell: bash
         run: |
@@ -58,7 +112,7 @@ jobs:
               `);
               const row = result.rows[0];
               const missing = Object.entries(row).filter(([, value]) => !value).map(([key]) => key);
-              if (missing.length) throw new Error(`Expected VIMS base tables are missing: ${missing.join(', ')}`);
+              if (missing.length) throw new Error(`Expected VIMS base tables are missing after initialization: ${missing.join(', ')}`);
               console.log('Expected VIMS base schema verified.');
             } finally {
               await client.end();
