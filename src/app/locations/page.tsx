@@ -2,13 +2,15 @@ import { db } from "@/db";
 import { locations, users, inspections } from "@/db/schema";
 import { eq, sql, asc } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
+import { StationEditor } from "./StationEditor";
 import { MapPin, Users, Wrench, Phone, Mail } from "lucide-react";
-import { getCurrentUser, canManageLocations } from "@/lib/auth";
+import { canManageLocations } from "@/lib/auth";
+import { requireInternalUser } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function LocationsPage() {
-  const user = await getCurrentUser();
+  const user = await requireInternalUser();
   const canManage = canManageLocations(user);
 
   const allLocations = await db.select().from(locations).orderBy(asc(locations.name));
@@ -36,11 +38,7 @@ export default async function LocationsPage() {
         eyebrow="Network"
         title="Inspection Stations"
         description="Multi-site network across Ghana. Each station maintains its own inspectors, vehicles, equipment and daily schedules."
-        action={canManage ? (
-          <button className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">
-            + Add Station
-          </button>
-        ) : undefined}
+        action={canManage ? <StationEditor /> : undefined}
       />
 
       {rows.length === 0 ? (
@@ -58,7 +56,14 @@ export default async function LocationsPage() {
                   <p className="text-xs text-slate-500 font-mono">{s.code}</p>
                   <p className="text-xs text-slate-600 mt-0.5 truncate">{s.region}{s.district ? `, ${s.district}` : ""}</p>
                 </div>
-                <Badge tone={s.status === "active" ? "emerald" : "slate"}>{s.status}</Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge tone={s.status === "active" ? "emerald" : s.status === "maintenance" ? "amber" : "slate"}>{s.status}</Badge>
+                  {canManage && <StationEditor station={{
+                    id: s.id, name: s.name, code: s.code, region: s.region || "", district: s.district || "",
+                    address: s.address || "", gpsAddress: s.gpsAddress || "", phone: s.phone || "", email: s.email || "",
+                    managerName: s.managerName || "", capacity: s.capacity, equipment: Array.isArray(s.equipment) ? s.equipment : [], status: s.status,
+                  }} />}
+                </div>
               </div>
 
               <div className="mt-3 space-y-1 text-sm text-slate-600">

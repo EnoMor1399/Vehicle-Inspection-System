@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
-import { eq, and, desc, isNull, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
-import { getCurrentUser, canEditVehicles } from "@/lib/auth";
+import { getCurrentUser, canEditVehicles, canAccessTransporterScope } from "@/lib/auth";
 
 export type VehicleFormData = {
   transporterId?: string | null;
@@ -162,26 +162,30 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
   revalidatePath("/vehicles");
 }
 
-export async function deleteVehicle(id: string) {
+export async function decommissionVehicle(id: string) {
   const user = await requireEditor();
   const [v] = await db.select().from(vehicles).where(eq(vehicles.id, id));
   if (!v) return;
-  await db.delete(vehicles).where(eq(vehicles.id, id));
+  await db.update(vehicles).set({ status: "decommissioned", updatedAt: new Date() }).where(eq(vehicles.id, id));
   await logAudit({
     userId: user.id,
     userName: user.name,
-    action: "delete",
+    action: "archive",
     entityType: "vehicle",
     entityId: id,
     entityLabel: v.registrationNumber,
-    summary: `Deleted vehicle ${v.registrationNumber}`,
+    summary: `Decommissioned vehicle ${v.registrationNumber}`,
+    before: { status: v.status },
+    after: { status: "decommissioned" },
   });
+  revalidatePath(`/vehicles/${id}`);
   revalidatePath("/vehicles");
 }
 
 export async function getVehicleDetail(id: string) {
+  const user = await getCurrentUser();
   const [v] = await db.select().from(vehicles).where(eq(vehicles.id, id));
-  if (!v) return null;
+  if (!v || !canAccessTransporterScope(user, v.transporterId)) return null;
   const insp = await db
     .select()
     .from(inspections)

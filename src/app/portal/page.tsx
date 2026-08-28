@@ -1,10 +1,10 @@
 import { db } from "@/db";
 import { vehicles, inspections, transporters } from "@/db/schema";
-import { eq, desc, sql, and, isNull } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { PageHeader, Card, Badge, StatCard } from "@/components/ui";
-import { Truck, Car, CheckCircle2, XCircle, AlertTriangle, Calendar } from "lucide-react";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { Car, CheckCircle2, XCircle, Calendar } from "lucide-react";
+import { formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +21,21 @@ export default async function PortalPage() {
     );
   }
 
-  // Find the transporter associated with this user (by email domain match or direct link)
-  const domain = user.email.split("@")[1];
-  const allTransporters = await db.select().from(transporters).where(isNull(transporters.deletedAt));
-  const matchedTransporter = allTransporters.find((t) => t.email?.endsWith(domain)) || allTransporters[0];
-  if (!matchedTransporter) {
-    return <div className="p-10"><Card className="p-8"><p>No transporter profile linked to your account.</p></Card></div>;
+  // External portal users must be explicitly linked to one transporter. Never infer
+  // tenancy from an email domain and never fall back to another company record.
+  if (!user.transporterId) {
+    return (
+      <div className="p-6 lg:p-10">
+        <PageHeader title="Transporter Portal" description="Your account is not yet linked to a transporter profile." />
+        <Card className="p-8">
+          <p className="text-slate-700">Ask an administrator to link this account to the correct transporter before fleet data can be displayed.</p>
+        </Card>
+      </div>
+    );
+  }
+  const [matchedTransporter] = await db.select().from(transporters).where(eq(transporters.id, user.transporterId));
+  if (!matchedTransporter || matchedTransporter.deletedAt) {
+    return <div className="p-10"><Card className="p-8"><p>The linked transporter profile is unavailable. Contact an administrator.</p></Card></div>;
   }
 
   const fleet = await db.select().from(vehicles).where(eq(vehicles.transporterId, matchedTransporter.id));

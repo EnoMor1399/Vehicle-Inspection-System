@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Button } from "@/components/ui";
 import { X, Pencil } from "lucide-react";
 
 export function SignaturePad({

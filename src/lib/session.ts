@@ -108,48 +108,75 @@ export async function signUp(input: {
     return { ok: false, error: "Passwords do not match", field: "confirmPassword" };
   }
 
-  const [existing] = await db.select().from(users).where(eq(users.email, normalized));
-  if (existing) {
-    return { ok: false, error: "An account with this email already exists", field: "email" };
+  const headersList = await headers();
+  const ipAddress = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || headersList.get("x-real-ip") || "unknown";
+  const userAgent = headersList.get("user-agent") || "unknown";
+  const signupLimit = await rateLimit("signup", `ip:${ipAddress}`);
+  if (!signupLimit.allowed) {
+    return { ok: false, error: "Too many account-creation attempts. Please try again later." };
   }
 
   const passwordHash = await hashPassword(password);
   const id = newId();
-
-  // Production bootstrap is explicit: only the configured email can become
-  // the first super administrator. All other registrations are viewers.
-  const [userCount] = await db.select({ n: sql<number>`count(*)::int` }).from(users);
-  const isFirstUser = (userCount?.n || 0) === 0;
   const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
-  const role = isFirstUser && (process.env.NODE_ENV !== "production" || bootstrapEmail === normalized)
-    ? "super_admin"
-    : "viewer";
 
-  await db.insert(users).values({
-    id,
-    name: name.trim(),
-    email: normalized,
-    role,
-    passwordHash,
-    phone: phone || null,
-    isActive: true,
+  const created = await db.transaction(async (tx) => {
+    // Serialise account bootstrap so concurrent sign-ups cannot create multiple
+    // initial administrators or permanently consume the bootstrap slot.
+    await tx.execute(sql`select pg_advisory_xact_lock(78654219)`);
+
+    const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, normalized));
+    if (existing) return { ok: false as const, error: "An account with this email already exists", field: "email" as const };
+
+    const [superAdminCount] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.role, "super_admin"));
+    const [userCount] = await tx.select({ n: sql<number>`count(*)::int` }).from(users);
+
+    const noSuperAdmin = Number(superAdminCount?.n || 0) === 0;
+    const isBootstrapIdentity = Boolean(bootstrapEmail && bootstrapEmail === normalized);
+    const isDevelopmentFirstUser = process.env.NODE_ENV !== "production" && Number(userCount?.n || 0) === 0;
+    const role = noSuperAdmin && (isBootstrapIdentity || isDevelopmentFirstUser) ? "super_admin" : "viewer";
+
+    // If a production deployment has no administrator, only the configured
+    // bootstrap identity may claim that role. Other accounts can safely exist
+    // as viewers without blocking the administrator from registering later.
+    if (process.env.NODE_ENV === "production" && noSuperAdmin && !bootstrapEmail) {
+      return {
+        ok: false as const,
+        error: "Administrator bootstrap is not configured. Set BOOTSTRAP_ADMIN_EMAIL before creating the first production account.",
+        field: "email" as const,
+      };
+    }
+
+    await tx.insert(users).values({
+      id,
+      name: name.trim(),
+      email: normalized,
+      role,
+      passwordHash,
+      phone: phone?.trim() || null,
+      isActive: true,
+    });
+
+    await tx.insert(auditLogs).values({
+      id: newId(),
+      userId: id,
+      userName: name.trim(),
+      action: "create",
+      entityType: "user",
+      entityId: id,
+      entityLabel: normalized,
+      summary: `New account created: ${name.trim()} (${normalized})`,
+    });
+
+    return { ok: true as const, role };
   });
 
-  await db.insert(auditLogs).values({
-    id: newId(),
-    userId: id,
-    userName: name.trim(),
-    action: "create",
-    entityType: "user",
-    entityId: id,
-    entityLabel: normalized,
-    summary: `New account created: ${name.trim()} (${normalized})`,
-  });
+  if (!created.ok) return created;
 
   // Auto sign in using the same revocable session mechanism as normal login.
-  const headersList = await headers();
-  const ipAddress = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || headersList.get("x-real-ip") || "unknown";
-  const userAgent = headersList.get("user-agent") || "unknown";
   const { createSession } = await import("@/lib/security");
   const sessionToken = await createSession(id, ipAddress, userAgent, { remember: false });
   const jar = await cookies();
@@ -172,19 +199,5 @@ export async function signUp(input: {
     summary: `${name.trim()} signed up and logged in`,
   });
 
-  return { ok: true, userId: id, userName: name.trim(), role };
-}
-
-async function recordFailedLogin(email: string, reason: string) {
-  try {
-    await db.insert(auditLogs).values({
-      id: newId(),
-      action: "login_failed",
-      entityType: "user",
-      entityLabel: email,
-      summary: `Failed login attempt for ${email}: ${reason}`,
-    });
-  } catch {
-    // ignore
-  }
+  return { ok: true, userId: id, userName: name.trim(), role: created.role };
 }

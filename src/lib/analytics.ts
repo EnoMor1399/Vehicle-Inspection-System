@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { inspections, vehicles, transporters } from "@/db/schema";
-import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export interface DashboardStats {
   totalVehicles: number;

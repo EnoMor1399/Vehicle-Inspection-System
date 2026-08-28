@@ -1,17 +1,19 @@
 import "../certificate.css";
 import { addMonths } from "date-fns";
+import type { ReactNode } from "react";
 import { db } from "@/db";
 import { inspections, vehicles, signatures, transporters, locations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { requireAuth } from "@/lib/require-auth";
+import { canAccessTransporterScope } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { summarizeSection, INSPECTION_SECTIONS } from "@/lib/sections";
 import { QRCode } from "@/app/inspections/QRCode";
 import { formatDateTime, formatDate } from "@/lib/utils";
-import { ShieldCheck, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
-import { CertificateToolbar } from "./CertificateToolbar";
+import { ShieldCheck, CheckCircle2, AlertTriangle, XCircle, CalendarClock, FileCheck2 } from "lucide-react";
+import { CertificateToolbar } from "../CertificateToolbar";
 import { certificateVerificationCode, createCertificateSignature } from "@/lib/certificate-security";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +21,14 @@ export const dynamic = "force-dynamic";
 type ResultTone = "pass" | "conditional" | "fail" | "pending" | "expired";
 
 export default async function CertificatePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAuth();
+  const currentUser = await requireAuth();
   const { id } = await params;
 
   const [inspection] = await db.select().from(inspections).where(eq(inspections.id, id));
   if (!inspection) notFound();
 
   const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, inspection.vehicleId));
-  if (!vehicle) notFound();
+  if (!vehicle || !canAccessTransporterScope(currentUser, vehicle.transporterId)) notFound();
 
   const [transporter] = vehicle.transporterId
     ? await db.select().from(transporters).where(eq(transporters.id, vehicle.transporterId))
@@ -90,7 +92,11 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
 
   return (
     <main className="certificate-screen">
-      <CertificateToolbar vehicleRegistration={vehicle.registrationNumber} verifyUrl={verifyUrl || verifyPath} />
+      <CertificateToolbar
+        inspectionId={inspection.id}
+        vehicleRegistration={vehicle.registrationNumber}
+        verifyUrl={verifyUrl || verifyPath}
+      />
 
       <article className={`certificate-document certificate-state-${tone}`}>
         <div className="certificate-security-pattern" aria-hidden="true" />
@@ -98,75 +104,109 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
         <div className="certificate-frame certificate-frame-inner" aria-hidden="true" />
 
         {!issuanceRequirementsMet && (
-          <div className="certificate-control-watermark" aria-hidden="true">PENDING APPROVAL</div>
+          <div className="certificate-control-watermark" aria-hidden="true">PENDING AUTHORIZATION</div>
         )}
         {expired && issuanceRequirementsMet && (
           <div className="certificate-control-watermark" aria-hidden="true">EXPIRED</div>
         )}
 
         <header className="certificate-header">
-          <div className="certificate-brand">
-            <div className="certificate-logo-box">
-              {settings.logoDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={settings.logoDataUrl} alt={`${settings.companyName} logo`} />
-              ) : (
-                <ShieldCheck aria-hidden="true" />
-              )}
+          <div className="certificate-brand-row">
+            <div className="certificate-brand">
+              <div className="certificate-logo-box">
+                {settings.logoDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={settings.logoDataUrl} alt={`${settings.companyName} logo`} />
+                ) : (
+                  <ShieldCheck aria-hidden="true" />
+                )}
+              </div>
+              <div>
+                <p className="certificate-kicker">Official Inspection Document</p>
+                <h2>{settings.companyName}</h2>
+                <p className="certificate-tagline">{settings.tagline || "Vehicle Inspection Management System"}</p>
+                <p className="certificate-legal-line">
+                  {[
+                    settings.registrationNumber && `Reg. No. ${settings.registrationNumber}`,
+                    settings.taxId && `TIN ${settings.taxId}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" • ") || "Registered inspection organization"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="certificate-kicker">Official Inspection Document</p>
-              <h2>{settings.companyName}</h2>
-              <p className="certificate-tagline">{settings.tagline || "Vehicle Inspection Management System"}</p>
-              <p className="certificate-legal-line">
-                {[settings.registrationNumber && `Reg. No. ${settings.registrationNumber}`, settings.taxId && `TIN ${settings.taxId}`]
-                  .filter(Boolean).join(" • ") || "Registered inspection organization"}
+
+            <aside className="certificate-reference-card">
+              <span>Certificate Reference</span>
+              <strong>{inspection.inspectionNumber}</strong>
+              <small>Document version 2.1</small>
+            </aside>
+          </div>
+
+          <section className="certificate-title-block">
+            <div className="certificate-rule"><span /></div>
+            <p>{settings.certificateHeader || "Certificate of Vehicle Inspection and Roadworthiness"}</p>
+            <h1>Vehicle Inspection Certificate</h1>
+            <div className="certificate-subtitle-box">
+              <p>
+                This certificate confirms that the vehicle described below was inspected and assessed in accordance with the issuing
+                organization&apos;s approved inspection procedures and control standards.
               </p>
             </div>
-          </div>
-          <div className="certificate-reference">
-            <span>Certificate Reference</span>
-            <strong>{inspection.inspectionNumber}</strong>
-            <small>Document version 2.0</small>
-          </div>
+            <div className="certificate-rule"><span /></div>
+          </section>
         </header>
 
-        <section className="certificate-title-block">
-          <div className="certificate-rule"><span /></div>
-          <p>{settings.certificateHeader || "Vehicle Safety & Roadworthiness Assessment"}</p>
-          <h1>Vehicle Inspection Certificate</h1>
-          <div className="certificate-rule"><span /></div>
-        </section>
-
-        <section className="certificate-intro">
-          <p>
-            This document certifies that the vehicle identified below was inspected on <strong>{formatDate(inspection.inspectionDate)}</strong>
-            {location?.name ? <> at <strong>{location.name}</strong></> : null} in accordance with the organization&apos;s approved vehicle inspection procedures.
-            The recorded outcome and validity status are stated on this certificate and can be independently checked using the signed QR verification code.
-          </p>
-        </section>
-
-        <section className="certificate-status-row">
+        <section className="certificate-status-band">
           <div className={`certificate-result-seal result-${tone}`}>
             <div className="certificate-result-icon">
               {tone === "pass" ? <CheckCircle2 /> : tone === "fail" ? <XCircle /> : <AlertTriangle />}
             </div>
             <div>
-              <span>Inspection Status</span>
+              <span>Inspection Outcome</span>
               <strong>{resultLabel}</strong>
               <small>{description}</small>
             </div>
           </div>
+
           <div className="certificate-validity-panel">
             <div>
-              <span>Issued / Inspected</span>
+              <span>Inspection Date</span>
               <strong>{formatDate(inspection.inspectionDate)}</strong>
             </div>
             <div>
-              <span>Valid Until</span>
-              <strong>{roadworthy ? formatDate(validUntil) : "Not valid for roadworthiness"}</strong>
+              <span>Validity Status</span>
+              <strong>{roadworthy ? `Valid until ${formatDate(validUntil)}` : "Not valid for road use"}</strong>
             </div>
           </div>
+        </section>
+
+        <section className="certificate-intro">
+          <p>
+            The results recorded on this certificate represent the condition of the vehicle on the date of inspection.
+            Verification can be performed instantly using the QR code and certificate verification code shown below.
+          </p>
+        </section>
+
+        <section className="certificate-hero-grid">
+          <InfoCard
+            icon={<FileCheck2 className="h-5 w-5" />}
+            label="Certificate No."
+            value={inspection.inspectionNumber}
+            helper="Controlled document identifier"
+          />
+          <InfoCard
+            icon={<CalendarClock className="h-5 w-5" />}
+            label="Inspection Date & Time"
+            value={formatDateTime(inspection.inspectionDate)}
+            helper={location?.name ? `Inspected at ${location.name}` : inspection.station || "Inspection station recorded"}
+          />
+          <InfoCard
+            icon={<ShieldCheck className="h-5 w-5" />}
+            label="Verification Code"
+            value={verificationCode}
+            helper="Use with the QR code for online verification"
+          />
         </section>
 
         <section className="certificate-section">
@@ -176,10 +216,10 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
           <div className="certificate-detail-grid">
             <Detail label="Registration Number" value={vehicle.registrationNumber} emphasize />
             <Detail label="Make / Model" value={`${vehicle.make} ${vehicle.model || ""}`.trim()} />
+            <Detail label="Transporter / Owner" value={transporter?.companyName || vehicle.ownerName || "Not recorded"} />
             <Detail label="VIN" value={vehicle.vin || "Not recorded"} mono />
             <Detail label="Chassis Number" value={vehicle.chassisNumber || "Not recorded"} mono />
             <Detail label="Vehicle Class" value={vehicle.vehicleClass || vehicle.category || "Not recorded"} />
-            <Detail label="Transporter / Owner" value={transporter?.companyName || vehicle.ownerName || "Not recorded"} />
           </div>
         </section>
 
@@ -188,10 +228,13 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
             <span>02</span><h3>Inspection Record</h3>
           </div>
           <div className="certificate-detail-grid four-col">
-            <Detail label="Inspection Date" value={formatDateTime(inspection.inspectionDate)} />
-            <Detail label="Station" value={location?.name || inspection.station || "Not recorded"} />
-            <Detail label="Inspector" value={inspection.inspectorName || inspectorSig?.signerName || "Not recorded"} />
-            <Detail label="Supervisor" value={inspection.supervisorName || supervisorSig?.signerName || (settings.requireSupervisorApproval ? "Pending" : "Not required")} />
+            <Detail label="Station / Location" value={location?.name || inspection.station || "Not recorded"} />
+            <Detail label="Inspecting Officer" value={inspection.inspectorName || inspectorSig?.signerName || "Not recorded"} />
+            <Detail
+              label="Supervising Officer"
+              value={inspection.supervisorName || supervisorSig?.signerName || (settings.requireSupervisorApproval ? "Pending" : "Not required")}
+            />
+            <Detail label="Workflow Status" value={inspection.workflowStatus || "Not recorded"} />
           </div>
         </section>
 
@@ -250,12 +293,15 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
             />
             <div className="certificate-verification-box">
               <div className="certificate-qr">
-                <QRCode value={verifyUrl || verifyPath} size={104} />
+                <QRCode value={verifyUrl || verifyPath} size={110} />
               </div>
               <div>
                 <span>Secure Online Verification</span>
                 <strong>{verificationCode}</strong>
-                <p>Scan the QR code to validate the signed certificate record and current status.</p>
+                <p>
+                  Scan the QR code or visit the verification link to confirm the authenticity, current validity status,
+                  and signed certificate record.
+                </p>
               </div>
             </div>
           </div>
@@ -268,8 +314,13 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
             <p>{[settings.phone, settings.email, settings.website].filter(Boolean).join(" • ")}</p>
           </div>
           <div className="certificate-footer-notice">
-            <p>{settings.certificateFooter || "Electronically generated controlled document. Verify authenticity using the QR code and verification code printed above."}</p>
-            <p className="certificate-accreditation-note">No external accreditation or government endorsement is implied unless separately stated and supported by the issuing organization&apos;s current accreditation records.</p>
+            <p>
+              {settings.certificateFooter ||
+                "This is an electronically generated controlled document. Its authenticity should be confirmed using the printed verification code or QR code."}
+            </p>
+            <p className="certificate-accreditation-note">
+              No external accreditation, regulatory approval, or government endorsement is implied unless separately stated and supported by current accreditation records of the issuing organization.
+            </p>
           </div>
         </footer>
       </article>
@@ -278,16 +329,21 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
 }
 
 function certificateState(result: string, issued: boolean, expired: boolean): { label: string; tone: ResultTone; description: string } {
-  if (!issued) return { label: "PENDING AUTHORIZATION", tone: "pending", description: "Approval or required signature is outstanding" };
-  if (expired) return { label: "EXPIRED", tone: "expired", description: "The inspection validity period has ended" };
-  if (result === "pass") return { label: "PASS — ROADWORTHY", tone: "pass", description: "Meets the recorded inspection requirements" };
-  if (result === "conditional_pass") return { label: "CONDITIONAL", tone: "conditional", description: "Conditions or corrective actions apply" };
-  if (result === "reinspection_required") return { label: "RE-INSPECTION REQUIRED", tone: "conditional", description: "Corrective work and re-inspection are required" };
-  return { label: "FAIL — NOT ROADWORTHY", tone: "fail", description: "Does not meet the recorded inspection requirements" };
+  if (!issued) return { label: "PENDING AUTHORIZATION", tone: "pending", description: "Approval or required signatures are outstanding." };
+  if (expired) return { label: "EXPIRED", tone: "expired", description: "The inspection validity period has ended." };
+  if (result === "pass") return { label: "PASS — ROADWORTHY", tone: "pass", description: "The vehicle met the recorded inspection requirements." };
+  if (result === "conditional_pass") return { label: "CONDITIONAL PASS", tone: "conditional", description: "Conditions or corrective actions apply before continued operation." };
+  if (result === "reinspection_required") return { label: "RE-INSPECTION REQUIRED", tone: "conditional", description: "Corrective work must be completed and the vehicle re-inspected." };
+  return { label: "FAIL — NOT ROADWORTHY", tone: "fail", description: "The vehicle did not meet the recorded inspection requirements." };
 }
 
 function Detail({ label, value, mono, emphasize }: { label: string; value: string; mono?: boolean; emphasize?: boolean }) {
-  return <div className="certificate-detail"><span>{label}</span><strong className={`${mono ? "mono" : ""} ${emphasize ? "emphasize" : ""}`}>{value}</strong></div>;
+  return (
+    <div className="certificate-detail">
+      <span>{label}</span>
+      <strong className={`${mono ? "mono" : ""} ${emphasize ? "emphasize" : ""}`.trim()}>{value}</strong>
+    </div>
+  );
 }
 
 function Score({ label, value, className }: { label: string; value: number; className: string }) {
@@ -298,7 +354,32 @@ function Reading({ label, value }: { label: string; value: string }) {
   return <div><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function SignatureBlock({ title, name, dataUrl, signedAt, required }: { title: string; name: string; dataUrl?: string | null; signedAt?: Date | null; required: boolean }) {
+function InfoCard({ icon, label, value, helper }: { icon: ReactNode; label: string; value: string; helper?: string }) {
+  return (
+    <div className="certificate-info-card">
+      <div className="certificate-info-icon">{icon}</div>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {helper ? <small>{helper}</small> : null}
+      </div>
+    </div>
+  );
+}
+
+function SignatureBlock({
+  title,
+  name,
+  dataUrl,
+  signedAt,
+  required,
+}: {
+  title: string;
+  name: string;
+  dataUrl?: string | null;
+  signedAt?: Date | null;
+  required: boolean;
+}) {
   return (
     <div className="certificate-signature">
       <span>{title}</span>

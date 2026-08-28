@@ -1,15 +1,14 @@
-import { requireAuth } from "@/lib/require-auth";
+import { requirePermission } from "@/lib/require-auth";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { Activity, AlertTriangle, CheckCircle2, Clock, TrendingDown, Wrench } from "lucide-react";
-import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function PredictiveMaintenancePage() {
-  await requireAuth();
+  await requirePermission("reports");
 
   // Get all vehicles with their latest inspection data
   const allVehicles = await db.select().from(vehicles).limit(50);
@@ -59,20 +58,19 @@ export default async function PredictiveMaintenancePage() {
       riskScore > 0.4 ? "warning" :
       riskScore > 0.2 ? "monitor" : "healthy";
 
-    const mfgYear = v.manufacturingYear || new Date().getFullYear() - 5;
-    const age = new Date().getFullYear() - mfgYear;
-    const baseDays = 365;
-    const daysToFailure = riskScore > 0.7
-      ? Math.round(baseDays * (1 - riskScore) * Math.min(1.5, 1 + age * 0.05))
+    const recommendedReviewDays = riskScore > 0.7
+      ? 30
       : riskScore > 0.4
-      ? Math.round(baseDays * (1 - riskScore * 0.8))
+      ? 90
+      : riskScore > 0.2
+      ? 180
       : null;
 
     return {
       vehicle: v,
       status,
       riskScore,
-      daysToFailure,
+      recommendedReviewDays,
       atRisk,
       stats: { passes, failures, conditionals, total: history.length },
     };
@@ -89,12 +87,12 @@ export default async function PredictiveMaintenancePage() {
   return (
     <div className="p-6 lg:p-10">
       <PageHeader
-        eyebrow="AI Analytics"
-        title="Predictive Maintenance"
-        description="AI-powered predictions based on inspection history. Identify vehicles at risk of failure before they happen."
+        eyebrow="Risk Intelligence"
+        title="Maintenance Risk Intelligence"
+        description="Historical risk signals derived from recurring inspection outcomes. Use these indicators to prioritize preventive review; they are not a prediction of a specific future failure."
         action={
           <Badge tone="violet" className="text-sm px-3 py-1">
-            <Activity className="h-4 w-4" /> AI Model v1.0
+            <Activity className="h-4 w-4" /> Historical Risk Model
           </Badge>
         }
       />
@@ -164,7 +162,7 @@ export default async function PredictiveMaintenancePage() {
                   <RiskBadge status={p.status} />
                   <p className="text-xs text-slate-500 mt-1">
                     Risk: <span className="font-medium">{Math.round(p.riskScore * 100)}%</span>
-                    {p.daysToFailure && ` · ~${p.daysToFailure}d`}
+                    {p.recommendedReviewDays && ` · review ≤${p.recommendedReviewDays}d`}
                   </p>
                 </div>
               </a>

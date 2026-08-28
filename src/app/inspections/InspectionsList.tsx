@@ -101,7 +101,7 @@ export function InspectionsList({ rows }: InspectionsListProps) {
                       <ResultBadge result={r.overallResult} />
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link href={`/inspections/${r.id}`} className="text-amber-700 hover:text-amber-800 font-medium text-sm">
+                      <Link href={`/inspections/${r.id}`} className="text-[var(--brand-accent)] hover:opacity-75 font-semibold text-sm">
                         View →
                       </Link>
                     </td>

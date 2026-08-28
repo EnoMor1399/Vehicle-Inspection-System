@@ -6,8 +6,11 @@ import pg from "pg";
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
 
-const migrationPath = resolve("migrations/20260820_enterprise_upgrade.sql");
-const sql = await readFile(migrationPath, "utf8");
+const migrationPaths = [
+  "migrations/20260820_enterprise_upgrade.sql",
+  "migrations/20260823_enterprise_v22_hardening.sql",
+];
+
 const client = new pg.Client({
   connectionString,
   ssl: /sslmode=require/i.test(connectionString) ? { rejectUnauthorized: false } : undefined,
@@ -15,8 +18,12 @@ const client = new pg.Client({
 
 await client.connect();
 try {
-  await client.query(sql);
-  console.log("Enterprise database upgrade applied successfully.");
+  for (const migrationPath of migrationPaths) {
+    const sql = await readFile(resolve(migrationPath), "utf8");
+    await client.query(sql);
+    console.log(`Applied ${migrationPath}`);
+  }
+  console.log("Enterprise database upgrades applied successfully.");
 } finally {
   await client.end();
 }

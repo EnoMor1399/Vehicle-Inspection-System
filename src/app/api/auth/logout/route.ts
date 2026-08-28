@@ -9,6 +9,5 @@ export async function POST() {
 }
 
 export async function GET() {
-  await signOut();
-  redirect("/login");
+  return Response.json({ error: "Method not allowed" }, { status: 405, headers: { Allow: "POST" } });
 }

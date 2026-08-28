@@ -1,10 +1,12 @@
 import { db } from "@/db";
-import { users, locations } from "@/db/schema";
+import { users, locations, transporters } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
-import { Users, Shield, MapPin, Mail, Activity } from "lucide-react";
-import { getCurrentUser, canManageUsers, ROLE_LABEL } from "@/lib/auth";
+import { Users, Shield, Mail, LockKeyhole } from "lucide-react";
+import { canManageUsers, ROLE_LABEL } from "@/lib/auth";
+import { requirePermission } from "@/lib/require-auth";
 import { formatDateTime } from "@/lib/utils";
+import { UserAccessEditor } from "./UserAccessEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ const ROLE_GROUPS = [
 ];
 
 export default async function UsersPage() {
-  const user = await getCurrentUser();
+  const user = await requirePermission("users");
   const canManage = canManageUsers(user);
 
   const allUsers = await db
@@ -34,11 +36,18 @@ export default async function UsersPage() {
       phone: users.phone,
       isActive: users.isActive,
       lastLoginAt: users.lastLoginAt,
+      locationId: users.locationId,
+      transporterId: users.transporterId,
       locationName: locations.name,
     })
     .from(users)
     .leftJoin(locations, eq(locations.id, users.locationId))
     .orderBy(asc(users.name));
+
+  const [locationOptions, transporterOptions] = await Promise.all([
+    db.select({ id: locations.id, name: locations.name }).from(locations).orderBy(asc(locations.name)),
+    db.select({ id: transporters.id, companyName: transporters.companyName }).from(transporters).orderBy(asc(transporters.companyName)),
+  ]);
 
   // Permission matrix: which role can do what
   const matrix = [
@@ -64,11 +73,11 @@ export default async function UsersPage() {
       <PageHeader
         eyebrow="Access Control"
         title="Users & Role-Based Permissions"
-        description="10 distinct roles with fine-grained permissions for view, create, edit, delete, approve, import, export and print."
+        description="Role-based access, station assignment, account activation and explicit transporter tenant links for controlled external access."
         action={canManage ? (
-          <button className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">
-            + Invite User
-          </button>
+          <div className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+            <LockKeyhole className="h-4 w-4" /> Controlled account administration
+          </div>
         ) : undefined}
       />
 
@@ -150,7 +159,13 @@ export default async function UsersPage() {
                       <td className="py-3 pr-4"><Badge tone={u.isActive ? "emerald" : "slate"}>{u.isActive ? "Active" : "Inactive"}</Badge></td>
                       <td className="py-3 pr-4 text-slate-600 text-xs">{u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "Never"}</td>
                       <td className="py-3 text-right">
-                        {canManage && <button className="text-amber-700 hover:text-amber-800 text-sm font-medium">Edit →</button>}
+                        {canManage && (
+                          <UserAccessEditor
+                            user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, locationId: u.locationId, transporterId: u.transporterId }}
+                            locations={locationOptions}
+                            transporters={transporterOptions}
+                          />
+                        )}
                       </td>
                     </tr>
                   );

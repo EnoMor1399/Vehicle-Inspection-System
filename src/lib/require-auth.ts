@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
+import { hasPermission } from "@/lib/auth";
 
 // Protect server-rendered pages with the same revocable session used by login.
 export async function requireAuth() {
@@ -20,5 +21,18 @@ export async function requireAuth() {
     .where(eq(users.id, session.userId));
 
   if (!user || !user.isActive) redirect("/login");
+  return user;
+}
+
+
+export async function requireInternalUser() {
+  const user = await requireAuth();
+  if (user.role === "transporter_user") redirect("/portal");
+  return user;
+}
+
+export async function requirePermission(resource: string) {
+  const user = await requireInternalUser();
+  if (!hasPermission(user, resource)) redirect("/");
   return user;
 }

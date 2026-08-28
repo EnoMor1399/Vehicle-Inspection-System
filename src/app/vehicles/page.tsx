@@ -1,16 +1,17 @@
 import { db } from "@/db";
 import { vehicles, transporters, inspections } from "@/db/schema";
-import { eq, isNull, and, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Button } from "@/components/ui";
 import { Plus } from "lucide-react";
-import { getCurrentUser, canEditVehicles } from "@/lib/auth";
+import { canEditVehicles } from "@/lib/auth";
+import { requireInternalUser } from "@/lib/require-auth";
 import { VehiclesList } from "./VehiclesList";
 
 export const dynamic = "force-dynamic";
 
 export default async function VehiclesPage() {
-  const user = await getCurrentUser();
+  const user = await requireInternalUser();
   const editable = canEditVehicles(user);
 
   const rows = await db

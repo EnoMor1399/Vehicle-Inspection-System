@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { sessions, securityEvents, users } from "@/db/schema";
+import { sessions, securityEvents } from "@/db/schema";
 import { eq, desc, and, gt } from "drizzle-orm";
 import { Card } from "@/components/ui";
 import { Shield, AlertTriangle, Activity, Lock, Smartphone, LogOut } from "lucide-react";

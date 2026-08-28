@@ -49,7 +49,7 @@ function rateLimited(result: Awaited<ReturnType<typeof rateLimit>>) {
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = clientIp(request);
   const requestId = request.headers.get("x-request-id") || crypto.randomUUID();

@@ -108,11 +108,15 @@ export async function validateSession(token: string): Promise<{
     return { valid: false };
   }
   
-  // Update last activity
-  await db
-    .update(sessions)
-    .set({ lastActivityAt: new Date() })
-    .where(eq(sessions.id, session.id));
+  // Throttle activity writes. Validation can run many times during a single page
+  // request; writing on every check creates unnecessary database load.
+  const ACTIVITY_WRITE_INTERVAL = 2 * 60 * 1000;
+  if (now - lastActivity >= ACTIVITY_WRITE_INTERVAL) {
+    await db
+      .update(sessions)
+      .set({ lastActivityAt: new Date(now) })
+      .where(eq(sessions.id, session.id));
+  }
   
   return {
     valid: true,

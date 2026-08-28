@@ -9,7 +9,7 @@ const envSchema = z.object({
   // Application
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
-  APP_VERSION: z.string().default("2.0.0"),
+  APP_VERSION: z.string().default("2.2.0"),
   
   // Authentication
   JWT_SECRET: z.string().min(32).optional(),

@@ -9,7 +9,7 @@ import { Button, Card, Field, TextInput, TextArea, Select } from "@/components/u
 import { PhotoCapture, type Photo } from "@/components/PhotoCapture";
 import { SignaturePad } from "@/components/SignaturePad";
 import {
-  CheckCircle2, XCircle, Minus, ArrowLeft, Loader2,
+  CheckCircle2, XCircle, Minus, Loader2,
   Check, Car, Disc, Lightbulb, Droplet, Eye, ShieldAlert,
   AlertTriangle, FileText, Truck, AlertOctagon,
 } from "lucide-react";

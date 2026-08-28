@@ -282,6 +282,7 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     phone: varchar("phone", { length: 50 }),
     locationId: varchar("location_id", { length: 36 }).references(() => locations.id, { onDelete: "set null" }),
+    transporterId: varchar("transporter_id", { length: 36 }).references(() => transporters.id, { onDelete: "set null" }),
     // Fine-grained permissions override (JSONB). Empty/null = use role defaults.
     permissions: jsonb("permissions").$type<Record<string, boolean>>().default({}),
     isActive: boolean("is_active").notNull().default(true),
@@ -300,6 +301,7 @@ export const users = pgTable(
   (t) => ({
     roleIdx: index("user_role_idx").on(t.role),
     locationIdx: index("user_location_idx").on(t.locationId),
+    transporterIdx: index("user_transporter_idx").on(t.transporterId),
     emailIdx: index("user_email_idx").on(t.email),
   })
 );
@@ -702,10 +704,12 @@ export const locationRelations = relations(locations, ({ many }) => ({
 
 export const userRelations = relations(users, ({ one }) => ({
   location: one(locations, { fields: [users.locationId], references: [locations.id] }),
+  transporter: one(transporters, { fields: [users.transporterId], references: [transporters.id] }),
 }));
 
 export const transporterRelations = relations(transporters, ({ many }) => ({
   vehicles: many(vehicles),
+  users: many(users),
 }));
 
 export const vehicleRelations = relations(vehicles, ({ one, many }) => ({

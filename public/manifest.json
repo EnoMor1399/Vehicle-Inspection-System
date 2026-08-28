@@ -1,12 +1,13 @@
 {
   "name": "RSL Vehicle Inspection Management System",
   "short_name": "RSL VIMS",
-  "description": "Enterprise-grade vehicle inspection management for Road Safety Limited",
+  "description": "Enterprise vehicle inspection management for Road Safety Limited",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#0f172a",
-  "theme_color": "#039703",
+  "theme_color": "#0f172a",
   "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
@@ -22,62 +23,19 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/dashboard.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "/screenshots/mobile.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
   "shortcuts": [
     {
       "name": "New Inspection",
       "short_name": "Inspect",
-      "description": "Start a new vehicle inspection",
       "url": "/inspections/new",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Scan RFID",
+      "name": "RFID Registry",
       "short_name": "RFID",
-      "description": "Scan vehicle RFID tag",
       "url": "/rfid",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ],
-  "share_target": {
-    "action": "/import",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "files": [
-        { "name": "file", "accept": [".xlsx", ".xls", ".csv"] }
-      ]
-    }
-  },
-  "protocol_handlers": [
-    {
-      "protocol": "web+rsl",
-      "url": "/verify/%s"
-    }
-  ],
-  "prefer_related_applications": false,
-  "related_applications": [
-    {
-      "platform": "play",
-      "url": "https://play.google.com/store/apps/details?id=gh.rsl.vims",
-      "id": "gh.rsl.vims"
-    },
-    {
-      "platform": "itunes",
-      "url": "https://apps.apple.com/app/rsl-vims/id000000000"
-    }
-  ]
+  "prefer_related_applications": false
 }

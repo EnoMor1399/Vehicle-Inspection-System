@@ -4,13 +4,14 @@ import { eq, isNull, sql, desc } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Button } from "@/components/ui";
 import { Plus } from "lucide-react";
-import { getCurrentUser, canEditTransporters } from "@/lib/auth";
+import { canEditTransporters } from "@/lib/auth";
+import { requireInternalUser } from "@/lib/require-auth";
 import { TransportersList } from "./TransportersList";
 
 export const dynamic = "force-dynamic";
 
 export default async function TransportersPage() {
-  const user = await getCurrentUser();
+  const user = await requireInternalUser();
   const editable = canEditTransporters(user);
 
   const rows = await db

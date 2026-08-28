@@ -1,15 +1,14 @@
-import { requireAuth } from "@/lib/require-auth";
-import { hasPermission } from "@/lib/auth";
+import { requirePermission } from "@/lib/require-auth";
 import { getSettings } from "@/lib/settings";
 import { SettingsForm } from "./SettingsForm";
-import { PageHeader, Card, Badge } from "@/components/ui";
-import { Settings as SettingsIcon, ShieldAlert } from "lucide-react";
+import { PageHeader, Badge } from "@/components/ui";
+import { ShieldAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const user = await requireAuth();
-  const canEdit = hasPermission(user, "settings");
+  await requirePermission("settings");
+  const canEdit = true;
   const settings = await getSettings();
 
   return (

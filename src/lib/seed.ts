@@ -160,6 +160,9 @@ export async function seedIfEmpty() {
     },
   ]);
 
+  // Explicit tenant link for the demo transporter portal account.
+  await db.update(users).set({ transporterId: t1 }).where(eq(users.id, transporterUserId));
+
   // Vehicles
   const v1 = newId(), v2 = newId(), v3 = newId(), v4 = newId(), v5 = newId(), v6 = newId(), v7 = newId(), v8 = newId();
   await db.insert(vehicles).values([

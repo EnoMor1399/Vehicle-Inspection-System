@@ -2,7 +2,7 @@
 
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, Cell, ReferenceLine,
+  Tooltip, ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
 import { TrendingUp, TrendingDown, Award, AlertTriangle, CheckCircle2, XCircle, Calendar, BarChart3 } from "lucide-react";
 import { useState } from "react";

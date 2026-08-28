@@ -3,16 +3,28 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function markRead(formData: FormData) {
-  const id = String(formData.get("id") || "");
+  const user = await getCurrentUser();
+  const id = String(formData.get("id") || "").trim();
   if (!id) return;
-  await db.update(notifications).set({ readAt: new Date() }).where(eq(notifications.id, id));
+
+  await db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(and(eq(notifications.id, id), eq(notifications.userId, user.id)));
+
   revalidatePath("/notifications");
 }
 
 export async function markAllRead() {
-  await db.update(notifications).set({ readAt: new Date() });
+  const user = await getCurrentUser();
+  await db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(eq(notifications.userId, user.id));
+
   revalidatePath("/notifications");
 }

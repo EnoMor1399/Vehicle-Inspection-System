@@ -1,57 +1,125 @@
 @import "tailwindcss";
 
-/* ============================================
-   MOBILE RESPONSIVENESS ENHANCEMENTS
-   ============================================ */
+:root {
+  --brand-color: #039703;
+  --brand-accent: #026b02;
+  --surface-page: #f4f6f9;
+  --surface-card: #ffffff;
+  --border-subtle: #dfe5ec;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+}
 
-/* Base mobile optimizations */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--surface-page);
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand-color) 18%, white);
+  color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-color) 30%, transparent);
+  outline-offset: 2px;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled),
+a[href] {
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  accent-color: var(--brand-color);
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand-color) 4%, transparent), transparent 22rem),
+    var(--surface-page);
+}
+
+.app-shell-content {
+  position: relative;
+}
+
+/* Formal enterprise table treatment across internal application pages. */
+.app-shell-content :where(.responsive-table) {
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.app-shell-content :where(table) {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.app-shell-content :where(thead th) {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.app-shell-content :where(th, td) {
+  border-bottom-color: #e8edf3;
+}
+
+.app-shell-content :where(tbody tr) {
+  transition: background-color 140ms ease;
+}
+
+.app-shell-content :where(tbody tr:hover) {
+  background: #f8fafc;
+}
+
+/* Improve raw controls used by legacy pages without overriding component-specific styling. */
+.app-shell-content :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.app-shell-content :where(input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus) {
+  border-color: var(--brand-color);
+}
+
+.app-shell-content :where(dialog, [role="dialog"]) {
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.2);
+}
+
+/* Keep native page layouts intact while improving touch ergonomics. */
 @media (max-width: 768px) {
-  /* Improve text readability on mobile */
-  html {
-    font-size: 16px; /* Base font size for mobile */
-    -webkit-text-size-adjust: 100%;
-    -ms-text-size-adjust: 100%;
-  }
-
-  body {
-    font-size: 16px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  /* Optimize headings for mobile */
-  h1 {
-    font-size: 1.75rem !important;
-    line-height: 1.3 !important;
-    margin-bottom: 0.75rem !important;
-  }
-
-  h2 {
-    font-size: 1.5rem !important;
-    line-height: 1.35 !important;
-    margin-bottom: 0.625rem !important;
-  }
-
-  h3 {
-    font-size: 1.25rem !important;
-    line-height: 1.4 !important;
-    margin-bottom: 0.5rem !important;
-  }
-
-  h4 {
-    font-size: 1.125rem !important;
-    line-height: 1.4 !important;
-  }
-
-  /* Improve paragraph readability */
-  p {
-    font-size: 1rem;
-    line-height: 1.6;
-    margin-bottom: 0.875rem;
-  }
-
-  /* Optimize form inputs for mobile */
   input[type="text"],
   input[type="email"],
   input[type="password"],
@@ -64,312 +132,75 @@
   input[type="datetime-local"],
   textarea,
   select {
-    font-size: 16px !important; /* Prevents zoom on iOS */
-    padding: 0.75rem 1rem !important;
-    min-height: 48px; /* Touch target size */
-    border-radius: 0.5rem !important;
-    width: 100%;
-    box-sizing: border-box;
+    min-height: 44px;
+    font-size: 16px;
   }
 
-  textarea {
-    min-height: 100px;
-    resize: vertical;
-  }
-
-  /* Improve button touch targets */
   button,
-  [role="button"],
-  .button {
-    min-height: 44px;
-    padding: 0.75rem 1.25rem !important;
-    font-size: 1rem !important;
-    border-radius: 0.5rem !important;
+  [role="button"] {
+    min-height: 40px;
   }
 
-  /* Optimize links for touch */
-  a {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
+  [role="dialog"] {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
   }
 
-  /* Improve form labels */
-  label {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    display: block;
-  }
-
-  /* Optimize form groups */
-  .form-group,
-  [class*="space-y"] {
-    margin-bottom: 1.25rem;
-  }
-
-  /* Improve card spacing */
-  [class*="Card"],
-  [class*="card"] {
-    padding: 1rem !important;
-    margin-bottom: 1rem;
-  }
-
-  /* Optimize tables for mobile */
-  table {
-    font-size: 0.875rem;
-    display: block;
+  .responsive-table {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-
-  thead {
-    display: none; /* Hide headers on very small screens */
-  }
-
-  tbody tr {
-    display: block;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-  }
-
-  tbody td {
-    display: block;
-    padding: 0.5rem 0 !important;
-    text-align: left !important;
-    border: none !important;
-  }
-
-  tbody td::before {
-    content: attr(data-label);
-    font-weight: 600;
-    display: block;
-    margin-bottom: 0.25rem;
-    color: #64748b;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-  }
-
-  /* Optimize lists */
-  ul, ol {
-    padding-left: 1.5rem;
-    margin-bottom: 1rem;
-  }
-
-  li {
-    margin-bottom: 0.5rem;
-    line-height: 1.6;
-  }
-
-  /* Improve padding for containers */
-  [class*="container"],
-  [class*="wrapper"] {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-  }
-
-  /* Optimize page headers */
-  [class*="PageHeader"],
-  [class*="page-header"] {
-    padding: 1rem !important;
-    margin-bottom: 1.5rem !important;
-  }
-
-  /* Improve grid layouts */
-  [class*="grid"] {
-    gap: 1rem !important;
-  }
-
-  /* Optimize badges and tags */
-  [class*="Badge"],
-  [class*="badge"],
-  [class*="tag"] {
-    font-size: 0.75rem !important;
-    padding: 0.25rem 0.625rem !important;
-  }
-
-  /* Improve icon sizing */
-  svg {
-    width: 1.25rem;
-    height: 1.25rem;
-  }
-
-  /* Optimize modals and dialogs */
-  [role="dialog"],
-  [class*="modal"],
-  [class*="dialog"] {
-    margin: 1rem !important;
-    max-width: calc(100% - 2rem) !important;
-    max-height: calc(100vh - 2rem) !important;
-    overflow-y: auto;
-  }
 }
 
-/* Extra small devices (phones in portrait, less than 576px) */
-@media (max-width: 575px) {
-  html {
-    font-size: 15px;
-  }
-
-  h1 {
-    font-size: 1.5rem !important;
-  }
-
-  h2 {
-    font-size: 1.375rem !important;
-  }
-
-  h3 {
-    font-size: 1.125rem !important;
-  }
-
-  /* Hide non-essential elements on very small screens */
-  [class*="hide-mobile"],
-  [class*="hidden-xs"] {
-    display: none !important;
-  }
-
-  /* Stack flex items on small screens */
-  [class*="flex"] {
-    flex-direction: column !important;
-  }
-
-  /* Full width buttons on small screens */
-  button,
-  [role="button"] {
-    width: 100%;
-  }
-}
-
-/* Small tablets (576px - 767px) */
-@media (min-width: 576px) and (max-width: 767px) {
-  /* Restore table headers on tablets */
-  thead {
-    display: table-header-group;
-  }
-
-  tbody tr {
-    display: table-row;
-    margin-bottom: 0;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-  }
-
-  tbody td {
-    display: table-cell;
-    padding: 0.75rem 1rem !important;
-  }
-
-  tbody td::before {
-    display: none;
-  }
-}
-
-/* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
-  /* Increase touch targets */
   button,
   [role="button"],
-  a,
-  input[type="checkbox"],
-  input[type="radio"] {
-    min-height: 48px;
-    min-width: 48px;
-  }
-
-  /* Remove hover effects on touch devices */
-  button:hover,
-  [role="button"]:hover,
-  a:hover {
-    transform: none !important;
-  }
-
-  /* Improve select dropdowns */
-  select {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    padding-right: 2.5rem !important;
+  a[href] {
+    touch-action: manipulation;
   }
 }
 
-/* Landscape orientation on mobile */
-@media (max-width: 896px) and (orientation: landscape) {
-  /* Reduce vertical spacing in landscape */
-  [class*="py-"],
-  [class*="my-"] {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-    margin-top: 0.5rem !important;
-    margin-bottom: 0.5rem !important;
-  }
-
-  /* Optimize modals for landscape */
-  [role="dialog"],
-  [class*="modal"] {
-    max-height: 90vh !important;
+@supports (padding: max(0px)) {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
 
-/* High DPI displays */
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  body {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-}
-
-/* Safe area insets for notched devices */
-@supports (padding-top: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-
-  /* Adjust fixed elements for safe areas */
-  [class*="fixed"],
-  [class*="sticky"] {
-    padding-top: calc(env(safe-area-inset-top) + 1rem);
-    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
-  }
-}
-
-/* ============================================
-   Certificate Print Styles
-   ============================================ */
+/* Certificate print styles */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
   body * {
     visibility: hidden;
   }
+
   .certificate-container,
-  .certificate-container * {
+  .certificate-container *,
+  .certificate-document,
+  .certificate-document * {
     visibility: visible;
   }
-  .certificate-container {
+
+  .certificate-container,
+  .certificate-document {
     position: absolute;
-    left: 0;
-    top: 0;
+    inset: 0;
     width: 100%;
+    min-height: 100%;
+    box-shadow: none !important;
   }
+
   .no-print {
     display: none !important;
   }
 }
 
-/* Certificate Animations */
 @keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 .animate-shimmer {
@@ -377,11 +208,26 @@
 }
 
 .certificate-title {
-  font-family: 'Georgia', serif;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.015em;
 }
 
 .certificate-watermark {
-  font-family: 'Georgia', serif;
+  font-family: Georgia, "Times New Roman", serif;
   letter-spacing: 0.2em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

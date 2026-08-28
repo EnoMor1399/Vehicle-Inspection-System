@@ -1,122 +1,177 @@
-import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
+import { authenticateApiRequest, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { hasPermission } from "@/lib/auth";
 
 // Power BI DirectQuery-compatible OData v4 endpoint
 // Supports: service document, $metadata, $filter, $select, $orderby, $top, $skip, $count, $format
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vims.rsl.gh";
 
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   const url = new URL(request.url);
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || url.origin).replace(/\/$/, "");
   const path = url.searchParams.get("path") || "";
   const format = url.searchParams.get("$format") || url.searchParams.get("format") || "json";
 
-  // Service document (root)
+  const allowedEntities = [
+    "Inspections",
+    "Vehicles",
+    "Transporters",
+    "Stations",
+    "Defects",
+    ...(hasPermission(auth.user, "documents") ? ["Documents"] : []),
+    ...(hasPermission(auth.user, "audit") ? ["AuditLogs"] : []),
+    ...(hasPermission(auth.user, "users") ? ["Users"] : []),
+  ];
+
   if (!path || path === "/") {
     return jsonResponse({
-      "@odata.context": `${BASE_URL}/api/v1/powerbi/$metadata`,
-      value: [
-        { name: "Inspections", kind: "EntitySet", url: "Inspections" },
-        { name: "Vehicles", kind: "EntitySet", url: "Vehicles" },
-        { name: "Transporters", kind: "EntitySet", url: "Transporters" },
-        { name: "Stations", kind: "EntitySet", url: "Stations" },
-        { name: "Defects", kind: "EntitySet", url: "Defects" },
-        { name: "Documents", kind: "EntitySet", url: "Documents" },
-        { name: "AuditLogs", kind: "EntitySet", url: "AuditLogs" },
-        { name: "Users", kind: "EntitySet", url: "Users" },
-      ],
+      "@odata.context": `${baseUrl}/api/v1/powerbi/$metadata`,
+      value: allowedEntities.map((name) => ({ name, kind: "EntitySet", url: name })),
     }, format);
   }
 
-  // Parse path: e.g., "Inspections", "Vehicles", "Inspections?$filter=..."
   const [entityName, queryString] = path.split("?");
   const entity = entityName.toLowerCase();
+  if (!allowedEntities.some((name) => name.toLowerCase() === entity)) {
+    return apiError(403, `Entity '${entityName}' is not available for this credential`);
+  }
 
-  // Parse query options
-  const opts = parseQueryOptions(url.searchParams, queryString);
+  try {
+    const opts = parseQueryOptions(url.searchParams, queryString);
+    const loaders: Record<string, () => Promise<any>> = {
+      inspections: () => loadInspections(opts),
+      vehicles: () => loadVehicles(opts),
+      transporters: () => loadTransporters(opts),
+      stations: () => loadStations(opts),
+      defects: () => loadDefects(opts),
+      documents: () => loadDocuments(opts),
+      auditlogs: () => loadAuditLogs(opts),
+      users: () => loadUsers(opts),
+    };
 
-  const loaders: Record<string, () => Promise<any>> = {
-    inspections: () => loadInspections(opts),
-    vehicles: () => loadVehicles(opts),
-    transporters: () => loadTransporters(opts),
-    stations: () => loadStations(opts),
-    defects: () => loadDefects(opts),
-    documents: () => loadDocuments(opts),
-    auditlogs: () => loadAuditLogs(opts),
-    users: () => loadUsers(opts),
+    const loader = loaders[entity];
+    if (!loader) return apiError(404, `Entity '${entityName}' not found`);
+
+    const result = await loader();
+    return jsonResponse({
+      "@odata.context": `${baseUrl}/api/v1/powerbi/$metadata#${entityName}`,
+      "@odata.count": opts.count ? result.total : undefined,
+      value: result.data,
+      ...(result.data.length === opts.top && result.total > opts.top + opts.skip
+        ? { "@odata.nextLink": `${baseUrl}/api/v1/powerbi?path=${encodeURIComponent(entityName)}&$skip=${opts.skip + opts.top}&$top=${opts.top}` }
+        : {}),
+    }, format);
+  } catch (error) {
+    return apiError(400, error instanceof Error ? error.message : "Invalid OData query");
+  }
+}
+
+type QueryOptions = {
+  top: number;
+  skip: number;
+  filter: string;
+  select: string;
+  orderby: string;
+  count: boolean;
+};
+
+function boundedInteger(value: string | null, fallback: number, min: number, max: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) throw new Error("Invalid pagination value");
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function parseQueryOptions(params: URLSearchParams, queryString?: string): QueryOptions {
+  const extra = queryString ? new URLSearchParams(queryString) : new URLSearchParams();
+  const read = (key: string) => extra.get(key) ?? params.get(key);
+  return {
+    top: boundedInteger(read("$top"), 100, 1, 500),
+    skip: boundedInteger(read("$skip"), 0, 0, 100000),
+    filter: read("$filter") || "",
+    select: read("$select") || "",
+    orderby: read("$orderby") || "",
+    count: read("$count") === "true",
   };
-
-  const loader = loaders[entity];
-  if (!loader) {
-    return apiError(404, `Entity '${entityName}' not found. Available: ${Object.keys(loaders).map(k => capitalize(k)).join(", ")}`);
-  }
-
-  const result = await loader();
-  return jsonResponse({
-    "@odata.context": `${BASE_URL}/api/v1/powerbi/$metadata#${entityName}`,
-    "@odata.count": opts.count ? result.total : undefined,
-    value: result.data,
-    ...(result.data.length === (opts.top || 100) && result.total > (opts.top || 100) + (opts.skip || 0)
-      ? { "@odata.nextLink": `${BASE_URL}/api/v1/powerbi?path=${entityName}?$skip=${(opts.skip || 0) + (opts.top || 100)}&$top=${opts.top || 100}` }
-      : {}),
-  }, format);
 }
 
-function parseQueryOptions(params: URLSearchParams, queryString?: string) {
-  const opts: any = {
-    top: parseInt(params.get("$top") || "100"),
-    skip: parseInt(params.get("$skip") || "0"),
-    filter: params.get("$filter") || "",
-    select: params.get("$select") || "",
-    orderby: params.get("$orderby") || "",
-    count: params.get("$count") === "true",
-  };
-  // Parse additional from queryString
-  if (queryString) {
-    const extra = new URLSearchParams(queryString);
-    if (extra.get("$top")) opts.top = parseInt(extra.get("$top")!);
-    if (extra.get("$skip")) opts.skip = parseInt(extra.get("$skip")!);
-    if (extra.get("$filter")) opts.filter = extra.get("$filter");
-    if (extra.get("$select")) opts.select = extra.get("$select");
-    if (extra.get("$orderby")) opts.orderby = extra.get("$orderby");
-    if (extra.get("$count") === "true") opts.count = true;
+const ODATA_OPERATOR: Record<string, string> = {
+  eq: "=",
+  ne: "!=",
+  gt: ">",
+  lt: "<",
+  ge: ">=",
+  le: "<=",
+};
+
+function safeSqlLiteral(raw: string): string {
+  const value = raw.trim();
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return value;
+  if (/^(true|false)$/i.test(value)) return value.toLowerCase();
+  if (/^null$/i.test(value)) return "NULL";
+  if (/^'(?:[^']|'')*'$/.test(value)) {
+    const inner = value.slice(1, -1).replace(/''/g, "'");
+    return `'${inner.replace(/'/g, "''")}'`;
   }
-  return opts;
+  throw new Error("Unsupported OData filter value");
 }
 
-function buildWhereClause(filter: string, allowedFields: Record<string, string>): string {
-  if (!filter) return "";
-  // Simple OData filter parser — supports eq, ne, gt, lt, ge, le, and, or
-  // Maps OData field names to SQL column names
-  let sql_filter = filter;
-  for (const [odata, sqlCol] of Object.entries(allowedFields)) {
-    sql_filter = sql_filter.replace(new RegExp(`\\b${odata}\\b`, "g"), sqlCol);
+function buildWhereClause(filter: string, allowedFields: Record<string, string>, baseCondition?: string): string {
+  const trimmed = filter.trim();
+  if (!trimmed) return baseCondition ? `WHERE ${baseCondition}` : "";
+  if (/[;]|--|\/\*/.test(trimmed)) throw new Error("Unsupported OData filter syntax");
+
+  // Deliberately support a small, auditable OData subset: simple comparisons joined by AND/OR.
+  const tokens = trimmed.split(/\s+(and|or)\s+/i);
+  const expressions: string[] = [];
+  for (let index = 0; index < tokens.length; index += 2) {
+    const condition = tokens[index].trim();
+    const match = condition.match(/^([A-Za-z][A-Za-z0-9_]*)\s+(eq|ne|gt|lt|ge|le)\s+(.+)$/i);
+    if (!match) throw new Error("Unsupported OData filter expression");
+    const [, fieldName, operatorName, rawValue] = match;
+    const sqlField = allowedFields[fieldName];
+    if (!sqlField) throw new Error(`Filtering by '${fieldName}' is not allowed`);
+    const operator = ODATA_OPERATOR[operatorName.toLowerCase()];
+    const literal = safeSqlLiteral(rawValue);
+    expressions.push(`${sqlField} ${operator} ${literal}`);
+    if (index + 1 < tokens.length) {
+      const connector = tokens[index + 1].toUpperCase();
+      if (connector !== "AND" && connector !== "OR") throw new Error("Unsupported OData connector");
+      expressions.push(connector);
+    }
   }
-  // Convert OData operators to SQL
-  sql_filter = sql_filter
-    .replace(/\beq\b/g, "=")
-    .replace(/\bne\b/g, "!=")
-    .replace(/\bgt\b/g, ">")
-    .replace(/\blt\b/g, "<")
-    .replace(/\bge\b/g, ">=")
-    .replace(/\ble\b/g, "<=")
-    .replace(/\band\b/gi, "AND")
-    .replace(/\bor\b/gi, "OR");
-  return `WHERE ${sql_filter}`;
+
+  const clause = `(${expressions.join(" ")})`;
+  return `WHERE ${baseCondition ? `${baseCondition} AND ` : ""}${clause}`;
 }
 
-function buildOrderBy(orderby: string, allowedFields: Record<string, string>): string {
-  if (!orderby) return "";
-  let sql_order = orderby;
-  for (const [odata, sqlCol] of Object.entries(allowedFields)) {
-    sql_order = sql_order.replace(new RegExp(`\\b${odata}\\b`, "g"), sqlCol);
-  }
-  sql_order = sql_order.replace(/\bdesc\b/gi, "DESC").replace(/\basc\b/gi, "ASC");
-  return `ORDER BY ${sql_order}`;
+function buildOrderBy(orderby: string, allowedFields: Record<string, string>, fallbackField: string): string {
+  const raw = orderby.trim() || fallbackField;
+  const items = raw.split(",").map((item) => item.trim()).filter(Boolean);
+  if (items.length > 4) throw new Error("Too many order-by fields");
+  const clauses = items.map((item) => {
+    const match = item.match(/^([A-Za-z][A-Za-z0-9_]*)(?:\s+(asc|desc))?$/i);
+    if (!match) throw new Error("Unsupported OData order-by expression");
+    const sqlField = allowedFields[match[1]];
+    if (!sqlField) throw new Error(`Ordering by '${match[1]}' is not allowed`);
+    return `${sqlField} ${(match[2] || "asc").toUpperCase()}`;
+  });
+  return `ORDER BY ${clauses.join(", ")}`;
+}
+
+function buildSelectClause(select: string, fields: Record<string, string>): string {
+  const cols = select.split(",").map((s) => s.trim()).filter(Boolean);
+  if (!cols.length) throw new Error("At least one select field is required");
+  if (cols.length > 30) throw new Error("Too many selected fields");
+  return cols.map((field) => {
+    const sqlCol = fields[field];
+    if (!sqlCol) throw new Error(`Selecting '${field}' is not allowed`);
+    return `${sqlCol} as "${field}"`;
+  }).join(", ");
 }
 
 async function loadInspections(opts: any) {
@@ -134,7 +189,7 @@ async function loadInspections(opts: any) {
     StationRegion: "l.region",
   };
   const where = buildWhereClause(opts.filter, fields);
-  const orderBy = buildOrderBy(opts.orderby || "i.inspection_date desc", fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
   const select = opts.select ? buildSelectClause(opts.select, fields) : `
       i.id, i.inspection_number as "InspectionNumber", i.inspection_date as "InspectionDate",
       i.overall_result as "OverallResult", i.workflow_status as "WorkflowStatus",
@@ -172,9 +227,10 @@ async function loadVehicles(opts: any) {
     Make: "v.make", Model: "v.model", Status: "v.status",
     Category: "v.category", VehicleClass: "v.vehicle_class",
     FuelType: "v.fuel_type", ManufacturingYear: "v.manufacturing_year",
+    TransporterRegion: "t.region",
   };
   const where = buildWhereClause(opts.filter, fields);
-  const orderBy = buildOrderBy(opts.orderby || "v.created_at desc", fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "RegistrationNumber asc");
   const rows = await query(sql.raw(`
     SELECT v.id, v.registration_number as "RegistrationNumber",
       v.make as "Make", v.model as "Model", v.body_type as "BodyType",
@@ -204,8 +260,8 @@ async function loadTransporters(opts: any) {
   const fields: Record<string, string> = {
     CompanyName: "t.company_name", Region: "t.region", District: "t.district",
   };
-  const where = buildWhereClause(opts.filter, fields) || "WHERE t.deleted_at IS NULL";
-  const orderBy = buildOrderBy(opts.orderby || "t.company_name", fields);
+  const where = buildWhereClause(opts.filter, fields, "t.deleted_at IS NULL");
+  const orderBy = buildOrderBy(opts.orderby, fields, "CompanyName asc");
   const rows = await query(sql.raw(`
     SELECT t.id, t.company_name as "CompanyName", t.registration_number as "RegistrationNumber",
       t.tin_number as "TIN", t.region as "Region", t.district as "District",
@@ -312,14 +368,6 @@ async function loadUsers(opts: any) {
   `));
   const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM users`));
   return { data: rows, total: countRow?.c || 0 };
-}
-
-function buildSelectClause(select: string, fields: Record<string, string>): string {
-  const cols = select.split(",").map((s) => s.trim());
-  return cols.map((c) => {
-    const sqlCol = fields[c];
-    return sqlCol ? `${sqlCol} as "${c}"` : c;
-  }).join(", ");
 }
 
 function capitalize(s: string): string {

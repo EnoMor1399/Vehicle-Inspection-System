@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Card, Badge, Button, EmptyState } from "@/components/ui";
+import { Card, Badge, EmptyState } from "@/components/ui";
 import { ExportMenu } from "@/components/ExportMenu";
 import { Car } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
@@ -87,7 +87,7 @@ export function VehiclesList({ rows, editable }: VehiclesListProps) {
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link href={`/vehicles/${v.id}`} className="text-amber-700 hover:text-amber-800 font-medium text-sm">
+                      <Link href={`/vehicles/${v.id}`} className="text-[var(--brand-accent)] hover:opacity-75 font-semibold text-sm">
                         View →
                       </Link>
                     </td>

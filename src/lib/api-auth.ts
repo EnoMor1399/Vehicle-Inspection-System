@@ -60,6 +60,9 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
 
       const [user] = await db.select().from(users).where(eq(users.id, keyRow.userId));
       if (!user || !user.isActive) return { ok: false, status: 401, message: "API key owner is inactive" };
+      if (user.role === "transporter_user") {
+        return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
+      }
       if (!userAllowed(user, options.permission)) {
         return { ok: false, status: 403, message: "User does not have permission for this resource" };
       }
@@ -83,6 +86,9 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
       if (session.valid && session.userId) {
         const [user] = await db.select().from(users).where(eq(users.id, session.userId));
         if (user?.isActive) {
+          if (user.role === "transporter_user") {
+            return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
+          }
           if (!userAllowed(user, options.permission)) {
             return { ok: false, status: 403, message: "You do not have permission for this resource" };
           }

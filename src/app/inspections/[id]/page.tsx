@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Car, Calendar, User, MapPin, Gauge, CheckCircle2, XCircle, AlertTriangle, Minus, Printer, FileText } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Minus, FileText, Camera } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { formatDateTime, formatDate } from "@/lib/utils";
 import { getInspectionDetail } from "../server";
@@ -8,13 +8,19 @@ import { summarizeSection, INSPECTION_SECTIONS } from "@/lib/sections";
 import { QRCode } from "../QRCode";
 import { PrintButton } from "../PrintButton";
 import { PhotoGallery, DocumentList } from "@/components/PhotoGallery";
-import { Camera } from "lucide-react";
+import { getCurrentUser, canApprove } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
+import { InspectionApprovalPanel } from "../InspectionApprovalPanel";
 
 export const dynamic = "force-dynamic";
 
 export default async function InspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const row = await getInspectionDetail(id);
+  const [row, user, settings] = await Promise.all([
+    getInspectionDetail(id),
+    getCurrentUser(),
+    getSettings(),
+  ]);
   if (!row) notFound();
   const { inspection: i, vehicle: v } = row;
 
@@ -40,13 +46,14 @@ export default async function InspectionDetailPage({ params }: { params: Promise
         title={`${v.make} ${v.model || ""} — ${v.registrationNumber}`}
         description={`Inspected ${formatDateTime(i.inspectionDate)} at ${i.station}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <WorkflowBadge status={i.workflowStatus} />
             <ResultBadge result={i.overallResult} />
             <a
               href={`/certificate/${i.id}`}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700"
             >
-              <FileText className="h-4 w-4" /> View Certificate
+              <FileText className="h-4 w-4" /> {i.workflowStatus === "approved" ? "View Certificate" : "Certificate Preview"}
             </a>
             <PrintButton />
           </div>
@@ -129,6 +136,10 @@ export default async function InspectionDetailPage({ params }: { params: Promise
         </Card>
       </div>
 
+      {i.workflowStatus === "completed" && canApprove(user) && (
+        <InspectionApprovalPanel inspectionId={i.id} requireSignature={settings.requireDigitalSignature} />
+      )}
+
       <div className="mt-6">
         <Card className="p-6">
           <h2 className="text-lg font-semibold text-slate-950 mb-4">Checklist Sections</h2>
@@ -200,6 +211,18 @@ function StatChip({ label, value, tone }: { label: string; value: number; tone: 
       <p className={`text-xl font-semibold ${color}`}>{value}</p>
     </div>
   );
+}
+
+function WorkflowBadge({ status }: { status: string }) {
+  const map: Record<string, { tone: "emerald" | "blue" | "amber" | "red" | "slate"; label: string }> = {
+    approved: { tone: "emerald", label: "AUTHORIZED" },
+    completed: { tone: "blue", label: "AWAITING REVIEW" },
+    in_progress: { tone: "amber", label: "IN PROGRESS" },
+    failed: { tone: "red", label: "REVIEW REJECTED" },
+    archived: { tone: "slate", label: "ARCHIVED" },
+  };
+  const item = map[status] || { tone: "slate" as const, label: status.replaceAll("_", " ").toUpperCase() };
+  return <Badge tone={item.tone}>{item.label}</Badge>;
 }
 
 function ResultBadge({ result }: { result: string }) {

@@ -4,13 +4,14 @@ import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Button } from "@/components/ui";
 import { Plus } from "lucide-react";
-import { getCurrentUser, canManageInspections } from "@/lib/auth";
+import { canManageInspections } from "@/lib/auth";
+import { requireInternalUser } from "@/lib/require-auth";
 import { InspectionsList } from "./InspectionsList";
 
 export const dynamic = "force-dynamic";
 
 export default async function InspectionsPage() {
-  const user = await getCurrentUser();
+  const user = await requireInternalUser();
   const editable = canManageInspections(user);
 
   const rows = await db

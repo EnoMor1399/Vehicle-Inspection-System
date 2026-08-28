@@ -158,7 +158,7 @@ export default async function TransporterDetailPage({ params }: { params: Promis
                         ) : <span className="text-slate-400 text-xs">No inspections</span>}
                       </td>
                       <td className="py-3 text-right">
-                        <Link href={`/vehicles/${vehicle.id}`} className="text-amber-700 hover:text-amber-800 text-sm font-medium">View →</Link>
+                        <Link href={`/vehicles/${vehicle.id}`} className="text-[var(--brand-accent)] hover:opacity-75 text-sm font-semibold">View →</Link>
                       </td>
                     </tr>
                   ))}
