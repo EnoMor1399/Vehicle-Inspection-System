@@ -153,8 +153,8 @@ export function StationChart({ data }: { data: { station: string; pass: number; 
         />
         <Tooltip cursor={{ fill: "#f8fafc" }} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: "14px", fontSize: "12px" }} />
-        <Bar dataKey="pass" stackId="outcome" fill="#0f766e" name="Pass" radius={[4, 4, 0, 0]} radius={[4, 0, 0, 4]} />
-        <Bar dataKey="fail" stackId="outcome" fill="#dc5a5a" name="Fail" radius={[4, 4, 0, 0]} radius={[0, 4, 4, 0]} />
+        <Bar dataKey="pass" stackId="outcome" fill="#0f766e" name="Pass" radius={[4, 0, 0, 4]} />
+        <Bar dataKey="fail" stackId="outcome" fill="#dc5a5a" name="Fail" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -170,8 +170,8 @@ export function TransporterChart({ data }: { data: { transporter: string; pass: 
         <YAxis type="category" dataKey="transporter" tick={{ fontSize: 11 }} width={95} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="pass" fill="#0f766e" name="Pass" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="fail" fill="#dc5a5a" name="Fail" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="pass" fill="#0f766e" name="Pass" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="fail" fill="#dc5a5a" name="Fail" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
