@@ -1,0 +1,128 @@
+name: Apply VIMS Enterprise V2.3 Final Upgrade
+
+on:
+  push:
+    branches:
+      - upgrade/enterprise-v2.3-interface-redesign
+    paths:
+      - '.vims-v23-supp/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-upgrade:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout upgrade branch
+        uses: actions/checkout@v4
+        with:
+          ref: upgrade/enterprise-v2.3-interface-redesign
+          fetch-depth: 0
+
+      - name: Reconstruct verified V2.3 tracked patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/vims-v23.b64
+          for i in $(seq -w 0 13); do
+            curl -fsSL "https://raw.githubusercontent.com/EnoMor1399/Vehicle-Inspection-System/cd698311d04cbc8811be5e650448fa87c0000b22/.vims-v23-fresh/part-${i}" >> /tmp/vims-v23.b64
+          done
+          base64 --decode /tmp/vims-v23.b64 > /tmp/vims-v23.patch.xz
+          echo '520719571d8a55413d2b1cd60291fb9975fd6c888291c5433574112bfd29aaed  /tmp/vims-v23.patch.xz' | sha256sum -c -
+          xz -t /tmp/vims-v23.patch.xz
+          xz -dc /tmp/vims-v23.patch.xz > /tmp/vims-v23.patch
+
+      - name: Apply non-conflicting V2.3 tracked changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check \
+            --exclude='src/app/api/v1/inspections/route.ts' \
+            --exclude='src/app/certificate/*/page.tsx' \
+            --exclude='src/app/daily-inspections/page.tsx' \
+            --exclude='src/app/reports/ReportsActions.tsx' \
+            --exclude='src/app/security/setup-2fa/Setup2FA.tsx' \
+            --exclude='src/app/verify/*/page.tsx' \
+            /tmp/vims-v23.patch
+          git apply \
+            --exclude='src/app/api/v1/inspections/route.ts' \
+            --exclude='src/app/certificate/*/page.tsx' \
+            --exclude='src/app/daily-inspections/page.tsx' \
+            --exclude='src/app/reports/ReportsActions.tsx' \
+            --exclude='src/app/security/setup-2fa/Setup2FA.tsx' \
+            --exclude='src/app/verify/*/page.tsx' \
+            /tmp/vims-v23.patch
+
+      - name: Overlay reviewed new and conflict files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t supp < <(find .vims-v23-supp -maxdepth 1 -type f -name 'part-*' -printf '%f\n' | sort -V)
+          test "${#supp[@]}" -eq 6
+          : > /tmp/vims-v23-supp.b64
+          for part in "${supp[@]}"; do cat ".vims-v23-supp/${part}" >> /tmp/vims-v23-supp.b64; done
+          base64 --decode /tmp/vims-v23-supp.b64 > /tmp/vims-v23-supp.tar.xz
+          echo '3031db356c534b7ba85cd239a7173f11db2096f9ddababff9f90b98a187f14e6  /tmp/vims-v23-supp.tar.xz' | sha256sum -c -
+          xz -t /tmp/vims-v23-supp.tar.xz
+          tar -xJf /tmp/vims-v23-supp.tar.xz -C .
+          rm -f src/middleware.ts
+          rm -f 'src/app/certificate/[id]/CertificateToolbar.tsx'
+
+      - name: Fix React Compiler lint compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/components/AppShell.tsx')
+          source = path.read_text()
+          replacements = [
+              ('import { useMemo, useState } from "react";', 'import { useState } from "react";'),
+              ('const activeContext = useMemo(() => {', 'const activeContext = (() => {'),
+              ('}, [pathname]);', '})();'),
+          ]
+          for old, new in replacements:
+              if source.count(old) != 1:
+                  raise SystemExit(f'Expected exactly one AppShell occurrence of: {old}')
+              source = source.replace(old, new, 1)
+          path.write_text(source)
+          PY
+          rm -rf .vims-v23-supp
+          rm -f .github/workflows/apply-vims-v23-final.yml
+
+      - name: Verify upgraded source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='2.3.0') throw new Error('Expected V2.3.0, got '+p.version)"
+          test -f src/proxy.ts
+          test ! -f src/middleware.ts
+          test ! -f 'src/app/certificate/[id]/CertificateToolbar.tsx'
+          test -f src/components/PWAProvider.tsx
+          test -f src/app/inspections/InspectionApprovalPanel.tsx
+          test -f src/app/locations/StationEditor.tsx
+          test -f src/app/users/UserAccessEditor.tsx
+          test -f migrations/20260823_enterprise_v22_hardening.sql
+          test -f INTERFACE_REDESIGN_V23.md
+          ! grep -q 'useMemo' src/components/AppShell.tsx
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Commit completed V2.3 branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Upgrade VIMS to Enterprise V2.3 professional interface and hardening'
+          git push origin HEAD:upgrade/enterprise-v2.3-interface-redesign
