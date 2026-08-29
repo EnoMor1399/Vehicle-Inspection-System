@@ -6,7 +6,6 @@ import { hasPermission } from "@/lib/auth";
 // Power BI DirectQuery-compatible OData v4 endpoint
 // Supports: service document, $metadata, $filter, $select, $orderby, $top, $skip, $count, $format
 
-
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) return apiError(auth.status, auth.message);
@@ -18,6 +17,7 @@ export async function GET(request: Request) {
 
   const allowedEntities = [
     "Inspections",
+    "PreTripInspections",
     "Vehicles",
     "Transporters",
     "Stations",
@@ -44,6 +44,7 @@ export async function GET(request: Request) {
     const opts = parseQueryOptions(url.searchParams, queryString);
     const loaders: Record<string, () => Promise<any>> = {
       inspections: () => loadInspections(opts),
+      pretripinspections: () => loadPreTripInspections(opts),
       vehicles: () => loadVehicles(opts),
       transporters: () => loadTransporters(opts),
       stations: () => loadStations(opts),
@@ -125,7 +126,6 @@ function buildWhereClause(filter: string, allowedFields: Record<string, string>,
   if (!trimmed) return baseCondition ? `WHERE ${baseCondition}` : "";
   if (/[;]|--|\/\*/.test(trimmed)) throw new Error("Unsupported OData filter syntax");
 
-  // Deliberately support a small, auditable OData subset: simple comparisons joined by AND/OR.
   const tokens = trimmed.split(/\s+(and|or)\s+/i);
   const expressions: string[] = [];
   for (let index = 0; index < tokens.length; index += 2) {
@@ -221,6 +221,61 @@ async function loadInspections(opts: any) {
   return { data: rows, total: countRow?.c || 0 };
 }
 
+async function loadPreTripInspections(opts: any) {
+  const fields: Record<string, string> = {
+    InspectionDate: "d.inspection_date",
+    Status: "d.status",
+    ClearedForTrip: "d.cleared_for_trip",
+    DriverName: "d.driver_name",
+    VehicleRegistration: "v.registration_number",
+    VehicleMake: "v.make",
+    VehicleModel: "v.model",
+    TransporterName: "t.company_name",
+    TransporterRegion: "t.region",
+  };
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      d.id,
+      d.inspection_date as "InspectionDate",
+      d.start_time as "StartTime",
+      d.completed_at as "CompletedAt",
+      d.driver_name as "DriverName",
+      d.odometer as "Odometer",
+      d.trip_purpose as "TripPurpose",
+      d.route_description as "RouteDescription",
+      d.status as "Status",
+      d.total_items as "TotalItems",
+      d.passed_items as "PassedItems",
+      d.failed_items as "FailedItems",
+      d.cleared_for_trip as "ClearedForTrip",
+      d.supervisor_review as "SupervisorReview",
+      d.notes as "Notes",
+      v.registration_number as "VehicleRegistration",
+      v.make as "VehicleMake",
+      v.model as "VehicleModel",
+      t.company_name as "TransporterName",
+      t.region as "TransporterRegion"
+  `;
+  const rows = await query(sql.raw(`
+    SELECT ${select}
+    FROM daily_inspections d
+    INNER JOIN vehicles v ON v.id = d.vehicle_id
+    LEFT JOIN transporters t ON t.id = v.transporter_id
+    ${where}
+    ${orderBy}
+    LIMIT ${opts.top} OFFSET ${opts.skip}
+  `));
+  const countRow = await queryOne(sql.raw(`
+    SELECT count(*)::int as c
+    FROM daily_inspections d
+    INNER JOIN vehicles v ON v.id = d.vehicle_id
+    LEFT JOIN transporters t ON t.id = v.transporter_id
+    ${where}
+  `));
+  return { data: rows, total: countRow?.c || 0 };
+}
+
 async function loadVehicles(opts: any) {
   const fields: Record<string, string> = {
     RegistrationNumber: "v.registration_number",
@@ -252,7 +307,7 @@ async function loadVehicles(opts: any) {
     ${orderBy}
     LIMIT ${opts.top} OFFSET ${opts.skip}
   `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM vehicles v ${where}`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
@@ -275,7 +330,7 @@ async function loadTransporters(opts: any) {
     ${orderBy}
     LIMIT ${opts.top} OFFSET ${opts.skip}
   `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM transporters t WHERE t.deleted_at IS NULL`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM transporters t ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
@@ -370,11 +425,6 @@ async function loadUsers(opts: any) {
   return { data: rows, total: countRow?.c || 0 };
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-// Helper: extract rows from db.execute result (pg driver returns { rows: [...] })
 async function query(sqlText: any): Promise<any[]> {
   const result = await db.execute(sqlText);
   return (result as any).rows || [];

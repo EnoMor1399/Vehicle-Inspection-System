@@ -3,7 +3,6 @@ import { authenticateApiRequest } from "@/lib/api-auth";
 // OData v4 $metadata endpoint — returns EDMX XML schema
 // Power BI uses this to discover the data model
 
-
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) {
@@ -46,6 +45,30 @@ export async function GET(request: Request) {
         <Property Name="TransporterRegion" Type="Edm.String"/>
         <Property Name="StationName" Type="Edm.String"/>
         <Property Name="StationRegion" Type="Edm.String"/>
+      </EntityType>
+
+      <EntityType Name="PreTripInspection">
+        <Key><PropertyRef Name="id"/></Key>
+        <Property Name="id" Type="Edm.String" Nullable="false"/>
+        <Property Name="InspectionDate" Type="Edm.Date"/>
+        <Property Name="StartTime" Type="Edm.DateTimeOffset"/>
+        <Property Name="CompletedAt" Type="Edm.DateTimeOffset"/>
+        <Property Name="DriverName" Type="Edm.String"/>
+        <Property Name="Odometer" Type="Edm.Int32"/>
+        <Property Name="TripPurpose" Type="Edm.String"/>
+        <Property Name="RouteDescription" Type="Edm.String"/>
+        <Property Name="Status" Type="Edm.String"/>
+        <Property Name="TotalItems" Type="Edm.Int32"/>
+        <Property Name="PassedItems" Type="Edm.Int32"/>
+        <Property Name="FailedItems" Type="Edm.Int32"/>
+        <Property Name="ClearedForTrip" Type="Edm.Boolean"/>
+        <Property Name="SupervisorReview" Type="Edm.Boolean"/>
+        <Property Name="Notes" Type="Edm.String"/>
+        <Property Name="VehicleRegistration" Type="Edm.String"/>
+        <Property Name="VehicleMake" Type="Edm.String"/>
+        <Property Name="VehicleModel" Type="Edm.String"/>
+        <Property Name="TransporterName" Type="Edm.String"/>
+        <Property Name="TransporterRegion" Type="Edm.String"/>
       </EntityType>
 
       <EntityType Name="Vehicle">
@@ -173,6 +196,7 @@ export async function GET(request: Request) {
 
       <EntityContainer Name="VIMSContainer">
         <EntitySet Name="Inspections" EntityType="RSL.VIMS.Inspection"/>
+        <EntitySet Name="PreTripInspections" EntityType="RSL.VIMS.PreTripInspection"/>
         <EntitySet Name="Vehicles" EntityType="RSL.VIMS.Vehicle"/>
         <EntitySet Name="Transporters" EntityType="RSL.VIMS.Transporter"/>
         <EntitySet Name="Stations" EntityType="RSL.VIMS.Station"/>
