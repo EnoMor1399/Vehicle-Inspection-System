@@ -15,7 +15,6 @@ export function Card({ children, className }: { children: ReactNode; className?:
 }
 
 export function PageHeader({
-  eyebrow,
   title,
   description,
   action,
@@ -26,17 +25,11 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 border-b border-slate-200/80 pb-5 sm:mb-8 sm:pb-6 md:flex-row md:items-end md:justify-between">
+    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0 flex-1">
-        {eyebrow && (
-          <div className="mb-2 flex items-center gap-2">
-            <span className="h-px w-7 bg-[var(--brand-color)]" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>
-          </div>
-        )}
-        <h1 className="break-words text-2xl font-semibold tracking-[-0.025em] text-slate-950 sm:text-3xl">{title}</h1>
+        <h1 className="break-words text-2xl font-semibold tracking-[-0.025em] text-slate-950 sm:text-[28px]">{title}</h1>
         {description && (
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-[15px]">{description}</p>
+          <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-500">{description}</p>
         )}
       </div>
       {action && <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">{action}</div>}

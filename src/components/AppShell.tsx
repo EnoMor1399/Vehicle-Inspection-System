@@ -103,7 +103,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 const TRANSPORTER_NAV_GROUPS: NavGroup[] = [
   {
-    label: "Your Workspace",
+    label: "Workspace",
     items: [{ href: "/portal", label: "Transporter Portal", icon: Truck }],
   },
 ];
@@ -179,44 +179,39 @@ export function AppShell({
   const workspaceLabel = isTransporter
     ? "Transporter Portal"
     : isSuperAdmin
-      ? "Super Administrator Workspace"
-      : `${roleLabel} Workspace`;
+      ? "Super Administrator"
+      : roleLabel;
 
-  const accessBadge = isSuperAdmin ? "FULL ACCESS" : isTransporter ? "SCOPED" : "ROLE BASED";
-  const sessionLabel = isSuperAdmin
-    ? `${userName || roleLabel} · Full system access`
-    : isTransporter
-      ? `${userName || "Transporter"} · Scoped access`
-      : `${userName || roleLabel} · ${roleLabel}`;
+  const sessionLabel = userName || workspaceLabel;
 
   return (
     <div data-app-shell className="app-shell min-h-screen lg:flex">
       <aside
         aria-label="Primary navigation"
-        className={`fixed inset-y-0 left-0 z-50 flex w-[18rem] flex-col border-r border-white/10 bg-[#0b1525] text-slate-100 shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-white/10 bg-[#0b1525] text-slate-100 shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="border-b border-white/10 px-4 py-5">
-          <div className="flex items-center gap-3 rounded-2xl bg-white/[0.045] p-3 ring-1 ring-white/[0.06]">
+        <div className="border-b border-white/10 px-4 py-4">
+          <div className="flex items-center gap-3">
             {branding.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={branding.logoUrl}
                 alt={branding.companyName}
-                className="h-11 w-11 rounded-xl bg-white object-contain p-1.5 shadow-sm"
+                className="h-10 w-10 rounded-xl bg-white object-contain p-1.5 shadow-sm"
               />
             ) : (
               <div
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl shadow-lg"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-lg"
                 style={{ background: `linear-gradient(135deg, ${branding.themeColor}, ${branding.accentColor || "#026b02"})` }}
               >
-                <ShieldCheck className="h-6 w-6 text-white" />
+                <ShieldCheck className="h-5 w-5 text-white" />
               </div>
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-400">{workspaceLabel}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-500">{branding.tagline}</p>
             </div>
             <button
               type="button"
@@ -227,21 +222,13 @@ export function AppShell({
               <X className="h-5 w-5" />
             </button>
           </div>
-
-          <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[11px] text-slate-400">
-            <span className="inline-flex min-w-0 items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
-              <span className="truncate">{isSuperAdmin ? "Unrestricted administrator" : isTransporter ? "Transporter account" : roleLabel}</span>
-            </span>
-            <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 font-medium text-slate-300">{accessBadge}</span>
-          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           {navGroups.map((group) => (
-            <div key={group.label} className="mb-5 last:mb-0">
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{group.label}</p>
-              <div className="space-y-1">
+            <div key={group.label} className="mb-4 last:mb-0">
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{group.label}</p>
+              <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const active = isActivePath(pathname, item.href);
                   const Icon = item.icon;
@@ -251,9 +238,9 @@ export function AppShell({
                       href={item.href}
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
-                      className={`group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                      className={`group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                         active
-                          ? "bg-white text-slate-950 shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+                          ? "bg-white text-slate-950"
                           : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
                       }`}
                     >
@@ -279,24 +266,6 @@ export function AppShell({
           ))}
         </nav>
 
-        {isTransporter && (
-          <div className="mx-3 mb-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.06] p-3 text-xs leading-relaxed text-slate-400">
-            Your account is limited to the fleet, inspections and compliance records linked to your transporter profile.
-          </div>
-        )}
-
-        {!isTransporter && !isSuperAdmin && userRole && (
-          <div className="mx-3 mb-3 rounded-xl border border-sky-400/15 bg-sky-400/[0.05] p-3 text-xs leading-relaxed text-slate-400">
-            Navigation is limited to the modules assigned to your role and any explicit permissions granted to your account.
-          </div>
-        )}
-
-        {isSuperAdmin && (
-          <div className="mx-3 mb-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] p-3 text-xs leading-relaxed text-slate-400">
-            Super Administrator access is unrestricted across user accounts, operational modules, administration and support tools.
-          </div>
-        )}
-
         <div className="border-t border-white/10 p-3">
           <form action="/api/auth/logout" method="POST">
             <button
@@ -304,10 +273,9 @@ export function AppShell({
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-red-500/10 hover:text-red-200"
             >
               <LogOut className="h-[18px] w-[18px]" />
-              Sign out securely
+              Sign out
             </button>
           </form>
-          <p className="mt-2 truncate px-3 text-[10px] text-slate-600">{branding.footerText}</p>
         </div>
       </aside>
 
@@ -333,11 +301,9 @@ export function AppShell({
             </button>
 
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                <span>{isTransporter ? "TRANSPORTER" : isSuperAdmin ? "SUPER ADMIN" : "VIMS"}</span>
-                <ChevronRight className="h-3 w-3" />
-                <span className="truncate">{activeContext?.group || (isTransporter ? "Your Workspace" : "Workspace")}</span>
-              </div>
+              <p className="truncate text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                {activeContext?.group || (isTransporter ? "Workspace" : "VIMS")}
+              </p>
               <p className="mt-0.5 truncate text-[15px] font-semibold tracking-tight text-slate-950">
                 {activeContext?.item.label || workspaceLabel}
               </p>
