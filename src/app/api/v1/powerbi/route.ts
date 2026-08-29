@@ -3,8 +3,8 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { hasPermission } from "@/lib/auth";
 
-// Power BI DirectQuery-compatible OData v4 endpoint
-// Supports: service document, $metadata, $filter, $select, $orderby, $top, $skip, $count, $format
+// Power BI-compatible OData v4 endpoint.
+// Supports: service document, $metadata, $filter, $select, $orderby, $top, $skip, $count, $format.
 
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
   try {
     const opts = parseQueryOptions(url.searchParams, queryString);
-    const loaders: Record<string, () => Promise<any>> = {
+    const loaders: Record<string, () => Promise<{ data: any[]; total: number }>> = {
       inspections: () => loadInspections(opts),
       pretripinspections: () => loadPreTripInspections(opts),
       vehicles: () => loadVehicles(opts),
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
       "@odata.count": opts.count ? result.total : undefined,
       value: result.data,
       ...(result.data.length === opts.top && result.total > opts.top + opts.skip
-        ? { "@odata.nextLink": `${baseUrl}/api/v1/powerbi?path=${encodeURIComponent(entityName)}&$skip=${opts.skip + opts.top}&$top=${opts.top}` }
+        ? { "@odata.nextLink": buildNextLink(baseUrl, entityName, opts) }
         : {}),
     }, format);
   } catch (error) {
@@ -98,6 +98,18 @@ function parseQueryOptions(params: URLSearchParams, queryString?: string): Query
     orderby: read("$orderby") || "",
     count: read("$count") === "true",
   };
+}
+
+function buildNextLink(baseUrl: string, entityName: string, opts: QueryOptions): string {
+  const next = new URL(`${baseUrl}/api/v1/powerbi`);
+  next.searchParams.set("path", entityName);
+  next.searchParams.set("$top", String(opts.top));
+  next.searchParams.set("$skip", String(opts.skip + opts.top));
+  if (opts.filter) next.searchParams.set("$filter", opts.filter);
+  if (opts.select) next.searchParams.set("$select", opts.select);
+  if (opts.orderby) next.searchParams.set("$orderby", opts.orderby);
+  if (opts.count) next.searchParams.set("$count", "true");
+  return next.toString();
 }
 
 const ODATA_OPERATOR: Record<string, string> = {
@@ -174,7 +186,7 @@ function buildSelectClause(select: string, fields: Record<string, string>): stri
   }).join(", ");
 }
 
-async function loadInspections(opts: any) {
+async function loadInspections(opts: QueryOptions) {
   const fields: Record<string, string> = {
     InspectionNumber: "i.inspection_number",
     InspectionDate: "i.inspection_date",
@@ -185,6 +197,7 @@ async function loadInspections(opts: any) {
     VehicleMake: "v.make",
     VehicleModel: "v.model",
     TransporterName: "t.company_name",
+    TransporterRegion: "t.region",
     StationName: "l.name",
     StationRegion: "l.region",
   };
@@ -198,14 +211,12 @@ async function loadInspections(opts: any) {
       i.parking_brake_efficiency as "ParkingBrakeEfficiency",
       i.smoke_test as "SmokeTest", i.opacity_test as "OpacityTest",
       i.total_photos as "TotalPhotos", i.template_type as "TemplateType",
-      i.next_inspection_date as "NextInspectionDate",
-      i.reinspection_date as "ReinspectionDate",
+      i.next_inspection_date as "NextInspectionDate", i.reinspection_date as "ReinspectionDate",
       v.registration_number as "VehicleRegistration", v.make as "VehicleMake",
       v.model as "VehicleModel", v.body_type as "VehicleBodyType",
       v.category as "VehicleCategory", v.manufacturing_year as "VehicleYear",
-      v.fuel_type as "VehicleFuelType",
-      t.company_name as "TransporterName", t.region as "TransporterRegion",
-      l.name as "StationName", l.region as "StationRegion"
+      v.fuel_type as "VehicleFuelType", t.company_name as "TransporterName",
+      t.region as "TransporterRegion", l.name as "StationName", l.region as "StationRegion"
   `;
   const rows = await query(sql.raw(`
     SELECT ${select}
@@ -221,12 +232,15 @@ async function loadInspections(opts: any) {
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadPreTripInspections(opts: any) {
+async function loadPreTripInspections(opts: QueryOptions) {
   const fields: Record<string, string> = {
     InspectionDate: "d.inspection_date",
     Status: "d.status",
     ClearedForTrip: "d.cleared_for_trip",
     DriverName: "d.driver_name",
+    PassedItems: "d.passed_items",
+    FailedItems: "d.failed_items",
+    TotalItems: "d.total_items",
     VehicleRegistration: "v.registration_number",
     VehicleMake: "v.make",
     VehicleModel: "v.model",
@@ -236,25 +250,15 @@ async function loadPreTripInspections(opts: any) {
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
   const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      d.id,
-      d.inspection_date as "InspectionDate",
-      d.start_time as "StartTime",
-      d.completed_at as "CompletedAt",
-      d.driver_name as "DriverName",
-      d.odometer as "Odometer",
-      d.trip_purpose as "TripPurpose",
-      d.route_description as "RouteDescription",
-      d.status as "Status",
-      d.total_items as "TotalItems",
-      d.passed_items as "PassedItems",
-      d.failed_items as "FailedItems",
-      d.cleared_for_trip as "ClearedForTrip",
-      d.supervisor_review as "SupervisorReview",
-      d.notes as "Notes",
-      v.registration_number as "VehicleRegistration",
-      v.make as "VehicleMake",
-      v.model as "VehicleModel",
-      t.company_name as "TransporterName",
+      d.id, d.inspection_date as "InspectionDate", d.start_time as "StartTime",
+      d.completed_at as "CompletedAt", d.driver_name as "DriverName",
+      d.odometer as "Odometer", d.trip_purpose as "TripPurpose",
+      d.route_description as "RouteDescription", d.status as "Status",
+      d.total_items as "TotalItems", d.passed_items as "PassedItems",
+      d.failed_items as "FailedItems", d.cleared_for_trip as "ClearedForTrip",
+      d.supervisor_review as "SupervisorReview", d.notes as "Notes",
+      v.registration_number as "VehicleRegistration", v.make as "VehicleMake",
+      v.model as "VehicleModel", t.company_name as "TransporterName",
       t.region as "TransporterRegion"
   `;
   const rows = await query(sql.raw(`
@@ -266,162 +270,161 @@ async function loadPreTripInspections(opts: any) {
     ${orderBy}
     LIMIT ${opts.top} OFFSET ${opts.skip}
   `));
-  const countRow = await queryOne(sql.raw(`
-    SELECT count(*)::int as c
-    FROM daily_inspections d
-    INNER JOIN vehicles v ON v.id = d.vehicle_id
-    LEFT JOIN transporters t ON t.id = v.transporter_id
-    ${where}
-  `));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM daily_inspections d INNER JOIN vehicles v ON v.id = d.vehicle_id LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadVehicles(opts: any) {
+async function loadVehicles(opts: QueryOptions) {
+  const totalInspections = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id)";
+  const passCount = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id AND i.overall_result = 'pass')";
+  const failCount = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id AND i.overall_result = 'fail')";
   const fields: Record<string, string> = {
-    RegistrationNumber: "v.registration_number",
-    Make: "v.make", Model: "v.model", Status: "v.status",
-    Category: "v.category", VehicleClass: "v.vehicle_class",
+    RegistrationNumber: "v.registration_number", Make: "v.make", Model: "v.model",
+    Status: "v.status", Category: "v.category", VehicleClass: "v.vehicle_class",
     FuelType: "v.fuel_type", ManufacturingYear: "v.manufacturing_year",
-    TransporterRegion: "t.region",
+    InsuranceExpiry: "v.insurance_expiry", RoadworthyExpiry: "v.roadworthy_expiry",
+    TransporterName: "t.company_name", TransporterRegion: "t.region",
+    TotalInspections: totalInspections, PassCount: passCount, FailCount: failCount,
   };
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "RegistrationNumber asc");
-  const rows = await query(sql.raw(`
-    SELECT v.id, v.registration_number as "RegistrationNumber",
-      v.make as "Make", v.model as "Model", v.body_type as "BodyType",
-      v.category as "Category", v.vehicle_class as "VehicleClass",
-      v.colour as "Colour", v.manufacturing_year as "ManufacturingYear",
-      v.fuel_type as "FuelType", v.transmission as "Transmission",
-      v.seating_capacity as "SeatingCapacity", v.gross_weight as "GrossWeight",
-      v.number_of_axles as "NumberOfAxles", v.odometer_reading as "OdometerReading",
-      v.status as "Status", v.insurance_expiry as "InsuranceExpiry",
-      v.roadworthy_expiry as "RoadworthyExpiry", v.road_fund_expiry as "RoadFundExpiry",
-      v.vin as "VIN", v.chassis_number as "ChassisNumber",
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      v.id, v.registration_number as "RegistrationNumber", v.make as "Make", v.model as "Model",
+      v.body_type as "BodyType", v.category as "Category", v.vehicle_class as "VehicleClass",
+      v.colour as "Colour", v.manufacturing_year as "ManufacturingYear", v.fuel_type as "FuelType",
+      v.transmission as "Transmission", v.seating_capacity as "SeatingCapacity",
+      v.gross_weight as "GrossWeight", v.number_of_axles as "NumberOfAxles",
+      v.odometer_reading as "OdometerReading", v.status as "Status",
+      v.insurance_expiry as "InsuranceExpiry", v.roadworthy_expiry as "RoadworthyExpiry",
+      v.road_fund_expiry as "RoadFundExpiry", v.vin as "VIN", v.chassis_number as "ChassisNumber",
       t.company_name as "TransporterName", t.region as "TransporterRegion",
-      (SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id) as "TotalInspections",
-      (SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id AND i.overall_result = 'pass') as "PassCount",
-      (SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id AND i.overall_result = 'fail') as "FailCount"
-    FROM vehicles v
-    LEFT JOIN transporters t ON t.id = v.transporter_id
-    ${where}
-    ${orderBy}
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
+      ${totalInspections} as "TotalInspections", ${passCount} as "PassCount", ${failCount} as "FailCount"
+  `;
+  const rows = await query(sql.raw(`SELECT ${select} FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
   const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadTransporters(opts: any) {
+async function loadTransporters(opts: QueryOptions) {
+  const fleetSize = "(SELECT count(*) FROM vehicles v WHERE v.transporter_id = t.id)";
+  const passCount = "(SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'pass')";
+  const failCount = "(SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'fail')";
   const fields: Record<string, string> = {
-    CompanyName: "t.company_name", Region: "t.region", District: "t.district",
+    CompanyName: "t.company_name", RegistrationNumber: "t.registration_number",
+    Region: "t.region", District: "t.district", FleetSize: fleetSize,
+    PassCount: passCount, FailCount: failCount,
   };
   const where = buildWhereClause(opts.filter, fields, "t.deleted_at IS NULL");
   const orderBy = buildOrderBy(opts.orderby, fields, "CompanyName asc");
-  const rows = await query(sql.raw(`
-    SELECT t.id, t.company_name as "CompanyName", t.registration_number as "RegistrationNumber",
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      t.id, t.company_name as "CompanyName", t.registration_number as "RegistrationNumber",
       t.tin_number as "TIN", t.region as "Region", t.district as "District",
       t.contact_person as "ContactPerson", t.mobile as "Mobile", t.email as "Email",
       t.insurance_company as "InsuranceCompany", t.insurance_expiry as "InsuranceExpiry",
-      (SELECT count(*) FROM vehicles v WHERE v.transporter_id = t.id) as "FleetSize",
-      (SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'pass') as "PassCount",
-      (SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'fail') as "FailCount"
-    FROM transporters t
-    ${where}
-    ${orderBy}
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
+      ${fleetSize} as "FleetSize", ${passCount} as "PassCount", ${failCount} as "FailCount"
+  `;
+  const rows = await query(sql.raw(`SELECT ${select} FROM transporters t ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
   const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM transporters t ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadStations(opts: any) {
-  const rows = await query(sql.raw(`
-    SELECT l.id, l.name as "Name", l.code as "Code", l.region as "Region",
-      l.district as "District", l.address as "Address", l.phone as "Phone",
-      l.email as "Email", l.capacity as "Capacity", l.status as "Status",
-      (SELECT count(*) FROM users u WHERE u.location_id = l.id) as "InspectorCount",
-      (SELECT count(*) FROM inspections i WHERE i.location_id = l.id) as "InspectionCount",
-      (SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'pass') as "PassCount",
-      (SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'fail') as "FailCount"
-    FROM locations l
-    ORDER BY l.name
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM locations`));
+async function loadStations(opts: QueryOptions) {
+  const inspectorCount = "(SELECT count(*) FROM users u WHERE u.location_id = l.id)";
+  const inspectionCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id)";
+  const passCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'pass')";
+  const failCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'fail')";
+  const fields: Record<string, string> = {
+    Name: "l.name", Code: "l.code", Region: "l.region", District: "l.district",
+    Capacity: "l.capacity", Status: "l.status", InspectorCount: inspectorCount,
+    InspectionCount: inspectionCount, PassCount: passCount, FailCount: failCount,
+  };
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      l.id, l.name as "Name", l.code as "Code", l.region as "Region", l.district as "District",
+      l.address as "Address", l.phone as "Phone", l.email as "Email", l.capacity as "Capacity",
+      l.status as "Status", ${inspectorCount} as "InspectorCount", ${inspectionCount} as "InspectionCount",
+      ${passCount} as "PassCount", ${failCount} as "FailCount"
+  `;
+  const rows = await query(sql.raw(`SELECT ${select} FROM locations l ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM locations l ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadDefects(opts: any) {
-  const rows = await query(sql.raw(`
-    SELECT i.inspection_number as "InspectionNumber",
-      i.inspection_date as "InspectionDate",
-      i.overall_result as "InspectionResult",
-      v.registration_number as "VehicleRegistration",
-      v.make as "VehicleMake", v.model as "VehicleModel",
-      sec->>'section' as "SectionCode",
-      sec->>'title' as "SectionTitle",
-      item->>'name' as "ItemName",
-      item->>'result' as "Result",
-      item->>'severity' as "Severity",
-      item->>'remarks' as "Remarks",
-      jsonb_array_length(coalesce(item->'photos', '[]'::jsonb)) as "PhotoCount"
-    FROM inspections i
-    INNER JOIN vehicles v ON v.id = i.vehicle_id,
-    jsonb_array_elements(i.section_data) as sec,
-    jsonb_array_elements(sec->'items') as item
-    WHERE item->>'result' = 'fail'
-    ORDER BY i.inspection_date DESC
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
-  const countRow = await queryOne(sql.raw(`
-    SELECT count(*)::int as c
-    FROM inspections i, jsonb_array_elements(i.section_data) as sec, jsonb_array_elements(sec->'items') as item
-    WHERE item->>'result' = 'fail'
-  `));
+async function loadDefects(opts: QueryOptions) {
+  const photoCount = "jsonb_array_length(coalesce(item->'photos', '[]'::jsonb))";
+  const fields: Record<string, string> = {
+    InspectionNumber: "i.inspection_number", InspectionDate: "i.inspection_date",
+    InspectionResult: "i.overall_result", VehicleRegistration: "v.registration_number",
+    VehicleMake: "v.make", VehicleModel: "v.model", SectionCode: "sec->>'section'",
+    SectionTitle: "sec->>'title'", ItemName: "item->>'name'", Result: "item->>'result'",
+    Severity: "item->>'severity'", Remarks: "item->>'remarks'", PhotoCount: photoCount,
+  };
+  const where = buildWhereClause(opts.filter, fields, "item->>'result' = 'fail'");
+  const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      i.inspection_number as "InspectionNumber", i.inspection_date as "InspectionDate",
+      i.overall_result as "InspectionResult", v.registration_number as "VehicleRegistration",
+      v.make as "VehicleMake", v.model as "VehicleModel", sec->>'section' as "SectionCode",
+      sec->>'title' as "SectionTitle", item->>'name' as "ItemName", item->>'result' as "Result",
+      item->>'severity' as "Severity", item->>'remarks' as "Remarks", ${photoCount} as "PhotoCount"
+  `;
+  const from = `FROM inspections i INNER JOIN vehicles v ON v.id = i.vehicle_id, jsonb_array_elements(i.section_data) as sec, jsonb_array_elements(sec->'items') as item`;
+  const rows = await query(sql.raw(`SELECT ${select} ${from} ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c ${from} ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadDocuments(opts: any) {
-  const rows = await query(sql.raw(`
-    SELECT d.id, d.name as "Name", d.type as "Type",
-      d.owner_type as "OwnerType", d.owner_id as "OwnerId",
-      d.mime_type as "MimeType", d.size_bytes as "SizeBytes",
-      d.version as "Version", d.expiry_date as "ExpiryDate",
-      d.created_at as "CreatedAt", u.name as "UploadedBy"
-    FROM documents d
-    LEFT JOIN users u ON u.id = d.uploaded_by
-    ORDER BY d.created_at DESC
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM documents`));
+async function loadDocuments(opts: QueryOptions) {
+  const fields: Record<string, string> = {
+    Name: "d.name", Type: "d.type", OwnerType: "d.owner_type", OwnerId: "d.owner_id",
+    Version: "d.version", ExpiryDate: "d.expiry_date", CreatedAt: "d.created_at", UploadedBy: "u.name",
+  };
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "CreatedAt desc");
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      d.id, d.name as "Name", d.type as "Type", d.owner_type as "OwnerType",
+      d.owner_id as "OwnerId", d.mime_type as "MimeType", d.size_bytes as "SizeBytes",
+      d.version as "Version", d.expiry_date as "ExpiryDate", d.created_at as "CreatedAt",
+      u.name as "UploadedBy"
+  `;
+  const rows = await query(sql.raw(`SELECT ${select} FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadAuditLogs(opts: any) {
-  const rows = await query(sql.raw(`
-    SELECT a.id, a.action as "Action", a.entity_type as "EntityType",
-      a.entity_id as "EntityId", a.entity_label as "EntityLabel",
-      a.summary as "Summary", a.user_name as "UserName",
+async function loadAuditLogs(opts: QueryOptions) {
+  const fields: Record<string, string> = {
+    Action: "a.action", EntityType: "a.entity_type", EntityId: "a.entity_id",
+    EntityLabel: "a.entity_label", Summary: "a.summary", UserName: "a.user_name",
+    IPAddress: "a.ip_address", CreatedAt: "a.created_at",
+  };
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "CreatedAt desc");
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      a.id, a.action as "Action", a.entity_type as "EntityType", a.entity_id as "EntityId",
+      a.entity_label as "EntityLabel", a.summary as "Summary", a.user_name as "UserName",
       a.ip_address as "IPAddress", a.created_at as "CreatedAt"
-    FROM audit_logs a
-    ORDER BY a.created_at DESC
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM audit_logs`));
+  `;
+  const rows = await query(sql.raw(`SELECT ${select} FROM audit_logs a ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM audit_logs a ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
-async function loadUsers(opts: any) {
-  const rows = await query(sql.raw(`
-    SELECT u.id, u.name as "Name", u.email as "Email", u.role as "Role",
+async function loadUsers(opts: QueryOptions) {
+  const fields: Record<string, string> = {
+    Name: "u.name", Email: "u.email", Role: "u.role", IsActive: "u.is_active",
+    LastLoginAt: "u.last_login_at", CreatedAt: "u.created_at", StationName: "l.name",
+  };
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
+  const select = opts.select ? buildSelectClause(opts.select, fields) : `
+      u.id, u.name as "Name", u.email as "Email", u.role as "Role",
       u.is_active as "IsActive", u.last_login_at as "LastLoginAt",
       u.created_at as "CreatedAt", l.name as "StationName"
-    FROM users u
-    LEFT JOIN locations l ON l.id = u.location_id
-    ORDER BY u.name
-    LIMIT ${opts.top} OFFSET ${opts.skip}
-  `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM users`));
+  `;
+  const rows = await query(sql.raw(`SELECT ${select} FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
+  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where}`));
   return { data: rows, total: countRow?.c || 0 };
 }
 
@@ -438,13 +441,17 @@ async function queryOne(sqlText: any): Promise<any> {
 function jsonResponse(data: any, format: string) {
   if (format === "xml") {
     return new Response(odataToAtomXml(data), {
-      headers: { "Content-Type": "application/atom+xml;type=feed;charset=utf-8" },
+      headers: {
+        "Content-Type": "application/atom+xml;type=feed;charset=utf-8",
+        "Cache-Control": "private, no-store",
+      },
     });
   }
   return new Response(JSON.stringify(data), {
     headers: {
       "Content-Type": "application/json;odata.metadata=minimal;odata.streaming=true",
       "OData-Version": "4.0",
+      "Cache-Control": "private, no-store",
     },
   });
 }
