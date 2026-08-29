@@ -81,12 +81,57 @@ export function InspectionForm({
     );
   }
 
+  function showFinalDecisionError(message: string) {
+    setActiveSection("P");
+    setError(message);
+    window.setTimeout(() => {
+      document.getElementById("inspection-validation-error")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }
+
   function submit() {
     setError(null);
-    if (!vehicleId) return setError("Please select a vehicle.");
+
+    if (!vehicleId) {
+      setActiveSection("A");
+      return setError("Please select a vehicle before submitting the inspection.");
+    }
+    if (!inspectorName.trim()) {
+      setActiveSection("A");
+      return setError("Inspector name is required before submission.");
+    }
+    if (!station.trim()) {
+      setActiveSection("A");
+      return setError("Inspection station is required before submission.");
+    }
+
+    const inspectedAt = new Date(inspectionDate);
+    if (Number.isNaN(inspectedAt.getTime())) {
+      setActiveSection("A");
+      return setError("Enter a valid inspection date and time.");
+    }
+    if (inspectedAt.getTime() > Date.now() + 5 * 60_000) {
+      setActiveSection("A");
+      return setError("Inspection date and time cannot be in the future.");
+    }
+
+    if (overallResult === "pass" && (totals.fail > 0 || smokeTest === "fail")) {
+      return showFinalDecisionError(
+        "PASS cannot be submitted while failed checklist or emissions items remain. Resolve the failed items or select Conditional Pass, Re-inspection Required, or Fail.",
+      );
+    }
+    if (overallResult === "conditional_pass" && totals.critical > 0) {
+      return showFinalDecisionError(
+        "Conditional Pass cannot be submitted while critical defects remain. Resolve the critical defects or select Re-inspection Required or Fail.",
+      );
+    }
+    if (!inspectorSig) {
+      return showFinalDecisionError("Inspector digital signature is required in Section P before submission.");
+    }
+
     const data: InspectionFormData = {
       vehicleId,
-      inspectionDate: new Date(inspectionDate).toISOString(),
+      inspectionDate: inspectedAt.toISOString(),
       inspectorName,
       station,
       odometerReading: odometer,
@@ -109,7 +154,7 @@ export function InspectionForm({
         const res = await createInspection(data);
         router.push(`/inspections/${res.id}`);
       } catch (e: any) {
-        setError(e?.message || "Submission failed");
+        setError(e?.message || "Submission failed. Review the inspection and try again.");
       }
     });
   }
@@ -364,7 +409,7 @@ export function InspectionForm({
         )}
 
         {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+          <div id="inspection-validation-error" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2" role="alert">
             <AlertTriangle className="h-4 w-4" /> {error}
           </div>
         )}
