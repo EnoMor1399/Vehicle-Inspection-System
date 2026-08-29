@@ -40,7 +40,6 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function TrendChart({ data }: { data: { month: string; pass: number; fail: number; conditional: number }[] }) {
-  // Format month labels (YYYY-MM -> Month Year)
   const formatMonth = (month: string) => {
     const [year, m] = month.split("-");
     return `${MONTH_NAMES[parseInt(m) - 1]} ${year.slice(2)}`;
@@ -48,84 +47,65 @@ export function TrendChart({ data }: { data: { month: string; pass: number; fail
 
   return (
     <div className="space-y-4">
-      {/* Chart */}
       <ResponsiveContainer width="100%" height={330}>
         <AreaChart data={data} margin={{ top: 20, right: 30, bottom: 20, left: 10 }}>
           <defs>
-            {/* Vibrant Pass Gradient */}
             <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
               <stop offset="50%" stopColor="#34d399" stopOpacity={0.4} />
               <stop offset="100%" stopColor="#a7f3d0" stopOpacity={0.1} />
             </linearGradient>
-            
-            {/* Vibrant Fail Gradient */}
             <linearGradient id="failGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.8} />
               <stop offset="50%" stopColor="#fb7185" stopOpacity={0.4} />
               <stop offset="100%" stopColor="#fecdd3" stopOpacity={0.1} />
             </linearGradient>
-            
-            {/* Conditional Gradient */}
             <linearGradient id="conditionalGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.6} />
               <stop offset="100%" stopColor="#fbbf24" stopOpacity={0.2} />
             </linearGradient>
-
           </defs>
-          
           <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" opacity={0.8} />
-          
-          <XAxis 
-            dataKey="month" 
+          <XAxis
+            dataKey="month"
             tick={{ fontSize: 11, fill: "#64748b" }}
             tickFormatter={formatMonth}
             axisLine={{ stroke: "#cbd5e1" }}
             tickLine={{ stroke: "#cbd5e1" }}
           />
-          
-          <YAxis 
+          <YAxis
             tick={{ fontSize: 11, fill: "#64748b" }}
             axisLine={{ stroke: "#cbd5e1" }}
             tickLine={{ stroke: "#cbd5e1" }}
           />
-          
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#cbd5e1", strokeWidth: 1 }} />
-          
-          <Legend 
-            wrapperStyle={{ paddingTop: "20px" }}
-            iconType="circle"
-            iconSize={10}
-          />
-          
-          <Area 
-            type="monotone" 
-            dataKey="pass" 
-            stroke="#10b981" 
+          <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" iconSize={10} />
+          <Area
+            type="monotone"
+            dataKey="pass"
+            stroke="#10b981"
             strokeWidth={2.5}
-            fill="url(#passGradient)" 
+            fill="url(#passGradient)"
             name="Pass"
             dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
             activeDot={{ r: 6, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
           />
-          
-          <Area 
-            type="monotone" 
-            dataKey="fail" 
-            stroke="#f43f5e" 
+          <Area
+            type="monotone"
+            dataKey="fail"
+            stroke="#f43f5e"
             strokeWidth={2.5}
-            fill="url(#failGradient)" 
+            fill="url(#failGradient)"
             name="Fail"
             dot={{ fill: "#f43f5e", r: 4, strokeWidth: 2, stroke: "#fff" }}
             activeDot={{ r: 6, fill: "#f43f5e", stroke: "#fff", strokeWidth: 2 }}
           />
-          
-          <Area 
-            type="monotone" 
-            dataKey="conditional" 
-            stroke="#f59e0b" 
+          <Area
+            type="monotone"
+            dataKey="conditional"
+            stroke="#f59e0b"
             strokeWidth={2.5}
-            fill="url(#conditionalGradient)" 
+            fill="url(#conditionalGradient)"
             name="Conditional"
             strokeDasharray="5 5"
             dot={{ fill: "#f59e0b", r: 3, strokeWidth: 2, stroke: "#fff" }}
@@ -204,44 +184,96 @@ export function CategoryPie({ data }: { data: { category: string; count: number 
   );
 }
 
-export function RegionHeatMap({ data }: { data: { region: string; vehicles: number; inspections: number; passRate: number }[] }) {
-  return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {data.map((region) => {
-        const passRate = Math.max(0, Math.min(100, region.passRate || 0));
-        const tone = passRate >= 80
-          ? "bg-white/80 text-emerald-700 ring-emerald-300"
-          : passRate >= 60
-            ? "bg-white/80 text-orange-700 ring-orange-300"
-            : "bg-white/80 text-rose-700 ring-rose-300";
-        const surface = passRate >= 80
-          ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/80"
-          : passRate >= 60
-            ? "border-orange-200 bg-gradient-to-br from-amber-50 to-orange-100/80"
-            : "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-100/80";
-        const bar = passRate >= 80
-          ? "bg-gradient-to-r from-emerald-500 to-teal-400"
-          : passRate >= 60
-            ? "bg-gradient-to-r from-amber-400 to-orange-500"
-            : "bg-gradient-to-r from-rose-500 to-pink-500";
+type RegionalComplianceRow = {
+  region: string;
+  vehicles: number;
+  inspections: number;
+  passRate: number | null;
+  pass?: number;
+  fail?: number;
+  conditional?: number;
+};
 
-        return (
-          <div key={region.region} className={"rounded-xl border p-4 shadow-sm " + surface}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{region.region}</p>
-                <p className="mt-1 text-xs text-slate-600">{region.vehicles} vehicles · {region.inspections} inspections</p>
+export function RegionHeatMap({ data }: { data: RegionalComplianceRow[] }) {
+  const totalVehicles = data.reduce((sum, region) => sum + Number(region.vehicles || 0), 0);
+  const unassignedVehicles = data.find((region) => region.region === "Unassigned")?.vehicles || 0;
+  const regionCoverage = totalVehicles > 0
+    ? Math.round(((totalVehicles - unassignedVehicles) / totalVehicles) * 100)
+    : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          Region reflects the <strong className="font-semibold text-slate-800">transporter operating region</strong> stored on each transporter profile.
+        </p>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 font-semibold ${unassignedVehicles > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {regionCoverage}% fleet region coverage
+        </span>
+      </div>
+
+      {unassignedVehicles > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+          <strong>{unassignedVehicles} vehicle{unassignedVehicles === 1 ? "" : "s"}</strong> currently fall under <strong>Unassigned</strong> because their linked transporter profile has no operating region. Their inspection results are still included, but regional interpretation remains incomplete until those transporter records are updated.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {data.map((region) => {
+          const hasInspectionData = region.inspections > 0 && region.passRate !== null;
+          const passRate = hasInspectionData ? Math.max(0, Math.min(100, Number(region.passRate))) : 0;
+          const tone = !hasInspectionData
+            ? "bg-white/80 text-slate-600 ring-slate-300"
+            : passRate >= 80
+              ? "bg-white/80 text-emerald-700 ring-emerald-300"
+              : passRate >= 60
+                ? "bg-white/80 text-orange-700 ring-orange-300"
+                : "bg-white/80 text-rose-700 ring-rose-300";
+          const surface = !hasInspectionData
+            ? "border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100/80"
+            : passRate >= 80
+              ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/80"
+              : passRate >= 60
+                ? "border-orange-200 bg-gradient-to-br from-amber-50 to-orange-100/80"
+                : "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-100/80";
+          const bar = !hasInspectionData
+            ? "bg-slate-300"
+            : passRate >= 80
+              ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+              : passRate >= 60
+                ? "bg-gradient-to-r from-amber-400 to-orange-500"
+                : "bg-gradient-to-r from-rose-500 to-pink-500";
+
+          const resultDetails = hasInspectionData
+            ? [
+                `${Number(region.pass || 0)} pass`,
+                `${Number(region.fail || 0)} fail`,
+                Number(region.conditional || 0) > 0 ? `${Number(region.conditional || 0)} conditional` : null,
+              ].filter(Boolean).join(" · ")
+            : "No technical inspection results recorded";
+
+          return (
+            <div key={region.region} className={"rounded-xl border p-4 shadow-sm " + surface}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{region.region}</p>
+                  <p className="mt-1 text-xs text-slate-600">{region.vehicles} vehicles · {region.inspections} inspections</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{resultDetails}</p>
+                </div>
+                <span className={"rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ring-1 ring-inset " + tone}>
+                  {hasInspectionData ? `${passRate}%` : "No data"}
+                </span>
               </div>
-              <span className={"rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ring-1 ring-inset " + tone}>
-                {passRate}%
-              </span>
+              <div
+                className="mt-4 h-2 overflow-hidden rounded-full bg-white/80 shadow-inner"
+                aria-label={hasInspectionData ? `${region.region} pass rate ${passRate}%` : `${region.region} has no inspection data`}
+              >
+                <div className={"h-full rounded-full " + bar} style={{ width: hasInspectionData ? `${passRate}%` : "0%" }} />
+              </div>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80 shadow-inner" aria-label={region.region + " pass rate " + passRate + "%"}>
-              <div className={"h-full rounded-full " + bar} style={{ width: passRate + "%" }} />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

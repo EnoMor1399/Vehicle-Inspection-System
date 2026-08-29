@@ -183,7 +183,13 @@ export async function getMonthlyTrend() {
 
 // Station comparison
 export async function getStationStats() {
-  const rows = await db.execute<{ station: string; inspections: number; pass: number; fail: number; passRate: number }>(sql`
+  const rows = await db.execute<{
+    station: string;
+    inspections: number;
+    pass: number;
+    fail: number;
+    pass_rate: string | number | null;
+  }>(sql`
     select
       coalesce(l.name, 'Unknown') as station,
       count(*)::int as inspections,
@@ -198,12 +204,26 @@ export async function getStationStats() {
     group by l.name
     order by inspections desc
   `);
-  return rows.rows;
+
+  return rows.rows.map((row) => ({
+    station: row.station,
+    inspections: Number(row.inspections || 0),
+    pass: Number(row.pass || 0),
+    fail: Number(row.fail || 0),
+    passRate: Number(row.pass_rate || 0),
+  }));
 }
 
 // Transporter performance
 export async function getTransporterPerformance() {
-  const rows = await db.execute<{ transporter: string; fleet: number; inspections: number; pass: number; fail: number; passRate: number }>(sql`
+  const rows = await db.execute<{
+    transporter: string;
+    fleet: number;
+    inspections: number;
+    pass: number;
+    fail: number;
+    pass_rate: string | number | null;
+  }>(sql`
     select
       t.company_name as transporter,
       count(distinct v.id)::int as fleet,
@@ -221,7 +241,15 @@ export async function getTransporterPerformance() {
     group by t.id, t.company_name
     order by inspections desc
   `);
-  return rows.rows;
+
+  return rows.rows.map((row) => ({
+    transporter: row.transporter,
+    fleet: Number(row.fleet || 0),
+    inspections: Number(row.inspections || 0),
+    pass: Number(row.pass || 0),
+    fail: Number(row.fail || 0),
+    passRate: Number(row.pass_rate || 0),
+  }));
 }
 
 // Common defects (from section_data JSONB)
@@ -253,24 +281,44 @@ export async function getCategoryDistribution() {
   return rows.rows;
 }
 
-// Regional comparison
+// Regional comparison. Region is the transporter operating region recorded on the transporter profile.
 export async function getRegionalStats() {
-  const rows = await db.execute<{ region: string; vehicles: number; inspections: number; passRate: number }>(sql`
+  const rows = await db.execute<{
+    region: string;
+    vehicles: number;
+    inspections: number;
+    pass: number;
+    fail: number;
+    conditional: number;
+    pass_rate: string | number | null;
+  }>(sql`
     select
-      coalesce(t.region, 'Unassigned') as region,
+      coalesce(nullif(trim(t.region), ''), 'Unassigned') as region,
       count(distinct v.id)::int as vehicles,
       count(i.id)::int as inspections,
+      count(i.id) filter (where i.overall_result = 'pass')::int as pass,
+      count(i.id) filter (where i.overall_result = 'fail')::int as fail,
+      count(i.id) filter (where i.overall_result in ('conditional_pass','reinspection_required'))::int as conditional,
       case when count(i.id) > 0
-        then round((count(*) filter (where i.overall_result = 'pass')::numeric / count(i.id)::numeric) * 100, 1)
-        else 0
+        then round((count(i.id) filter (where i.overall_result = 'pass')::numeric / count(i.id)::numeric) * 100, 1)
+        else null
       end as pass_rate
     from vehicles v
-    left join transporters t on t.id = v.transporter_id
+    left join transporters t on t.id = v.transporter_id and t.deleted_at is null
     left join inspections i on i.vehicle_id = v.id
-    group by t.region
-    order by vehicles desc
+    group by coalesce(nullif(trim(t.region), ''), 'Unassigned')
+    order by vehicles desc, region asc
   `);
-  return rows.rows;
+
+  return rows.rows.map((row) => ({
+    region: row.region,
+    vehicles: Number(row.vehicles || 0),
+    inspections: Number(row.inspections || 0),
+    pass: Number(row.pass || 0),
+    fail: Number(row.fail || 0),
+    conditional: Number(row.conditional || 0),
+    passRate: row.pass_rate === null ? null : Number(row.pass_rate),
+  }));
 }
 
 // Inspector performance
