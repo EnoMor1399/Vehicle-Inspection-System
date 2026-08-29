@@ -2,11 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  Activity,
-  BarChart3,
   CheckCircle2,
-  ChevronRight,
-  Database,
   Download,
   Eye,
   EyeOff,
@@ -14,9 +10,6 @@ import {
   KeyRound,
   Play,
   RefreshCw,
-  Search,
-  ShieldCheck,
-  SlidersHorizontal,
   Table2,
   XCircle,
 } from "lucide-react";
@@ -33,49 +26,49 @@ type Dataset = {
 const DATASETS: Dataset[] = [
   {
     name: "Inspections",
-    description: "Technical inspection outcomes, station, inspector, vehicle and transporter details.",
+    description: "Technical inspection results, vehicles, inspectors, stations and transporters.",
     fields: ["InspectionNumber", "InspectionDate", "OverallResult", "WorkflowStatus", "VehicleRegistration", "InspectorName", "TransporterName"],
   },
   {
     name: "PreTripInspections",
-    description: "Daily Pre-Trip / Safe-To-Load checks, trip clearance, driver and checklist totals.",
+    description: "Pre-Trip / Safe-To-Load checks, trip clearance, drivers and checklist totals.",
     fields: ["InspectionDate", "Status", "ClearedForTrip", "VehicleRegistration", "DriverName", "PassedItems", "FailedItems", "TransporterName"],
   },
   {
     name: "Vehicles",
-    description: "Fleet register with status, vehicle profile, expiry dates and inspection counts.",
+    description: "Fleet register, vehicle status, expiry dates and inspection counts.",
     fields: ["RegistrationNumber", "Make", "Model", "Status", "Category", "TransporterName", "TotalInspections"],
   },
   {
     name: "Transporters",
-    description: "Transporter companies, region, fleet size and inspection compliance counts.",
+    description: "Transporter companies, regions, fleet size and inspection compliance.",
     fields: ["CompanyName", "Region", "District", "FleetSize", "PassCount", "FailCount"],
   },
   {
     name: "Stations",
-    description: "Inspection stations with capacity, volume, inspector count and outcomes.",
+    description: "Inspection stations, capacity, volume, inspectors and outcomes.",
     fields: ["Name", "Code", "Region", "Capacity", "InspectionCount", "PassCount", "FailCount"],
   },
   {
     name: "Defects",
-    description: "Failed checklist items with severity, remarks, vehicle and evidence counts.",
+    description: "Failed checklist items, severity, remarks, vehicles and evidence counts.",
     fields: ["InspectionNumber", "InspectionDate", "VehicleRegistration", "SectionCode", "ItemName", "Severity", "PhotoCount"],
   },
   {
     name: "Documents",
-    description: "Document register with owner, version, expiry and uploader information.",
+    description: "Document register, ownership, versions and expiry information.",
     fields: ["Name", "Type", "OwnerType", "ExpiryDate", "Version", "UploadedBy"],
     restricted: true,
   },
   {
     name: "AuditLogs",
-    description: "Security and compliance audit trail for privileged operational events.",
+    description: "Security and compliance audit trail for privileged events.",
     fields: ["Action", "EntityType", "UserName", "Summary", "IPAddress", "CreatedAt"],
     restricted: true,
   },
   {
     name: "Users",
-    description: "User accounts, roles, station assignment and activity metadata.",
+    description: "User accounts, roles, station assignments and activity metadata.",
     fields: ["Name", "Email", "Role", "IsActive", "LastLoginAt", "StationName"],
     restricted: true,
   },
@@ -95,7 +88,6 @@ const EMPTY_PREVIEW: PreviewState = { loading: false, error: null, rows: [] };
 
 export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
   const serviceUrl = `${baseUrl}/api/v1/powerbi`;
-  const metadataUrl = `${serviceUrl}/$metadata`;
 
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -104,7 +96,6 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
   const [availableDatasets, setAvailableDatasets] = useState<string[] | null>(null);
   const [connectionMs, setConnectionMs] = useState<number | null>(null);
 
-  const [datasetSearch, setDatasetSearch] = useState("");
   const [dataset, setDataset] = useState("Inspections");
   const [filter, setFilter] = useState("");
   const [selectFields, setSelectFields] = useState("");
@@ -112,14 +103,6 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
   const [top, setTop] = useState("25");
   const [includeCount, setIncludeCount] = useState(true);
   const [preview, setPreview] = useState<PreviewState>(EMPTY_PREVIEW);
-
-  const filteredDatasets = useMemo(() => {
-    const q = datasetSearch.trim().toLowerCase();
-    if (!q) return DATASETS;
-    return DATASETS.filter((item) =>
-      `${item.name} ${item.description} ${item.fields.join(" ")}`.toLowerCase().includes(q),
-    );
-  }, [datasetSearch]);
 
   const selectedDataset = DATASETS.find((item) => item.name === dataset) || DATASETS[0];
 
@@ -142,12 +125,12 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
   async function testConnection() {
     if (!apiKey.trim()) {
       setConnectionState("error");
-      setConnectionMessage("Enter an API key before testing the connector.");
+      setConnectionMessage("Enter an API key first.");
       return;
     }
 
     setConnectionState("testing");
-    setConnectionMessage("Testing secure OData access…");
+    setConnectionMessage("Testing connection…");
     const started = performance.now();
 
     try {
@@ -157,33 +140,33 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(body?.error || body?.message || `Connection failed (${response.status})`);
+        throw new Error(body?.error?.message || body?.error || body?.message || `Connection failed (${response.status})`);
       }
 
       const sets = Array.isArray(body?.value)
         ? body.value.map((item: { name?: string }) => item?.name).filter(Boolean)
         : [];
-      const elapsed = Math.round(performance.now() - started);
       setAvailableDatasets(sets);
-      setConnectionMs(elapsed);
+      setConnectionMs(Math.round(performance.now() - started));
       setConnectionState("connected");
-      setConnectionMessage(`${sets.length} datasets available to this credential.`);
+      setConnectionMessage(`Connected · ${sets.length} datasets available`);
     } catch (error) {
       setAvailableDatasets(null);
       setConnectionMs(null);
       setConnectionState("error");
-      setConnectionMessage(error instanceof Error ? error.message : "Unable to connect to the Power BI endpoint.");
+      setConnectionMessage(error instanceof Error ? error.message : "Unable to connect.");
     }
   }
 
   async function runPreview() {
     if (!apiKey.trim()) {
-      setPreview({ loading: false, error: "Enter an API key in Connection Test before running a preview.", rows: [] });
+      setPreview({ loading: false, error: "Enter and test an API key before previewing data.", rows: [] });
       return;
     }
 
     setPreview({ loading: true, error: null, rows: [] });
     const started = performance.now();
+
     try {
       const response = await fetch(queryUrl, {
         headers: { "X-API-Key": apiKey.trim(), Accept: "application/json" },
@@ -191,7 +174,7 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(body?.error || body?.message || `Query failed (${response.status})`);
+        throw new Error(body?.error?.message || body?.error || body?.message || `Query failed (${response.status})`);
       }
       setPreview({
         loading: false,
@@ -235,199 +218,118 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard icon={<Database className="h-5 w-5" />} label="Datasets" value="9" hint="Core VIMS entities" />
-        <SummaryCard icon={<Activity className="h-5 w-5" />} label="Query Limit" value="500" hint="Rows per request" />
-        <SummaryCard icon={<BarChart3 className="h-5 w-5" />} label="Protocol" value="OData v4" hint="Power BI compatible" />
-        <SummaryCard icon={<ShieldCheck className="h-5 w-5" />} label="Security" value="API key" hint="Report permission required" />
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
-        <Card className="p-5 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Connection test</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-950">Validate Power BI access</h2>
-              <p className="mt-1 text-sm text-slate-500">The API key stays in this browser session and is not stored by this page.</p>
+      <Card className="p-5 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label className="text-sm font-semibold text-slate-700">API key</label>
+              <StatusBadge state={connectionState} />
             </div>
-            <StatusBadge state={connectionState} />
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Service URL</label>
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                <code className="min-w-0 flex-1 truncate text-xs text-slate-700">{serviceUrl}</code>
-                <CopyButton value={serviceUrl} />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">API key</label>
-              <div className="relative">
-                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  placeholder="Paste a report-enabled API key"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-11 text-sm text-slate-950 outline-none focus:border-[var(--brand-color)] focus:ring-4 focus:ring-slate-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey((value) => !value)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                  aria-label={showKey ? "Hide API key" : "Show API key"}
-                >
-                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button onClick={testConnection} disabled={connectionState === "testing"} className="w-full sm:w-auto">
-              <RefreshCw className={`h-4 w-4 ${connectionState === "testing" ? "animate-spin" : ""}`} />
-              {connectionState === "testing" ? "Testing…" : "Test connection"}
-            </Button>
-
-            <div className={`rounded-xl px-4 py-3 text-sm ${connectionState === "connected" ? "bg-emerald-50 text-emerald-800" : connectionState === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"}`}>
-              <div className="flex items-center justify-between gap-3">
-                <span>{connectionMessage}</span>
-                {connectionMs !== null && <span className="shrink-0 text-xs font-semibold">{connectionMs} ms</span>}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Quick setup</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-950">Connect from Power BI Desktop</h2>
-            </div>
-            <Badge tone="blue">OData v4</Badge>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <QuickStep number="1" title="Get Data" text="Choose OData Feed or use the generated Power Query script." />
-            <QuickStep number="2" title="Authenticate" text="Use the service URL and X-API-Key header." />
-            <QuickStep number="3" title="Model" text="Select datasets, create relationships, measures and dashboards." />
-          </div>
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Schema metadata</p>
-                <p className="mt-0.5 text-xs text-slate-500">Use this endpoint for OData entity and field discovery.</p>
-              </div>
-              <CopyButton value={metadataUrl} />
-            </div>
-            <code className="mt-2 block break-all text-xs text-slate-600">{metadataUrl}</code>
-          </div>
-        </Card>
-      </section>
-
-      <Card className="overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-950">Dataset explorer</h2>
-              <p className="mt-1 text-sm text-slate-500">Find a dataset, review its useful fields, then send it to the query builder.</p>
-            </div>
-            <label className="relative w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
-                type="search"
-                value={datasetSearch}
-                onChange={(event) => setDatasetSearch(event.target.value)}
-                placeholder="Search datasets or fields"
-                className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none focus:border-[var(--brand-color)] focus:ring-4 focus:ring-slate-100"
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder="Paste your VIMS API key"
+                autoComplete="off"
+                spellCheck={false}
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-11 text-sm text-slate-950 outline-none focus:border-[var(--brand-color)] focus:ring-4 focus:ring-slate-100"
               />
-            </label>
-          </div>
-        </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3">
-          {filteredDatasets.map((item) => {
-            const knownAvailable = availableDatasets === null || availableDatasets.includes(item.name);
-            const active = dataset === item.name;
-            return (
               <button
-                key={item.name}
                 type="button"
-                onClick={() => {
-                  setDataset(item.name);
-                  setPreview(EMPTY_PREVIEW);
-                }}
-                className={`rounded-2xl border p-4 text-left transition ${active ? "border-slate-900 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+                onClick={() => setShowKey((value) => !value)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label={showKey ? "Hide API key" : "Show API key"}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className={`grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-white/10 text-white" : "bg-slate-100 text-slate-600"}`}>
-                    <Database className="h-4 w-4" />
-                  </div>
-                  {!knownAvailable ? <Badge tone="red">Unavailable</Badge> : item.restricted ? <Badge tone="amber">Permission based</Badge> : null}
-                </div>
-                <p className={`mt-3 font-semibold ${active ? "text-white" : "text-slate-950"}`}>{item.name}</p>
-                <p className={`mt-1 text-xs leading-5 ${active ? "text-slate-300" : "text-slate-500"}`}>{item.description}</p>
-                <p className={`mt-3 line-clamp-2 text-[11px] font-mono ${active ? "text-slate-400" : "text-slate-500"}`}>{item.fields.join(" · ")}</p>
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
-            );
-          })}
+            </div>
+          </div>
+
+          <Button onClick={testConnection} disabled={connectionState === "testing"} className="lg:mb-0.5">
+            <RefreshCw className={`h-4 w-4 ${connectionState === "testing" ? "animate-spin" : ""}`} />
+            {connectionState === "testing" ? "Testing…" : "Test connection"}
+          </Button>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <div className={connectionState === "connected" ? "text-emerald-700" : connectionState === "error" ? "text-red-600" : "text-slate-500"}>
+            {connectionMessage}{connectionMs !== null ? ` · ${connectionMs} ms` : ""}
+          </div>
+          <div className="flex min-w-0 items-center gap-2 text-slate-500">
+            <code className="truncate">{serviceUrl}</code>
+            <CopyButton value={serviceUrl} />
+          </div>
         </div>
       </Card>
 
-      <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
+      <section className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Query builder</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-950">Build an OData request</h2>
-            </div>
-            <SlidersHorizontal className="h-5 w-5 text-slate-400" />
-          </div>
+          <h2 className="text-lg font-semibold text-slate-950">Data source</h2>
+          <p className="mt-1 text-sm text-slate-500">Choose what you want to send to Power BI.</p>
 
           <div className="mt-5 space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">Dataset</label>
-              <Select value={dataset} onChange={(event) => setDataset(event.target.value)}>
-                {DATASETS.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+              <Select
+                value={dataset}
+                onChange={(event) => {
+                  setDataset(event.target.value);
+                  setPreview(EMPTY_PREVIEW);
+                }}
+              >
+                {DATASETS.map((item) => {
+                  const unavailable = availableDatasets !== null && !availableDatasets.includes(item.name);
+                  return (
+                    <option key={item.name} value={item.name} disabled={unavailable}>
+                      {item.name}{item.restricted ? " · restricted" : ""}{unavailable ? " · unavailable" : ""}
+                    </option>
+                  );
+                })}
               </Select>
-            </div>
-            <div>
-              <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-700"><Filter className="h-4 w-4" /> Filter</label>
-              <TextInput value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="OverallResult eq 'fail'" />
-              <p className="mt-1.5 text-xs text-slate-500">Supported comparisons: eq, ne, gt, lt, ge, le joined with AND / OR.</p>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Select fields</label>
-              <TextInput value={selectFields} onChange={(event) => setSelectFields(event.target.value)} placeholder={selectedDataset.fields.slice(0, 4).join(",")} />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Order by</label>
-                <TextInput value={orderBy} onChange={(event) => setOrderBy(event.target.value)} placeholder="InspectionDate desc" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Rows</label>
-                <TextInput type="number" min={1} max={500} value={top} onChange={(event) => setTop(event.target.value)} />
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={includeCount} onChange={(event) => setIncludeCount(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
-              Include total row count
-            </label>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-950 p-4 text-slate-100">
-              <div className="flex items-start gap-3">
-                <code className="min-w-0 flex-1 break-all text-xs leading-5">{queryUrl}</code>
-                <CopyButton value={queryUrl} />
-              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{selectedDataset.description}</p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Rows</label>
+              <TextInput type="number" min={1} max={500} value={top} onChange={(event) => setTop(event.target.value)} />
+            </div>
+
+            <details className="rounded-xl border border-slate-200 bg-slate-50/70">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700">
+                <Filter className="h-4 w-4" /> Advanced query options
+              </summary>
+              <div className="space-y-4 border-t border-slate-200 p-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Filter</label>
+                  <TextInput value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="OverallResult eq 'fail'" />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Select fields</label>
+                  <TextInput value={selectFields} onChange={(event) => setSelectFields(event.target.value)} placeholder={selectedDataset.fields.slice(0, 4).join(",")} />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Order by</label>
+                  <TextInput value={orderBy} onChange={(event) => setOrderBy(event.target.value)} placeholder="InspectionDate desc" />
+                </div>
+                <label className="flex items-center gap-2 text-xs text-slate-700">
+                  <input type="checkbox" checked={includeCount} onChange={(event) => setIncludeCount(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+                  Include total row count
+                </label>
+                <div className="flex items-start gap-2 rounded-lg bg-slate-950 p-3 text-slate-100">
+                  <code className="min-w-0 flex-1 break-all text-[11px] leading-5">{queryUrl}</code>
+                  <CopyButton value={queryUrl} />
+                </div>
+              </div>
+            </details>
+
+            <div className="grid gap-2">
               <Button onClick={runPreview} disabled={preview.loading}>
-                <Play className="h-4 w-4" /> {preview.loading ? "Running…" : "Run preview"}
+                <Play className="h-4 w-4" /> {preview.loading ? "Running…" : "Preview data"}
               </Button>
               <Button variant="secondary" onClick={downloadPowerQuery}>
-                <Download className="h-4 w-4" /> Download Power Query
+                <Download className="h-4 w-4" /> Download for Power BI
               </Button>
               <Button variant="ghost" onClick={resetQuery}>Reset</Button>
             </div>
@@ -436,11 +338,11 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
 
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Live preview</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-950">Query results</h2>
+            <h2 className="text-lg font-semibold text-slate-950">Preview</h2>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              {preview.total !== undefined && <span>{preview.total} total</span>}
+              {preview.elapsedMs !== undefined && <Badge tone="slate">{preview.elapsedMs} ms</Badge>}
             </div>
-            {preview.elapsedMs !== undefined && <Badge tone="slate">{preview.elapsedMs} ms</Badge>}
           </div>
 
           {preview.error ? (
@@ -448,85 +350,54 @@ export function PowerBiWorkspace({ baseUrl }: { baseUrl: string }) {
               <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> {preview.error}
             </div>
           ) : preview.loading ? (
-            <div className="grid min-h-64 place-items-center text-sm text-slate-500">
-              <div className="text-center"><RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />Running secure query…</div>
+            <div className="grid min-h-72 place-items-center text-sm text-slate-500">
+              <div className="text-center"><RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />Loading data…</div>
             </div>
           ) : preview.rows.length === 0 ? (
-            <div className="grid min-h-64 place-items-center px-6 text-center">
+            <div className="grid min-h-72 place-items-center px-6 text-center">
               <div>
                 <Table2 className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-3 text-sm font-semibold text-slate-900">No preview loaded</p>
-                <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">Test your API key, choose a dataset, then run a preview. Up to 10 rows are displayed here.</p>
+                <p className="mt-3 text-sm font-semibold text-slate-900">No data preview yet</p>
+                <p className="mt-1 text-xs text-slate-500">Choose a dataset and click Preview data.</p>
               </div>
             </div>
           ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3 text-xs text-slate-500 sm:px-6">
-                <span>{preview.rows.length} rows shown</span>
-                {preview.total !== undefined && <><span>·</span><span>{preview.total} total rows</span></>}
-              </div>
-              <div className="max-h-[430px] overflow-auto">
-                <table className="min-w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500">
-                    <tr>{previewColumns.map((column) => <th key={column} className="whitespace-nowrap border-b border-slate-200 px-4 py-3 font-semibold">{column}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {preview.rows.map((row, index) => (
-                      <tr key={index} className="hover:bg-slate-50">
-                        {previewColumns.map((column) => (
-                          <td key={column} className="max-w-56 truncate px-4 py-3 text-slate-700" title={formatCell(row[column])}>{formatCell(row[column])}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+            <div className="max-h-[560px] overflow-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                  <tr>{previewColumns.map((column) => <th key={column} className="whitespace-nowrap border-b border-slate-200 px-4 py-3 font-semibold">{column}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {preview.rows.map((row, index) => (
+                    <tr key={index} className="hover:bg-slate-50">
+                      {previewColumns.map((column) => (
+                        <td key={column} className="max-w-56 truncate px-4 py-3 text-slate-700" title={formatCell(row[column])}>{formatCell(row[column])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       </section>
 
-      <Card className="p-5 sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Power Query starter</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-950">Generated M script</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">The downloaded script contains a placeholder API key, never the key entered on this page.</p>
+      <details className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-slate-800 sm:px-6">
+          Power Query script
+          <span className="ml-2 font-normal text-slate-500">for advanced setup</span>
+        </summary>
+        <div className="border-t border-slate-200 p-5 sm:p-6">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">The script contains a placeholder, not the API key entered above.</p>
+            <div className="flex gap-2">
+              <CopyButton value={powerQuery} />
+              <Button variant="secondary" size="sm" onClick={downloadPowerQuery}><Download className="h-4 w-4" /> Download .pq</Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <CopyButton value={powerQuery} />
-            <Button variant="secondary" size="sm" onClick={downloadPowerQuery}><Download className="h-4 w-4" /> Download .pq</Button>
-          </div>
+          <pre className="max-h-72 overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100"><code>{powerQuery}</code></pre>
         </div>
-        <pre className="mt-4 max-h-72 overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100"><code>{powerQuery}</code></pre>
-      </Card>
-    </div>
-  );
-}
-
-function SummaryCard({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: string; hint: string }) {
-  return (
-    <Card className="p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
-          <p className="mt-2 text-xl font-semibold text-slate-950 sm:text-2xl">{value}</p>
-          <p className="mt-1 text-xs text-slate-500">{hint}</p>
-        </div>
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">{icon}</div>
-      </div>
-    </Card>
-  );
-}
-
-function QuickStep({ number, title, text }: { number: string; title: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-xs font-bold text-white">{number}</span>
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-      </div>
-      <p className="mt-2 text-xs leading-5 text-slate-500">{text}</p>
+      </details>
     </div>
   );
 }
