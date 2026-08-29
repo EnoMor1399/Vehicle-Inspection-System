@@ -2,21 +2,18 @@ import { db } from "@/db";
 import { dailyInspections, inspections, transporters, vehicles } from "@/db/schema";
 import { asc, desc, eq, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
-import { PageHeader, Card, Badge, StatCard } from "@/components/ui";
+import { PageHeader, Card, Badge } from "@/components/ui";
 import {
-  Activity,
   ArrowLeft,
-  Calendar,
-  Car,
   CheckCircle2,
   ClipboardCheck,
   FileText,
   ShieldCheck,
   Truck,
-  XCircle,
 } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
+import { TransporterPortalAnalytics } from "./TransporterPortalAnalytics";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +60,7 @@ export default async function PortalPage({
         <PageHeader
           eyebrow="Super Administrator"
           title="Transporter Portal Directory"
-          description="Open any transporter workspace for unrestricted administrative oversight without changing your Super Administrator privileges."
+          description="Open any transporter workspace for scoped operational analytics and administrative oversight."
         />
 
         <Card className="mb-6 border-amber-200 bg-amber-50/70 p-5">
@@ -72,7 +69,7 @@ export default async function PortalPage({
             <div>
               <p className="font-semibold text-slate-950">Full oversight mode</p>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                Selecting a transporter opens the same scoped portal that transporter users see, while your full Super Administrator navigation and account-management privileges remain available.
+                Selecting a transporter opens the same scoped analytics portal that transporter users see while your Super Administrator privileges remain active.
               </p>
             </div>
           </div>
@@ -97,7 +94,7 @@ export default async function PortalPage({
                       {transporter.contactPerson && <p className="mt-2 text-sm text-slate-600">{transporter.contactPerson}</p>}
                     </div>
                   </div>
-                  <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">Open transporter workspace →</p>
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">Open analytics workspace →</p>
                 </Card>
               </Link>
             ))}
@@ -150,32 +147,116 @@ export default async function PortalPage({
 
   const passCount = technicalInspections.filter((row) => row.inspection.overallResult === "pass").length;
   const failCount = technicalInspections.filter((row) => row.inspection.overallResult === "fail").length;
-  const complianceRate = technicalInspections.length ? Math.round((passCount / technicalInspections.length) * 100) : 0;
-  const active = fleet.filter((vehicle) => vehicle.status === "active").length;
-  const suspended = fleet.filter((vehicle) => vehicle.status === "suspended" || vehicle.status === "failed").length;
   const clearedPreTrips = preTripInspections.filter((row) => row.inspection.clearedForTrip).length;
+  const availableStatuses = new Set(["active", "passed"]);
+  const availableVehicles = fleet.filter((vehicle) => availableStatuses.has(vehicle.status)).length;
+  const unavailableVehicles = Math.max(0, fleet.length - availableVehicles);
 
   const now = new Date();
   const in60Days = new Date(now.getTime() + 60 * 24 * 3600 * 1000);
-  const expiringDocuments = fleet.flatMap((vehicle) => {
-    const documents = [
-      { label: "Insurance", date: vehicle.insuranceExpiry },
-      { label: "Roadworthy", date: vehicle.roadworthyExpiry },
-      { label: "Road Fund", date: vehicle.roadFundExpiry },
-    ];
-    return documents
-      .filter((document) => {
-        if (!document.date) return false;
-        const expires = new Date(document.date);
-        return expires >= now && expires <= in60Days;
-      })
-      .map((document) => ({
-        vehicleId: vehicle.id,
-        registrationNumber: vehicle.registrationNumber,
-        label: document.label,
-        date: document.date as string,
-      }));
-  }).sort((a, b) => a.date.localeCompare(b.date));
+  const trackedDocuments = fleet.flatMap((vehicle) => [
+    { vehicleId: vehicle.id, registrationNumber: vehicle.registrationNumber, label: "Insurance", date: vehicle.insuranceExpiry },
+    { vehicleId: vehicle.id, registrationNumber: vehicle.registrationNumber, label: "Roadworthy", date: vehicle.roadworthyExpiry },
+    { vehicleId: vehicle.id, registrationNumber: vehicle.registrationNumber, label: "Road Fund", date: vehicle.roadFundExpiry },
+  ]).filter((document): document is { vehicleId: string; registrationNumber: string; label: string; date: string } => Boolean(document.date));
+
+  const expiredDocuments = trackedDocuments
+    .filter((document) => new Date(document.date) < now)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const expiringDocuments = trackedDocuments
+    .filter((document) => {
+      const expires = new Date(document.date);
+      return expires >= now && expires <= in60Days;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const technicalByVehicle = new Map<string, { total: number; passed: number }>();
+  for (const row of technicalInspections) {
+    const current = technicalByVehicle.get(row.vehicle.id) || { total: 0, passed: 0 };
+    current.total += 1;
+    if (row.inspection.overallResult === "pass") current.passed += 1;
+    technicalByVehicle.set(row.vehicle.id, current);
+  }
+
+  const preTripByVehicle = new Map<string, { total: number; cleared: number }>();
+  for (const row of preTripInspections) {
+    const current = preTripByVehicle.get(row.vehicle.id) || { total: 0, cleared: 0 };
+    current.total += 1;
+    if (row.inspection.clearedForTrip) current.cleared += 1;
+    preTripByVehicle.set(row.vehicle.id, current);
+  }
+
+  const vehicleAnalytics = fleet.map((vehicle) => {
+    const technical = technicalByVehicle.get(vehicle.id) || { total: 0, passed: 0 };
+    const preTrip = preTripByVehicle.get(vehicle.id) || { total: 0, cleared: 0 };
+    const technicalPassRate = percent(technical.passed, technical.total);
+    const clearanceRate = percent(preTrip.cleared, preTrip.total);
+    const availabilityScore = availableStatuses.has(vehicle.status) ? 100 : vehicle.status === "under_inspection" ? 60 : 0;
+    const components = [{ value: availabilityScore, weight: 35 }];
+    if (technical.total > 0) components.push({ value: technicalPassRate, weight: 40 });
+    if (preTrip.total > 0) components.push({ value: clearanceRate, weight: 25 });
+    const totalWeight = components.reduce((sum, item) => sum + item.weight, 0);
+    const readinessScore = Math.round(components.reduce((sum, item) => sum + item.value * item.weight, 0) / totalWeight);
+    return {
+      id: vehicle.id,
+      registrationNumber: vehicle.registrationNumber,
+      status: vehicle.status,
+      technical: technical.total,
+      technicalPassRate,
+      preTrip: preTrip.total,
+      clearanceRate,
+      readinessScore,
+      hasActivity: technical.total + preTrip.total > 0,
+    };
+  });
+
+  const technicalPassRate = percent(passCount, technicalInspections.length);
+  const tripClearanceRate = percent(clearedPreTrips, preTripInspections.length);
+  const fleetAvailabilityRate = percent(availableVehicles, fleet.length);
+  const scoreComponents: { value: number; weight: number }[] = [];
+  if (fleet.length > 0) scoreComponents.push({ value: fleetAvailabilityRate, weight: 35 });
+  if (technicalInspections.length > 0) scoreComponents.push({ value: technicalPassRate, weight: 40 });
+  if (preTripInspections.length > 0) scoreComponents.push({ value: tripClearanceRate, weight: 25 });
+  const scoreWeight = scoreComponents.reduce((sum, item) => sum + item.weight, 0);
+  const operationalScore = scoreWeight
+    ? Math.round(scoreComponents.reduce((sum, item) => sum + item.value * item.weight, 0) / scoreWeight)
+    : 0;
+
+  const technicalByMonth = new Map<string, { total: number; passed: number }>();
+  for (const row of technicalInspections) {
+    const date = new Date(row.inspection.inspectionDate);
+    const key = monthKey(date);
+    const current = technicalByMonth.get(key) || { total: 0, passed: 0 };
+    current.total += 1;
+    if (row.inspection.overallResult === "pass") current.passed += 1;
+    technicalByMonth.set(key, current);
+  }
+
+  const preTripByMonth = new Map<string, { total: number; cleared: number }>();
+  for (const row of preTripInspections) {
+    const date = new Date(`${row.inspection.inspectionDate}T12:00:00Z`);
+    const key = monthKey(date);
+    const current = preTripByMonth.get(key) || { total: 0, cleared: 0 };
+    current.total += 1;
+    if (row.inspection.clearedForTrip) current.cleared += 1;
+    preTripByMonth.set(key, current);
+  }
+
+  const monthFormatter = new Intl.DateTimeFormat("en", { month: "short" });
+  const trend = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11 + index, 1));
+    const key = monthKey(date);
+    const technical = technicalByMonth.get(key) || { total: 0, passed: 0 };
+    const preTrip = preTripByMonth.get(key) || { total: 0, cleared: 0 };
+    return {
+      month: key,
+      label: monthFormatter.format(date),
+      technical: technical.total,
+      technicalPassed: technical.passed,
+      preTrip: preTrip.total,
+      clearedTrips: preTrip.cleared,
+    };
+  });
 
   return (
     <div className="p-4 sm:p-6 lg:p-10">
@@ -190,18 +271,18 @@ export default async function PortalPage({
         title={matchedTransporter.companyName}
         description={
           isSuperAdmin
-            ? "Administrative preview of this transporter's fleet, inspections, Pre-Trip clearance and compliance documents."
-            : "Your fleet, inspection status, Pre-Trip clearance and compliance documents in one restricted workspace."
+            ? "Scoped analytics for this transporter's fleet availability, technical readiness, Pre-Trip clearance and compliance exposure."
+            : "Fleet performance, inspection readiness, trip clearance and compliance insights for your transport operation."
         }
       />
 
       <nav className="mb-6 flex flex-wrap gap-2" aria-label="Transporter portal sections">
         {[
-          ["#overview", "Overview"],
+          ["#overview", "Analytics"],
           ["#fleet", "Fleet"],
-          ["#inspections", "Inspection History"],
+          ["#inspections", "Technical Inspections"],
           ["#pre-trip", "Pre-Trip / Safe-To-Load"],
-          ["#documents", "Expiring Documents"],
+          ["#documents", "Documents"],
         ].map(([href, label]) => (
           <a
             key={href}
@@ -214,48 +295,48 @@ export default async function PortalPage({
       </nav>
 
       <section id="overview" className="scroll-mt-24">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <StatCard label="Fleet Size" value={fleet.length} tone="blue" icon={<Car className="h-5 w-5" />} />
-          <StatCard label="Active Vehicles" value={active} tone="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
-          <StatCard label="Suspended / Failed" value={suspended} tone="red" icon={<XCircle className="h-5 w-5" />} />
-          <StatCard label="Inspection Compliance" value={`${complianceRate}%`} tone={complianceRate >= 70 ? "emerald" : "amber"} icon={<ShieldCheck className="h-5 w-5" />} />
-          <StatCard label="Pre-Trips Cleared" value={clearedPreTrips} tone="emerald" icon={<Activity className="h-5 w-5" />} />
-          <StatCard label="Expiring ≤ 60 Days" value={expiringDocuments.length} tone="amber" icon={<Calendar className="h-5 w-5" />} />
-        </div>
+        <TransporterPortalAnalytics
+          metrics={{
+            fleetSize: fleet.length,
+            availableVehicles,
+            unavailableVehicles,
+            technicalInspections: technicalInspections.length,
+            technicalPassed: passCount,
+            preTripInspections: preTripInspections.length,
+            clearedPreTrips,
+            expiringDocuments: expiringDocuments.length,
+            expiredDocuments: expiredDocuments.length,
+            operationalScore,
+          }}
+          trend={trend}
+          vehicles={vehicleAnalytics}
+        />
 
-        <Card className={`mt-6 overflow-hidden p-5 sm:p-6 ${isSuperAdmin ? "border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50" : "border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-teal-50"}`}>
+        <Card className={`mt-6 overflow-hidden p-5 ${isSuperAdmin ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60"}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white ${isSuperAdmin ? "bg-amber-600" : "bg-emerald-600"}`}>
+              <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${isSuperAdmin ? "bg-amber-600" : "bg-emerald-600"}`}>
                 {isSuperAdmin ? <ShieldCheck className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-950">{isSuperAdmin ? "Super Administrator oversight" : "Restricted transporter access"}</p>
+                <p className="text-sm font-semibold text-slate-950">{isSuperAdmin ? "Super Administrator oversight" : "Private transporter analytics"}</p>
                 <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-600">
-                  {isSuperAdmin ? (
-                    <>You are previewing records linked to <strong>{matchedTransporter.companyName}</strong>. Your full VIMS navigation and authority over all user accounts remain active.</>
-                  ) : (
-                    <>This portal shows only records linked to <strong>{matchedTransporter.companyName}</strong>. Administrative configuration, other transporters, internal analytics controls and staff functions are not available to this account.</>
-                  )}
+                  {isSuperAdmin
+                    ? `All analytics above are calculated only from records linked to ${matchedTransporter.companyName}.`
+                    : `This workspace is restricted to ${matchedTransporter.companyName}. Other transporters, internal administration and system configuration are not exposed.`}
                 </p>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Signed in as</p>
-              <p className="mt-0.5 font-semibold text-slate-900">{user.name}</p>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Signed in as</p>
+              <p className="font-semibold text-slate-900">{user.name}</p>
             </div>
           </div>
         </Card>
       </section>
 
       <section id="fleet" className="mt-8 scroll-mt-24">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Fleet</p>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">{isSuperAdmin ? "Fleet Vehicles" : "My Vehicles"}</h2>
-          </div>
-          <Badge tone="blue">{fleet.length} vehicles</Badge>
-        </div>
+        <SectionHeading eyebrow="Fleet" title={isSuperAdmin ? "Fleet Vehicles" : "My Vehicles"} badge={`${fleet.length} vehicles`} tone="blue" />
         <Card className="overflow-hidden">
           {fleet.length === 0 ? (
             <p className="p-8 text-center text-sm text-slate-500">No vehicles are linked to this transporter.</p>
@@ -268,25 +349,30 @@ export default async function PortalPage({
                     <th className="px-4 py-3 text-left">Vehicle</th>
                     <th className="px-4 py-3 text-left">Class</th>
                     <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Readiness</th>
                     <th className="px-4 py-3 text-left">Roadworthy</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {fleet.map((vehicle) => (
-                    <tr key={vehicle.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-3 font-semibold text-slate-950">
-                        <Link href={`/vehicles/${vehicle.id}`} className="hover:text-emerald-700">{vehicle.registrationNumber}</Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700">{vehicle.make} {vehicle.model || ""}</td>
-                      <td className="px-4 py-3 text-slate-600">{vehicle.vehicleClass || vehicle.category || "—"}</td>
-                      <td className="px-4 py-3">
-                        <Badge tone={vehicle.status === "active" ? "emerald" : vehicle.status === "failed" ? "red" : "slate"}>
-                          {vehicle.status.replaceAll("_", " ")}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{vehicle.roadworthyExpiry ? formatDate(vehicle.roadworthyExpiry) : "—"}</td>
-                    </tr>
-                  ))}
+                  {fleet.map((vehicle) => {
+                    const analytics = vehicleAnalytics.find((item) => item.id === vehicle.id);
+                    return (
+                      <tr key={vehicle.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
+                        <td className="px-4 py-3 font-semibold text-slate-950">
+                          <Link href={`/vehicles/${vehicle.id}`} className="hover:text-emerald-700">{vehicle.registrationNumber}</Link>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{vehicle.make} {vehicle.model || ""}</td>
+                        <td className="px-4 py-3 text-slate-600">{vehicle.vehicleClass || vehicle.category || "—"}</td>
+                        <td className="px-4 py-3">
+                          <Badge tone={availableStatuses.has(vehicle.status) ? "emerald" : vehicle.status === "failed" || vehicle.status === "suspended" ? "red" : "slate"}>
+                            {vehicle.status.replaceAll("_", " ")}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{analytics?.hasActivity ? `${analytics.readinessScore}%` : "No inspection data"}</td>
+                        <td className="px-4 py-3 text-slate-600">{vehicle.roadworthyExpiry ? formatDate(vehicle.roadworthyExpiry) : "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -295,27 +381,14 @@ export default async function PortalPage({
       </section>
 
       <section id="inspections" className="mt-8 scroll-mt-24">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">Compliance</p>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">Technical Inspection History</h2>
-          </div>
-          <div className="flex gap-2">
-            <Badge tone="emerald">{passCount} passed</Badge>
-            {failCount > 0 && <Badge tone="red">{failCount} failed</Badge>}
-          </div>
-        </div>
+        <SectionHeading eyebrow="Technical Compliance" title="Technical Inspection History" badge={`${passCount} passed`} tone="emerald" secondaryBadge={failCount > 0 ? `${failCount} failed` : undefined} />
         <Card className="overflow-hidden">
           {technicalInspections.length === 0 ? (
             <p className="p-8 text-center text-sm text-slate-500">No technical inspections are on record for this fleet.</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {technicalInspections.slice(0, 25).map((row) => (
-                <Link
-                  key={row.inspection.id}
-                  href={`/inspections/${row.inspection.id}`}
-                  className="flex flex-col gap-2 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
-                >
+                <Link key={row.inspection.id} href={`/inspections/${row.inspection.id}`} className="flex flex-col gap-2 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-950">{row.vehicle.registrationNumber} · {row.inspection.inspectionNumber}</p>
                     <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(row.inspection.inspectionDate)} · {row.inspection.station}</p>
@@ -331,24 +404,14 @@ export default async function PortalPage({
       </section>
 
       <section id="pre-trip" className="mt-8 scroll-mt-24">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Daily Safety</p>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">Pre-Trip / Safe-To-Load History</h2>
-          </div>
-          <Badge tone="emerald">{clearedPreTrips} cleared</Badge>
-        </div>
+        <SectionHeading eyebrow="Daily Safety" title="Pre-Trip / Safe-To-Load History" badge={`${clearedPreTrips} cleared`} tone="emerald" secondaryBadge={`${Math.max(0, preTripInspections.length - clearedPreTrips)} grounded`} />
         <Card className="overflow-hidden">
           {preTripInspections.length === 0 ? (
             <p className="p-8 text-center text-sm text-slate-500">No Pre-Trip inspections are on record for this fleet.</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {preTripInspections.slice(0, 30).map((row) => (
-                <Link
-                  key={row.inspection.id}
-                  href={`/daily-inspections/${row.inspection.id}`}
-                  className="flex flex-col gap-2 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
-                >
+                <Link key={row.inspection.id} href={`/daily-inspections/${row.inspection.id}`} className="flex flex-col gap-2 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{row.vehicle.registrationNumber}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
@@ -359,9 +422,7 @@ export default async function PortalPage({
                     <Badge tone={row.inspection.status === "passed" ? "emerald" : row.inspection.status === "failed" ? "red" : "amber"}>
                       {row.inspection.status.replaceAll("_", " ")}
                     </Badge>
-                    <Badge tone={row.inspection.clearedForTrip ? "emerald" : "red"}>
-                      {row.inspection.clearedForTrip ? "Cleared" : "Grounded"}
-                    </Badge>
+                    <Badge tone={row.inspection.clearedForTrip ? "emerald" : "red"}>{row.inspection.clearedForTrip ? "Cleared" : "Grounded"}</Badge>
                   </div>
                 </Link>
               ))}
@@ -371,32 +432,20 @@ export default async function PortalPage({
       </section>
 
       <section id="documents" className="mt-8 scroll-mt-24">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Documents</p>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">Expiring Within 60 Days</h2>
-          </div>
-          <Badge tone={expiringDocuments.length ? "amber" : "emerald"}>{expiringDocuments.length} due</Badge>
-        </div>
+        <SectionHeading eyebrow="Documents" title="Fleet Document Exposure" badge={`${expiringDocuments.length} due ≤60 days`} tone={expiringDocuments.length ? "amber" : "emerald"} secondaryBadge={expiredDocuments.length ? `${expiredDocuments.length} expired` : undefined} />
         <Card className="p-5 sm:p-6">
-          {expiringDocuments.length === 0 ? (
+          {expiredDocuments.length === 0 && expiringDocuments.length === 0 ? (
             <div className="flex items-center gap-3 text-sm text-slate-600">
               <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              No tracked fleet documents expire within the next 60 days.
+              No tracked fleet documents are expired or due within the next 60 days.
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {expiredDocuments.map((document) => (
+                <DocumentCard key={`expired-${document.vehicleId}-${document.label}`} document={document} expired />
+              ))}
               {expiringDocuments.map((document) => (
-                <div key={`${document.vehicleId}-${document.label}`} className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-slate-950">{document.registrationNumber}</p>
-                      <p className="mt-1 text-sm text-slate-600">{document.label}</p>
-                    </div>
-                    <FileText className="h-5 w-5 text-amber-700" />
-                  </div>
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-amber-800">Expires {formatDate(document.date)}</p>
-                </div>
+                <DocumentCard key={`due-${document.vehicleId}-${document.label}`} document={document} />
               ))}
             </div>
           )}
@@ -408,11 +457,69 @@ export default async function PortalPage({
           <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
           <p>
             {isSuperAdmin
-              ? "You are in Super Administrator oversight mode. Use the full VIMS navigation to edit master records, user access, configuration or operational data as required."
+              ? "You are in Super Administrator oversight mode. Use the full VIMS navigation for master-record or account administration."
               : "Need a vehicle, transporter profile or inspection record corrected? Contact the VIMS operations team. Transporter accounts intentionally cannot edit master records or system configuration."}
           </p>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function percent(numerator: number, denominator: number) {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
+}
+
+function monthKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  badge,
+  tone,
+  secondaryBadge,
+}: {
+  eyebrow: string;
+  title: string;
+  badge: string;
+  tone: "blue" | "emerald" | "amber";
+  secondaryBadge?: string;
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{eyebrow}</p>
+        <h2 className="text-xl font-semibold tracking-tight text-slate-950">{title}</h2>
+      </div>
+      <div className="flex gap-2">
+        <Badge tone={tone}>{badge}</Badge>
+        {secondaryBadge && <Badge tone={secondaryBadge.includes("expired") || secondaryBadge.includes("failed") || secondaryBadge.includes("grounded") ? "red" : "slate"}>{secondaryBadge}</Badge>}
+      </div>
+    </div>
+  );
+}
+
+function DocumentCard({
+  document,
+  expired = false,
+}: {
+  document: { vehicleId: string; registrationNumber: string; label: string; date: string };
+  expired?: boolean;
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${expired ? "border-rose-200 bg-rose-50/70" : "border-amber-200 bg-amber-50/60"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-950">{document.registrationNumber}</p>
+          <p className="mt-1 text-sm text-slate-600">{document.label}</p>
+        </div>
+        <FileText className={`h-5 w-5 ${expired ? "text-rose-700" : "text-amber-700"}`} />
+      </div>
+      <p className={`mt-3 text-xs font-semibold uppercase tracking-wider ${expired ? "text-rose-800" : "text-amber-800"}`}>
+        {expired ? "Expired" : "Expires"} {formatDate(document.date)}
+      </p>
     </div>
   );
 }
