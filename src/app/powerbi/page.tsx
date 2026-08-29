@@ -6,14 +6,35 @@ import { PowerBiWorkspace } from "./PowerBiWorkspace";
 
 export const dynamic = "force-dynamic";
 
+function isLocalHost(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1";
+  } catch {
+    return true;
+  }
+}
+
 export default async function PowerBiPage() {
   await requirePermission("reports");
 
   const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") || "https";
-  const inferredBaseUrl = host ? `${protocol}://${host}` : "https://your-vims-domain.example";
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || inferredBaseUrl).replace(/\/$/, "");
+  const forwardedHost = (requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "")
+    .split(",")[0]
+    .trim();
+  const forwardedProto = (requestHeaders.get("x-forwarded-proto") || "https")
+    .split(",")[0]
+    .trim();
+  const requestBaseUrl = forwardedHost ? `${forwardedProto}://${forwardedHost}` : "";
+  const configuredBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+
+  // Always prefer the real request host in production. This prevents a stale
+  // NEXT_PUBLIC_APP_URL such as http://localhost:3000 from leaking into the
+  // Power BI connector and causing browser "Failed to fetch" errors.
+  const baseUrl = (
+    requestBaseUrl ||
+    (configuredBaseUrl && !isLocalHost(configuredBaseUrl) ? configuredBaseUrl : "https://your-vims-domain.example")
+  ).replace(/\/$/, "");
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8 xl:p-10">
