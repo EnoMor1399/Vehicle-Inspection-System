@@ -1,12 +1,16 @@
 import { headers } from "next/headers";
+import { desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { Code, Key, Link as LinkIcon, ShieldCheck, Terminal } from "lucide-react";
 import { requirePermission } from "@/lib/require-auth";
+import { db } from "@/db";
+import { apiKeys } from "@/db/schema";
+import { ApiKeyManager } from "./ApiKeyManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function ApiDocsPage() {
-  await requirePermission("settings");
+  const user = await requirePermission("settings");
   const requestHeaders = await headers();
   const forwardedHost = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "your-vims-domain.example";
   const forwardedProto = requestHeaders.get("x-forwarded-proto") || (process.env.NODE_ENV === "production" ? "https" : "http");
@@ -17,14 +21,43 @@ export default async function ApiDocsPage() {
   const apiWindowMs = Math.max(1000, Number(process.env.RATE_LIMIT_WINDOW_MS || 60000));
   const apiWindowSeconds = Math.ceil(apiWindowMs / 1000);
 
+  const rows = await db
+    .select({
+      id: apiKeys.id,
+      name: apiKeys.name,
+      keyPrefix: apiKeys.keyPrefix,
+      scopes: apiKeys.scopes,
+      isActive: apiKeys.isActive,
+      lastUsedAt: apiKeys.lastUsedAt,
+      expiresAt: apiKeys.expiresAt,
+      createdAt: apiKeys.createdAt,
+    })
+    .from(apiKeys)
+    .where(eq(apiKeys.userId, user.id))
+    .orderBy(desc(apiKeys.createdAt));
+
+  const initialKeys = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    keyPrefix: row.keyPrefix,
+    scopes: row.scopes || [],
+    isActive: row.isActive,
+    lastUsedAt: row.lastUsedAt?.toISOString() || null,
+    expiresAt: row.expiresAt?.toISOString() || null,
+    createdAt: row.createdAt.toISOString(),
+  }));
+
   return (
     <div className="p-4 sm:p-6 lg:p-10">
       <PageHeader
-        eyebrow="Administration · Integrations"
-        title="API & Integration Reference"
-        description="Authenticated REST and reporting interfaces available in this deployment. Access is controlled by API-key scopes and the owning user's permissions."
+        title="API & Integrations"
+        description="Generate secure API keys, connect Power BI and approved integrations, and review the authenticated VIMS interfaces available to your account."
         action={<div className="flex items-center gap-2"><Badge tone="blue">API v1</Badge><Badge tone="emerald"><ShieldCheck className="h-3.5 w-3.5" /> Scoped access</Badge></div>}
       />
+
+      <div id="api-keys" className="mb-6 scroll-mt-24">
+        <ApiKeyManager initialKeys={initialKeys} isSuperAdmin={user.role === "super_admin"} />
+      </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
@@ -33,7 +66,7 @@ export default async function ApiDocsPage() {
             <div><h2 className="font-semibold text-slate-950">Authentication</h2><p className="text-xs text-slate-500">Use an active API key with the required scope and user permission.</p></div>
           </div>
           <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{`X-API-Key: <YOUR_API_KEY>\n# or\nAuthorization: Bearer <YOUR_API_KEY>`}</pre>
-          <p className="mt-3 text-xs leading-relaxed text-slate-600">Keys are hashed at rest, can be revoked or expired, and are restricted by scopes such as <code>read</code>, <code>write</code>, <code>inspect</code>, or <code>admin</code>.</p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-600">Keys are hashed at rest, can be revoked or expired, and are restricted by scopes such as <code>read</code>, <code>write</code>, <code>inspect</code>, or <code>admin</code>. Power BI only needs <code>read</code>.</p>
         </Card>
 
         <Card className="p-5">
@@ -63,7 +96,7 @@ export default async function ApiDocsPage() {
           <Endpoint method="GET" path="/rfid" desc="Resolve registered RFID tag data where authorized." />
           <Endpoint method="GET" path="/predictive-maintenance" desc="Historical maintenance-risk indicators; not an exact failure prediction." />
           <Endpoint method="POST" path="/ai/detect-defects" desc="Historical defect-risk compatibility endpoint; image computer vision is not configured in this release." />
-          <Endpoint method="GET" path="/powerbi" desc="OData-style reporting endpoint with dataset-specific authorization." />
+          <Endpoint method="GET" path="/powerbi" desc="OData v4 reporting endpoint with technical, Pre-Trip and permission-based datasets." />
           <Endpoint method="POST" path="/webhooks" desc="Manage outbound webhook registrations subject to destination validation." />
         </div>
       </Card>
@@ -77,6 +110,7 @@ export default async function ApiDocsPage() {
           <h3 className="mb-3 font-semibold text-slate-950">Operational safeguards</h3>
           <ul className="space-y-2 text-sm text-slate-600">
             <li>• API-key scope plus user-permission checks.</li>
+            <li>• Full key value is shown only once and only a cryptographic hash is stored.</li>
             <li>• Request rate limiting and request identifiers.</li>
             <li>• Origin checks and body-size limits on mutating API requests.</li>
             <li>• Validated webhook destinations to reduce SSRF exposure.</li>
