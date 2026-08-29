@@ -13,6 +13,8 @@ export function PrintButton() {
       {pdfHref && (
         <a
           href={pdfHref}
+          download
+          aria-label="Export inspection certificate as PDF"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium shadow-sm hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           title="Download certificate as PDF"
         >
