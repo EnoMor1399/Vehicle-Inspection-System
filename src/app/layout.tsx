@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./theme-system.css";
 import { AppShell } from "@/components/AppShell";
 import { PWAProvider } from "@/components/PWAProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
