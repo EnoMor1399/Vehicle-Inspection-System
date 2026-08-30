@@ -270,3 +270,5 @@ html.theme-transition .theme-switcher * {
     forced-color-adjust: auto;
   }
 }
+
+/* Production deployment marker for the consolidated theme hardening release. */
