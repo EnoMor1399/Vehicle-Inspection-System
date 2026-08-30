@@ -1,13 +1,44 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --brand-color: #039703;
   --brand-accent: #026b02;
-  --surface-page: #f4f6f9;
+  --surface-page: #f4f7fb;
   --surface-card: #ffffff;
+  --surface-elevated: #f8fafc;
+  --surface-soft: #eef3f8;
+  --surface-input: #ffffff;
   --border-subtle: #dfe5ec;
+  --border-strong: #cbd5e1;
   --text-primary: #0f172a;
   --text-secondary: #475569;
+  --text-muted: #64748b;
+  --header-bg: rgba(255, 255, 255, 0.9);
+  --sidebar-bg: #0b1525;
+  --chart-grid: #e2e8f0;
+  --chart-text: #64748b;
+  --shadow-color: rgba(15, 23, 42, 0.08);
+  color-scheme: light;
+}
+
+html.dark {
+  --surface-page: #07111f;
+  --surface-card: #0f1b2d;
+  --surface-elevated: #142238;
+  --surface-soft: #18283d;
+  --surface-input: #0b1728;
+  --border-subtle: #26364d;
+  --border-strong: #33465f;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --header-bg: rgba(7, 17, 31, 0.9);
+  --sidebar-bg: #050b14;
+  --chart-grid: #26364d;
+  --chart-text: #94a3b8;
+  --shadow-color: rgba(0, 0, 0, 0.38);
+  color-scheme: dark;
 }
 
 * {
@@ -33,12 +64,12 @@ body {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--brand-color) 18%, white);
+  background: color-mix(in srgb, var(--brand-color) 22%, var(--surface-card));
   color: var(--text-primary);
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--brand-color) 30%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--brand-color) 35%, transparent);
   outline-offset: 2px;
 }
 
@@ -61,21 +92,148 @@ textarea {
   accent-color: var(--brand-color);
 }
 
+html.theme-transition body,
+html.theme-transition .app-shell,
+html.theme-transition .app-shell-content,
+html.theme-transition .app-shell-content *,
+html.theme-transition [data-app-shell] header,
+html.theme-transition [data-app-shell] aside {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
+  transition-duration: 180ms !important;
+  transition-timing-function: ease !important;
+}
+
 .app-shell {
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand-color) 4%, transparent), transparent 22rem),
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand-color) 5%, transparent), transparent 22rem),
+    var(--surface-page);
+}
+
+html.dark .app-shell {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand-color) 10%, transparent), transparent 28rem),
+    radial-gradient(circle at 0% 100%, rgba(37, 99, 235, 0.07), transparent 32rem),
     var(--surface-page);
 }
 
 .app-shell-content {
   position: relative;
+  color: var(--text-primary);
 }
+
+/* Shared shell surfaces */
+html.dark [data-app-shell] > aside {
+  background: var(--sidebar-bg) !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+html.dark [data-app-shell] > div > header {
+  background: var(--header-bg) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary);
+}
+
+html.dark [data-app-shell] > div > header .text-slate-950,
+html.dark [data-app-shell] > div > header .text-slate-900,
+html.dark [data-app-shell] > div > header .text-slate-800 {
+  color: var(--text-primary) !important;
+}
+
+html.dark [data-app-shell] > div > header .text-slate-700,
+html.dark [data-app-shell] > div > header .text-slate-600 {
+  color: var(--text-secondary) !important;
+}
+
+html.dark [data-app-shell] > div > header .text-slate-500,
+html.dark [data-app-shell] > div > header .text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+html.dark [data-app-shell] > div > header .bg-white {
+  background-color: var(--surface-card) !important;
+}
+
+html.dark [data-app-shell] > div > header .bg-slate-50\/80,
+html.dark [data-app-shell] > div > header .bg-slate-50 {
+  background-color: var(--surface-elevated) !important;
+}
+
+html.dark [data-app-shell] > div > header .border-slate-200,
+html.dark [data-app-shell] > div > header .border-slate-200\/80 {
+  border-color: var(--border-subtle) !important;
+}
+
+/* Compatibility layer for existing pages. Keeps hard-coded slate utilities readable in night mode. */
+html.dark .app-shell-content :where(.text-slate-950, .text-slate-900, .text-slate-800) {
+  color: var(--text-primary) !important;
+}
+
+html.dark .app-shell-content :where(.text-slate-700, .text-slate-600) {
+  color: var(--text-secondary) !important;
+}
+
+html.dark .app-shell-content :where(.text-slate-500, .text-slate-400) {
+  color: var(--text-muted) !important;
+}
+
+html.dark .app-shell-content :where(.bg-white) {
+  background-color: var(--surface-card) !important;
+}
+
+html.dark .app-shell-content :where(.bg-white\/90, .bg-white\/80, .bg-white\/70, .bg-white\/60, .bg-white\/50) {
+  background-color: color-mix(in srgb, var(--surface-card) 88%, transparent) !important;
+}
+
+html.dark .app-shell-content :where(.bg-slate-50, .bg-slate-50\/80, .bg-slate-50\/70, .bg-slate-50\/60, .bg-slate-50\/50) {
+  background-color: var(--surface-elevated) !important;
+}
+
+html.dark .app-shell-content :where(.bg-slate-100, .bg-slate-100\/80, .bg-slate-100\/60) {
+  background-color: var(--surface-soft) !important;
+}
+
+html.dark .app-shell-content :where(.border-slate-100, .border-slate-200, .border-slate-200\/80, .border-slate-300) {
+  border-color: var(--border-subtle) !important;
+}
+
+html.dark .app-shell-content :where(.divide-slate-100) > :not(:last-child) {
+  border-color: var(--border-subtle) !important;
+}
+
+html.dark .app-shell-content > div[class*="bg-gradient-to"] {
+  background-image: none !important;
+  background-color: var(--surface-page) !important;
+}
+
+/* Dark-safe semantic tints used across dashboards, analytics and status cards. */
+html.dark .app-shell-content .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.28) !important; }
+html.dark .app-shell-content .bg-blue-50 { background-color: rgba(30, 64, 175, 0.24) !important; }
+html.dark .app-shell-content .bg-violet-50 { background-color: rgba(91, 33, 182, 0.24) !important; }
+html.dark .app-shell-content .bg-amber-50 { background-color: rgba(146, 64, 14, 0.24) !important; }
+html.dark .app-shell-content .bg-orange-50 { background-color: rgba(154, 52, 18, 0.24) !important; }
+html.dark .app-shell-content .bg-red-50,
+html.dark .app-shell-content .bg-rose-50 { background-color: rgba(159, 18, 57, 0.22) !important; }
+html.dark .app-shell-content .bg-cyan-50,
+html.dark .app-shell-content .bg-teal-50 { background-color: rgba(15, 118, 110, 0.22) !important; }
+
+html.dark .app-shell-content :where(.text-emerald-700, .text-emerald-800, .text-emerald-900) { color: #6ee7b7 !important; }
+html.dark .app-shell-content :where(.text-blue-700, .text-blue-800, .text-blue-900) { color: #93c5fd !important; }
+html.dark .app-shell-content :where(.text-violet-700, .text-violet-800, .text-violet-900) { color: #c4b5fd !important; }
+html.dark .app-shell-content :where(.text-amber-700, .text-amber-800, .text-amber-900, .text-orange-700, .text-orange-800) { color: #fcd34d !important; }
+html.dark .app-shell-content :where(.text-red-700, .text-red-800, .text-red-900, .text-rose-700, .text-rose-800) { color: #fda4af !important; }
+html.dark .app-shell-content :where(.text-cyan-700, .text-teal-700, .text-teal-800) { color: #67e8f9 !important; }
+
+html.dark .app-shell-content :where(.border-emerald-100, .border-emerald-200) { border-color: rgba(16, 185, 129, 0.34) !important; }
+html.dark .app-shell-content :where(.border-blue-100, .border-blue-200) { border-color: rgba(59, 130, 246, 0.34) !important; }
+html.dark .app-shell-content :where(.border-violet-100, .border-violet-200) { border-color: rgba(139, 92, 246, 0.34) !important; }
+html.dark .app-shell-content :where(.border-amber-100, .border-amber-200, .border-orange-200) { border-color: rgba(245, 158, 11, 0.34) !important; }
+html.dark .app-shell-content :where(.border-red-100, .border-red-200, .border-rose-200) { border-color: rgba(244, 63, 94, 0.34) !important; }
 
 /* Formal enterprise table treatment across internal application pages. */
 .app-shell-content :where(.responsive-table) {
   border-radius: 1rem;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
 }
 
 .app-shell-content :where(table) {
@@ -85,8 +243,8 @@ textarea {
 }
 
 .app-shell-content :where(thead th) {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-elevated);
+  color: var(--text-muted);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.055em;
@@ -94,7 +252,7 @@ textarea {
 }
 
 .app-shell-content :where(th, td) {
-  border-bottom-color: #e8edf3;
+  border-bottom-color: var(--border-subtle);
 }
 
 .app-shell-content :where(tbody tr) {
@@ -102,12 +260,22 @@ textarea {
 }
 
 .app-shell-content :where(tbody tr:hover) {
-  background: #f8fafc;
+  background: var(--surface-elevated);
 }
 
 /* Improve raw controls used by legacy pages without overriding component-specific styling. */
 .app-shell-content :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+html.dark .app-shell-content :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  background-color: var(--surface-input);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+html.dark .app-shell-content :where(input::placeholder, textarea::placeholder) {
+  color: var(--text-muted);
 }
 
 .app-shell-content :where(input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus) {
@@ -115,7 +283,44 @@ textarea {
 }
 
 .app-shell-content :where(dialog, [role="dialog"]) {
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 24px 80px var(--shadow-color);
+}
+
+html.dark .app-shell-content :where(dialog, [role="dialog"]) {
+  background-color: var(--surface-card);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+/* Recharts inherits theme-safe axes, grids and tooltips. Data-series colors remain semantic. */
+html.dark .app-shell-content .recharts-cartesian-grid line {
+  stroke: var(--chart-grid) !important;
+}
+
+html.dark .app-shell-content :where(.recharts-cartesian-axis-line, .recharts-cartesian-axis-tick-line) {
+  stroke: var(--border-strong) !important;
+}
+
+html.dark .app-shell-content :where(.recharts-text, .recharts-cartesian-axis-tick text, .recharts-legend-item-text) {
+  fill: var(--chart-text) !important;
+  color: var(--chart-text) !important;
+}
+
+html.dark .app-shell-content .recharts-default-tooltip {
+  background: var(--surface-card) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 12px 32px var(--shadow-color) !important;
+}
+
+html.dark .app-shell-content .recharts-tooltip-label,
+html.dark .app-shell-content .recharts-tooltip-item {
+  color: var(--text-secondary) !important;
+}
+
+/* Native scrollbars follow the selected visual mode. */
+html.dark {
+  scrollbar-color: #33465f #07111f;
 }
 
 /* Keep native page layouts intact while improving touch ergonomics. */
@@ -173,6 +378,14 @@ textarea {
     margin: 0;
   }
 
+  html,
+  html.dark,
+  body {
+    background: #fff !important;
+    color: #0f172a !important;
+    color-scheme: light !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -190,6 +403,8 @@ textarea {
     inset: 0;
     width: 100%;
     min-height: 100%;
+    background: #fff !important;
+    color: #0f172a !important;
     box-shadow: none !important;
   }
 
