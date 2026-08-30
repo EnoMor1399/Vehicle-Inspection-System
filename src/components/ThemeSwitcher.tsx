@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { Check, Cloud, Monitor, Moon, Sun } from "lucide-react";
+import { saveThemePreferenceAction } from "@/app/theme-actions";
 
-type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark" | "system";
 
 const STORAGE_KEY = "vims-theme";
 const MODES: { value: ThemeMode; label: string; description: string; icon: typeof Sun; preview: string }[] = [
@@ -42,8 +43,9 @@ function resolveDark(mode: ThemeMode) {
 function applyTheme(mode: ThemeMode, animate = false) {
   const root = document.documentElement;
   const dark = resolveDark(mode);
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  if (animate) {
+  if (animate && !reduceMotion) {
     root.classList.add("theme-transition");
     window.setTimeout(() => root.classList.remove("theme-transition"), 240);
   }
@@ -59,22 +61,32 @@ function applyTheme(mode: ThemeMode, animate = false) {
   }
 }
 
-export function ThemeSwitcher() {
+export function ThemeSwitcher({
+  accountMode = null,
+  authenticated = false,
+}: {
+  accountMode?: ThemeMode | null;
+  authenticated?: boolean;
+}) {
   const pathname = usePathname();
-  const [mode, setMode] = useState<ThemeMode>("system");
+  const [mode, setMode] = useState<ThemeMode>(accountMode || "system");
   const [open, setOpen] = useState(false);
+  const [syncing, startSync] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    const initial = isThemeMode(stored)
-      ? stored
-      : isThemeMode(document.documentElement.dataset.theme || null)
-        ? (document.documentElement.dataset.theme as ThemeMode)
-        : "system";
+    const initial = accountMode || (isThemeMode(stored) ? stored : "system");
     setMode(initial);
+    window.localStorage.setItem(STORAGE_KEY, initial);
     applyTheme(initial);
-  }, []);
+
+    if (authenticated && !accountMode && isThemeMode(stored)) {
+      startSync(() => {
+        void saveThemePreferenceAction(stored);
+      });
+    }
+  }, [accountMode, authenticated]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -108,18 +120,24 @@ export function ThemeSwitcher() {
     window.localStorage.setItem(STORAGE_KEY, next);
     applyTheme(next, true);
     setOpen(false);
+
+    if (authenticated) {
+      startSync(() => {
+        void saveThemePreferenceAction(next);
+      });
+    }
   };
 
   const ActiveIcon = mode === "light" ? Sun : mode === "dark" ? Moon : Monitor;
   const activeLabel = MODES.find((item) => item.value === mode)?.label || "Auto";
 
   return (
-    <div ref={containerRef} className="theme-switcher no-print fixed bottom-4 right-4 z-[80] sm:bottom-5 sm:right-5">
+    <div ref={containerRef} className="theme-switcher no-print fixed right-3 top-2.5 z-[80] sm:right-5 sm:top-3">
       {open && (
         <div
           role="menu"
           aria-label="Appearance"
-          className="absolute bottom-[calc(100%+12px)] right-0 w-[290px] overflow-hidden rounded-[22px] border border-slate-200/90 bg-white/95 p-2.5 shadow-2xl shadow-slate-950/15 backdrop-blur-xl dark:border-slate-700/80 dark:bg-[#0d1b2c]/95 dark:shadow-black/45"
+          className="absolute right-0 top-[calc(100%+10px)] w-[290px] overflow-hidden rounded-[22px] border border-slate-200/90 bg-white/95 p-2.5 shadow-2xl shadow-slate-950/15 backdrop-blur-xl dark:border-slate-700/80 dark:bg-[#0d1b2c]/95 dark:shadow-black/45"
         >
           <div className="px-2 pb-2.5 pt-1">
             <div className="flex items-center justify-between gap-3">
@@ -130,6 +148,10 @@ export function ThemeSwitcher() {
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/45 dark:text-emerald-300 dark:ring-emerald-900">
                 <ActiveIcon className="h-4.5 w-4.5" />
               </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
+              {authenticated ? <Cloud className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
+              {authenticated ? (syncing ? "Syncing preference" : "Synced to your account") : "Saved on this device"}
             </div>
           </div>
 
@@ -178,12 +200,12 @@ export function ThemeSwitcher() {
         aria-expanded={open}
         aria-label={`Appearance: ${activeLabel}`}
         title={`Appearance: ${activeLabel}`}
-        className="group flex h-12 items-center gap-2.5 rounded-full border border-slate-200/90 bg-white/95 px-3.5 text-sm font-semibold text-slate-700 shadow-lg shadow-slate-950/10 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 dark:border-slate-700/80 dark:bg-[#0d1b2c]/95 dark:text-slate-100 dark:shadow-black/35 dark:hover:border-emerald-700 dark:focus-visible:ring-offset-slate-950"
+        className="group flex h-10 items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-2.5 text-xs font-semibold text-slate-700 shadow-md shadow-slate-950/10 backdrop-blur-xl transition hover:border-emerald-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 dark:border-slate-700/80 dark:bg-[#0d1b2c]/95 dark:text-slate-100 dark:shadow-black/35 dark:hover:border-emerald-700 dark:focus-visible:ring-offset-slate-950 sm:h-10 sm:px-3"
       >
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-900">
-          <ActiveIcon className="h-4 w-4" />
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-900">
+          <ActiveIcon className="h-3.5 w-3.5" />
         </span>
-        <span>{activeLabel}</span>
+        <span className="hidden sm:inline">{activeLabel}</span>
       </button>
     </div>
   );

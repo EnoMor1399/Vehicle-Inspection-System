@@ -9,14 +9,14 @@ export default async function LoginPage() {
   const settings = await getSettings();
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#eef2f6] p-3 sm:p-6 lg:p-8">
+    <div className="login-theme relative min-h-screen overflow-hidden bg-[var(--vims-page)] p-3 pt-16 text-[var(--vims-ink)] sm:p-6 sm:pt-20 lg:p-8 lg:pt-20">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-slate-900/10 blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-slate-900/10 dark:bg-cyan-500/5 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto grid min-h-[calc(100vh-3rem)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.16)] lg:grid-cols-[0.92fr_1.08fr]">
-        <section className="relative hidden overflow-hidden bg-[#0b1525] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-12">
+      <div className="relative mx-auto grid min-h-[calc(100vh-7rem)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] shadow-[var(--vims-shadow)] lg:grid-cols-[0.92fr_1.08fr]">
+        <section className="relative hidden overflow-hidden bg-[#0b1525] p-10 text-white dark:bg-[#050b13] lg:flex lg:flex-col lg:justify-between xl:p-12">
           <div
             className="absolute inset-x-0 top-0 h-1"
             style={{ background: `linear-gradient(90deg, ${settings.themeColor}, ${settings.accentColor || settings.themeColor})` }}
@@ -69,26 +69,26 @@ export default async function LoginPage() {
           </div>
         </section>
 
-        <section className="flex items-center justify-center px-5 py-8 sm:px-8 sm:py-10 lg:px-12 xl:px-16">
+        <section className="flex items-center justify-center bg-[var(--vims-panel-solid)] px-5 py-8 sm:px-8 sm:py-10 lg:px-12 xl:px-16">
           <div className="w-full max-w-lg">
             <div className="mb-8 flex items-center gap-3 lg:hidden">
               {settings.logoDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={settings.logoDataUrl} alt={settings.companyName} className="h-11 w-11 rounded-xl border border-slate-200 bg-white object-contain p-1.5" />
+                <img src={settings.logoDataUrl} alt={settings.companyName} className="h-11 w-11 rounded-xl border border-[var(--vims-line)] bg-white object-contain p-1.5" />
               ) : (
-                <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white dark:bg-emerald-700">
                   <ShieldCheck className="h-6 w-6" />
                 </div>
               )}
               <div>
-                <p className="text-sm font-semibold text-slate-950">{settings.companyName}</p>
-                <p className="text-xs text-slate-500">Secure VIMS access</p>
+                <p className="text-sm font-semibold text-[var(--vims-ink)]">{settings.companyName}</p>
+                <p className="text-xs text-[var(--vims-ink-muted)]">Secure VIMS access</p>
               </div>
             </div>
 
             <AuthForm />
 
-            <p className="mt-7 text-center text-[11px] leading-5 text-slate-400">
+            <p className="mt-7 text-center text-[11px] leading-5 text-[var(--vims-ink-muted)]">
               By signing in, you are accessing a controlled business system. Activity may be logged for security and audit purposes.
             </p>
           </div>

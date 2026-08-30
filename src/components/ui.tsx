@@ -5,7 +5,7 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return (
     <div
       className={classNames(
-        "rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.025),0_12px_32px_rgba(15,23,42,0.045)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgba(0,0,0,0.18),0_16px_40px_rgba(0,0,0,0.22)]",
+        "rounded-2xl border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] text-[var(--vims-ink)] shadow-[var(--vims-shadow-soft)]",
         className
       )}
     >
@@ -27,9 +27,9 @@ export function PageHeader({
   return (
     <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0 flex-1">
-        <h1 className="break-words text-2xl font-semibold tracking-[-0.025em] text-slate-950 dark:text-slate-50 sm:text-[28px]">{title}</h1>
+        <h1 className="break-words text-2xl font-semibold tracking-[-0.025em] text-[var(--vims-ink)] sm:text-[28px]">{title}</h1>
         {description && (
-          <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>
+          <p className="mt-1.5 max-w-3xl text-sm leading-5 text-[var(--vims-ink-muted)]">{description}</p>
         )}
       </div>
       {action && <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">{action}</div>}
@@ -52,9 +52,9 @@ export function Button({
   type?: "button" | "submit" | "reset";
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const variants: Record<string, string> = {
-    primary: "bg-slate-950 text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white",
-    secondary: "border border-slate-300 bg-white text-slate-800 shadow-sm hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-600 dark:hover:bg-slate-800",
-    ghost: "text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+    primary: "bg-[var(--vims-ink)] text-[var(--vims-panel-solid)] shadow-sm hover:opacity-90",
+    secondary: "border border-[var(--vims-line-strong)] bg-[var(--vims-panel-solid)] text-[var(--vims-ink)] shadow-sm hover:bg-[var(--vims-panel-soft)]",
+    ghost: "text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-soft)] hover:text-[var(--vims-ink)]",
     danger: "bg-red-600 text-white shadow-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400",
     success: "bg-emerald-700 text-white shadow-sm hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500",
   };
@@ -66,7 +66,7 @@ export function Button({
     <button
       type={type}
       className={classNames(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-950",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#07101c]",
         variants[variant],
         sizes[size],
         className
@@ -133,12 +133,12 @@ export function StatCard({
 
   return (
     <Card className="group relative overflow-hidden p-4 sm:p-5">
-      <span className="absolute inset-x-0 top-0 h-[2px] bg-slate-200 transition-colors group-hover:bg-[var(--brand-color)] dark:bg-slate-800" />
+      <span className="absolute inset-x-0 top-0 h-[2px] bg-[var(--vims-line)] transition-colors group-hover:bg-[var(--brand-color)]" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-2 break-words text-2xl font-semibold tracking-[-0.03em] text-slate-950 dark:text-slate-50 sm:text-[28px]">{value}</p>
-          {hint && <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
+          <p className="truncate text-xs font-medium uppercase tracking-[0.08em] text-[var(--vims-ink-muted)]">{label}</p>
+          <p className="mt-2 break-words text-2xl font-semibold tracking-[-0.03em] text-[var(--vims-ink)] sm:text-[28px]">{value}</p>
+          {hint && <p className="mt-1 truncate text-xs text-[var(--vims-ink-muted)]">{hint}</p>}
         </div>
         {icon && (
           <div className={classNames("grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset", tones[tone])}>
@@ -152,10 +152,10 @@ export function StatCard({
 
 export function EmptyState({ title, description, icon }: { title: string; description?: string; icon?: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-12 text-center dark:border-slate-700 dark:bg-slate-900/50 sm:py-14">
-      {icon && <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-xl bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:ring-slate-700">{icon}</div>}
-      <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</p>
-      {description && <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
+    <div className="rounded-2xl border border-dashed border-[var(--vims-line-strong)] bg-[var(--vims-panel-soft)] px-4 py-12 text-center sm:py-14">
+      {icon && <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-xl bg-[var(--vims-panel-solid)] text-[var(--vims-ink-muted)] shadow-sm ring-1 ring-[var(--vims-line)]">{icon}</div>}
+      <p className="text-base font-semibold text-[var(--vims-ink)]">{title}</p>
+      {description && <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-[var(--vims-ink-muted)]">{description}</p>}
     </div>
   );
 }
@@ -173,18 +173,18 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+      <span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">
         {label}
         {required && <span className="ml-0.5 text-red-500 dark:text-red-400">*</span>}
       </span>
       {children}
-      {hint && <span className="mt-1.5 block text-xs leading-5 text-slate-500 dark:text-slate-400">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs leading-5 text-[var(--vims-ink-muted)]">{hint}</span>}
     </label>
   );
 }
 
 const controlClass =
-  "block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] placeholder:text-slate-400 transition-[border-color,box-shadow,background-color,color] hover:border-slate-400 focus:border-[var(--brand-color)] focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:ring-slate-800 sm:text-sm";
+  "block w-full rounded-xl border border-[var(--vims-line-strong)] bg-[var(--vims-panel-solid)] px-3.5 py-2.5 text-base text-[var(--vims-ink)] shadow-[0_1px_2px_rgba(15,23,42,0.03)] placeholder:text-[var(--vims-ink-muted)] transition-[border-color,box-shadow,background-color,color] hover:border-[var(--vims-ink-muted)] focus:border-[var(--brand-color)] focus:outline-none focus:ring-4 focus:ring-[var(--vims-focus)] sm:text-sm";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={classNames(controlClass, props.className)} />;

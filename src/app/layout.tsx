@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { getSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
 
 export const dynamic = "force-dynamic";
 
@@ -59,11 +60,16 @@ const SHELL_RESOURCES = [
   "settings",
 ] as const;
 
-const THEME_BOOTSTRAP = `
+function buildThemeBootstrap(accountMode: ThemeMode | null) {
+  const account = accountMode ? JSON.stringify(accountMode) : "null";
+  return `
 (() => {
   try {
+    const accountMode = ${account};
     const stored = localStorage.getItem("vims-theme");
-    const mode = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+    const storedIsValid = stored === "light" || stored === "dark" || stored === "system";
+    const mode = accountMode || (storedIsValid ? stored : "system");
+    if (accountMode) localStorage.setItem("vims-theme", accountMode);
     const dark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     const root = document.documentElement;
     root.classList.toggle("dark", dark);
@@ -71,12 +77,16 @@ const THEME_BOOTSTRAP = `
     root.style.colorScheme = dark ? "dark" : "light";
   } catch (_) {}
 })();`;
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const settings = await getSettings();
   let shellUser: { role: string; name: string; allowedResources: string[] } | null = null;
+  let accountTheme: ThemeMode | null = null;
+
   try {
     const user = await getCurrentUser();
+    accountTheme = await getUserThemePreference(user.id);
     shellUser = {
       role: user.role,
       name: user.name,
@@ -86,10 +96,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     // Public and login routes intentionally render without an authenticated shell identity.
   }
 
+  const themeBootstrap = buildThemeBootstrap(accountTheme);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href={settings.logoDataUrl || "/icons/icon-192.png"} />
@@ -113,7 +125,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           >
             {children}
           </AppShell>
-          <ThemeSwitcher />
+          <ThemeSwitcher accountMode={accountTheme} authenticated={Boolean(shellUser)} />
           <PWAProvider />
         </ErrorBoundary>
       </body>

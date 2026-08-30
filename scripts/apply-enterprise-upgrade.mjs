@@ -9,6 +9,7 @@ if (!connectionString) throw new Error("DATABASE_URL is required");
 const migrationPaths = [
   "migrations/20260820_enterprise_upgrade.sql",
   "migrations/20260823_enterprise_v22_hardening.sql",
+  "migrations/20260830_user_theme_preferences.sql",
 ];
 
 const client = new pg.Client({
