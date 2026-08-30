@@ -135,12 +135,14 @@ export function AppShell({
   userRole,
   userName,
   allowedResources = [],
+  appearanceControl,
 }: {
   children: ReactNode;
   branding?: AppBranding;
   userRole?: string | null;
   userName?: string | null;
   allowedResources?: string[];
+  appearanceControl?: ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -173,7 +175,7 @@ export function AppShell({
   })();
 
   if (NO_SHELL_PATHS.includes(pathname) || pathname.startsWith("/verify") || pathname.startsWith("/certificate")) {
-    return <>{children}</>;
+    return <>{children}{appearanceControl}</>;
   }
 
   const workspaceLabel = isTransporter
@@ -309,11 +311,14 @@ export function AppShell({
               </p>
             </div>
 
-            <div className="hidden items-center gap-3 md:flex">
-              <div className="h-8 w-px bg-slate-200" />
-              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                {sessionLabel}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {appearanceControl}
+              <div className="hidden items-center gap-3 md:flex">
+                <div className="h-8 w-px bg-slate-200" />
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  {sessionLabel}
+                </div>
               </div>
             </div>
           </div>

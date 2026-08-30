@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
-import { Check, Cloud, Monitor, Moon, Sun } from "lucide-react";
+import { Check, Cloud, CloudOff, Monitor, Moon, Sun } from "lucide-react";
 import { saveThemePreferenceAction } from "@/app/theme-actions";
 
 export type ThemeMode = "light" | "dark" | "system";
+type SyncState = "idle" | "syncing" | "synced" | "local";
 
 const STORAGE_KEY = "vims-theme";
 const MODES: { value: ThemeMode; label: string; description: string; icon: typeof Sun; preview: string }[] = [
@@ -71,8 +72,20 @@ export function ThemeSwitcher({
   const pathname = usePathname();
   const [mode, setMode] = useState<ThemeMode>(accountMode || "system");
   const [open, setOpen] = useState(false);
-  const [syncing, startSync] = useTransition();
+  const [syncState, setSyncState] = useState<SyncState>(authenticated && accountMode ? "synced" : "idle");
+  const [, startSync] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
+  const embeddedInShell = pathname !== "/login";
+
+  const syncPreference = (next: ThemeMode) => {
+    if (!authenticated) return;
+    setSyncState("syncing");
+    startSync(() => {
+      void saveThemePreferenceAction(next).then((result) => {
+        setSyncState(result.ok ? "synced" : "local");
+      });
+    });
+  };
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -81,11 +94,15 @@ export function ThemeSwitcher({
     window.localStorage.setItem(STORAGE_KEY, initial);
     applyTheme(initial);
 
-    if (authenticated && !accountMode && isThemeMode(stored)) {
-      startSync(() => {
-        void saveThemePreferenceAction(stored);
-      });
+    if (authenticated && accountMode) {
+      setSyncState("synced");
+    } else if (authenticated && !accountMode && isThemeMode(stored)) {
+      syncPreference(stored);
+    } else if (authenticated) {
+      syncPreference("system");
     }
+    // Initial synchronization is intentionally driven only by server props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountMode, authenticated]);
 
   useEffect(() => {
@@ -120,19 +137,29 @@ export function ThemeSwitcher({
     window.localStorage.setItem(STORAGE_KEY, next);
     applyTheme(next, true);
     setOpen(false);
-
-    if (authenticated) {
-      startSync(() => {
-        void saveThemePreferenceAction(next);
-      });
-    }
+    syncPreference(next);
   };
 
   const ActiveIcon = mode === "light" ? Sun : mode === "dark" ? Moon : Monitor;
   const activeLabel = MODES.find((item) => item.value === mode)?.label || "Auto";
+  const SyncIcon = !authenticated ? Monitor : syncState === "local" ? CloudOff : Cloud;
+  const syncLabel = !authenticated
+    ? "Saved on this device"
+    : syncState === "syncing"
+      ? "Syncing preference"
+      : syncState === "synced"
+        ? "Synced to your account"
+        : syncState === "local"
+          ? "Account sync unavailable · saved locally"
+          : "Saved on this device";
 
   return (
-    <div ref={containerRef} className="theme-switcher no-print fixed right-3 top-2.5 z-[80] sm:right-5 sm:top-3">
+    <div
+      ref={containerRef}
+      className={`theme-switcher no-print z-[80] ${
+        embeddedInShell ? "relative shrink-0" : "fixed right-3 top-3 sm:right-5 sm:top-5"
+      }`}
+    >
       {open && (
         <div
           role="menu"
@@ -149,9 +176,11 @@ export function ThemeSwitcher({
                 <ActiveIcon className="h-4.5 w-4.5" />
               </div>
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
-              {authenticated ? <Cloud className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
-              {authenticated ? (syncing ? "Syncing preference" : "Synced to your account") : "Saved on this device"}
+            <div className={`mt-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+              syncState === "local" ? "text-amber-600 dark:text-amber-300" : "text-slate-400 dark:text-slate-500"
+            }`}>
+              <SyncIcon className="h-3 w-3" />
+              {syncLabel}
             </div>
           </div>
 
@@ -200,7 +229,7 @@ export function ThemeSwitcher({
         aria-expanded={open}
         aria-label={`Appearance: ${activeLabel}`}
         title={`Appearance: ${activeLabel}`}
-        className="group flex h-10 items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-2.5 text-xs font-semibold text-slate-700 shadow-md shadow-slate-950/10 backdrop-blur-xl transition hover:border-emerald-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 dark:border-slate-700/80 dark:bg-[#0d1b2c]/95 dark:text-slate-100 dark:shadow-black/35 dark:hover:border-emerald-700 dark:focus-visible:ring-offset-slate-950 sm:h-10 sm:px-3"
+        className="group flex h-10 items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-2.5 text-xs font-semibold text-slate-700 shadow-md shadow-slate-950/10 backdrop-blur-xl transition hover:border-emerald-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 dark:border-slate-700/80 dark:bg-[#0d1b2c]/95 dark:text-slate-100 dark:shadow-black/35 dark:hover:border-emerald-700 dark:focus-visible:ring-offset-slate-950 sm:px-3"
       >
         <span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-900">
           <ActiveIcon className="h-3.5 w-3.5" />

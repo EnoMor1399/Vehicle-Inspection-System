@@ -97,6 +97,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   }
 
   const themeBootstrap = buildThemeBootstrap(accountTheme);
+  const appearanceControl = <ThemeSwitcher accountMode={accountTheme} authenticated={Boolean(shellUser)} />;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -122,10 +123,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             userRole={shellUser?.role}
             userName={shellUser?.name}
             allowedResources={shellUser?.allowedResources || []}
+            appearanceControl={appearanceControl}
           >
             {children}
           </AppShell>
-          <ThemeSwitcher accountMode={accountTheme} authenticated={Boolean(shellUser)} />
           <PWAProvider />
         </ErrorBoundary>
       </body>

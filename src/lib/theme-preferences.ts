@@ -7,30 +7,11 @@ export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
 
-let tableReady: Promise<void> | null = null;
-
-async function ensureThemePreferenceTable() {
-  if (!tableReady) {
-    tableReady = (async () => {
-      await db.execute(sql`
-        create table if not exists user_theme_preferences (
-          user_id varchar(36) primary key references users(id) on delete cascade,
-          theme_mode varchar(10) not null default 'system'
-            check (theme_mode in ('light', 'dark', 'system')),
-          updated_at timestamp not null default now()
-        )
-      `);
-    })().catch((error) => {
-      tableReady = null;
-      throw error;
-    });
-  }
-  await tableReady;
-}
+let lookupWarningShown = false;
+let saveWarningShown = false;
 
 export async function getUserThemePreference(userId: string): Promise<ThemeMode | null> {
   try {
-    await ensureThemePreferenceTable();
     const result = await db.execute<{ theme_mode: string }>(sql`
       select theme_mode
       from user_theme_preferences
@@ -40,7 +21,13 @@ export async function getUserThemePreference(userId: string): Promise<ThemeMode 
     const value = result.rows[0]?.theme_mode;
     return isThemeMode(value) ? value : null;
   } catch (error) {
-    console.warn("Theme preference lookup unavailable; using device preference.", error instanceof Error ? error.message : error);
+    if (!lookupWarningShown) {
+      lookupWarningShown = true;
+      console.warn(
+        "Theme preference lookup unavailable; using device preference. Apply the user_theme_preferences migration to enable account sync.",
+        error instanceof Error ? error.message : error
+      );
+    }
     return null;
   }
 }
@@ -49,7 +36,6 @@ export async function setUserThemePreference(userId: string, mode: ThemeMode): P
   if (!isThemeMode(mode)) return false;
 
   try {
-    await ensureThemePreferenceTable();
     await db.execute(sql`
       insert into user_theme_preferences (user_id, theme_mode, updated_at)
       values (${userId}, ${mode}, now())
@@ -58,7 +44,13 @@ export async function setUserThemePreference(userId: string, mode: ThemeMode): P
     `);
     return true;
   } catch (error) {
-    console.warn("Theme preference could not be synced; local preference remains active.", error instanceof Error ? error.message : error);
+    if (!saveWarningShown) {
+      saveWarningShown = true;
+      console.warn(
+        "Theme preference could not be synced; local preference remains active. Apply the user_theme_preferences migration to enable account sync.",
+        error instanceof Error ? error.message : error
+      );
+    }
     return false;
   }
 }
