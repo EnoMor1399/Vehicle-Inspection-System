@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { PWAProvider } from "@/components/PWAProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { getSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 
@@ -57,6 +58,19 @@ const SHELL_RESOURCES = [
   "settings",
 ] as const;
 
+const THEME_BOOTSTRAP = `
+(() => {
+  try {
+    const stored = localStorage.getItem("vims-theme");
+    const mode = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+    const dark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const root = document.documentElement;
+    root.classList.toggle("dark", dark);
+    root.dataset.theme = mode;
+    root.style.colorScheme = dark ? "dark" : "light";
+  } catch (_) {}
+})();`;
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const settings = await getSettings();
   let shellUser: { role: string; name: string; allowedResources: string[] } | null = null;
@@ -72,15 +86,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   }
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href={settings.logoDataUrl || "/icons/icon-192.png"} />
         <meta name="theme-color" content={settings.themeColor} />
         <style>{`:root { --brand-color: ${settings.themeColor}; --brand-accent: ${settings.accentColor}; }`}</style>
       </head>
-      <body className="bg-slate-100 text-slate-900 antialiased">
+      <body className="antialiased">
         <ErrorBoundary>
           <AppShell
             branding={{
@@ -97,6 +112,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           >
             {children}
           </AppShell>
+          <ThemeSwitcher />
           <PWAProvider />
         </ErrorBoundary>
       </body>
