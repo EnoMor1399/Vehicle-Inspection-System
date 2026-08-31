@@ -4,6 +4,7 @@ import { vehicles, transporters } from "@/db/schema";
 import { eq, desc, sql, isNull, and } from "drizzle-orm";
 import { vehicleCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { parseApiPagination } from "@/lib/api-pagination";
+import { formatServerTiming, timeOperation } from "@/lib/performance";
 
 const VEHICLE_STATUSES = new Set(["active", "under_inspection", "failed", "passed", "suspended", "decommissioned"]);
 
@@ -24,18 +25,28 @@ export async function GET(request: Request) {
   const where = [];
   if (status) where.push(eq(vehicles.status, status as typeof vehicles.status.enumValues[number]));
   if (transporterId) where.push(eq(vehicles.transporterId, transporterId));
+  const predicate = where.length ? and(...where) : undefined;
 
-  const rows = await db.select().from(vehicles)
-    .where(where.length ? and(...where) : undefined)
-    .orderBy(desc(vehicles.createdAt)).limit(limit).offset(offset);
-
-  const [countRow] = await db.select({ n: sql<number>`count(*)::int` }).from(vehicles)
-    .where(where.length ? and(...where) : undefined);
+  const started = performance.now();
+  const [rowsQuery, countQuery] = await Promise.all([
+    timeOperation("vehicles_list", async () => db.select().from(vehicles)
+      .where(predicate)
+      .orderBy(desc(vehicles.createdAt)).limit(limit).offset(offset)),
+    timeOperation("vehicles_count", async () => db.select({ n: sql<number>`count(*)::int` }).from(vehicles)
+      .where(predicate)),
+  ]);
+  const totalDurationMs = performance.now() - started;
+  const [countRow] = countQuery.value;
 
   return json({
-    data: rows,
+    data: rowsQuery.value,
     pagination: { limit, offset, total: countRow?.n || 0 },
     meta: { api_version: "v1", user: auth.user.name, request_time: new Date().toISOString() },
+  }, 200, {
+    "Server-Timing": formatServerTiming([
+      { name: "vehicles_list", durationMs: rowsQuery.durationMs },
+      { name: "vehicles_count", durationMs: countQuery.durationMs },
+    ], totalDurationMs),
   });
 }
 

@@ -116,8 +116,8 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
   }
 }
 
-export function json(data: unknown, status = 200) {
-  return Response.json(data, { status });
+export function json(data: unknown, status = 200, headers?: HeadersInit) {
+  return Response.json(data, { status, headers });
 }
 
 export function apiError(status: number, message: string, details?: unknown) {
