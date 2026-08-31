@@ -7,6 +7,10 @@ on:
         description: "Type APPLY_VIMS_DB_UPGRADE"
         required: true
         type: string
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-db-upgrade.yml"
 
 permissions:
   contents: read
@@ -17,6 +21,7 @@ concurrency:
 
 jobs:
   upgrade:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Run production database upgrade'
     name: Apply idempotent VIMS migrations
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -25,10 +30,11 @@ jobs:
       - name: Validate confirmation
         shell: bash
         run: |
-          if [[ "$DB_UPGRADE_CONFIRMATION" != "APPLY_VIMS_DB_UPGRADE" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$DB_UPGRADE_CONFIRMATION" != "APPLY_VIMS_DB_UPGRADE" ]]; then
             echo "Confirmation does not match APPLY_VIMS_DB_UPGRADE."
             exit 1
           fi
+          echo "Production database upgrade authorized."
         env:
           DB_UPGRADE_CONFIRMATION: ${{ inputs.confirmation }}
 
