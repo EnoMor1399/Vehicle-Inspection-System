@@ -7,6 +7,22 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
 
+function normalizePostgresSslMode(value: string) {
+  try {
+    const url = new URL(value);
+    // pg currently treats sslmode=require as verify-full, but pg v9 will adopt
+    // weaker libpq semantics. Preserve today's certificate verification explicitly.
+    if (url.searchParams.get("sslmode")?.toLowerCase() === "require") {
+      url.searchParams.set("sslmode", "verify-full");
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+const connectionString = normalizePostgresSslMode(databaseUrl);
+
 function boundedInteger(value: string | undefined, fallback: number, min: number, max: number) {
   const parsed = Number.parseInt(value || "", 10);
   if (!Number.isFinite(parsed)) return fallback;
@@ -36,7 +52,7 @@ const globalForDb = globalThis as typeof globalThis & {
 
 function createPool() {
   const nextPool = new Pool({
-    connectionString: databaseUrl,
+    connectionString,
     max: poolMax,
     idleTimeoutMillis,
     connectionTimeoutMillis,
