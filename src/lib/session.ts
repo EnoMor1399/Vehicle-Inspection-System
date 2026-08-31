@@ -8,6 +8,12 @@ import { newId } from "@/lib/utils";
 import { hashPassword, validatePasswordStrength, validateEmail } from "@/lib/password";
 import { login as secureLogin, logout as secureLogout } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { clientIpFromHeaders, normalizeUserAgent } from "@/lib/request-context";
+
+const MAX_PASSWORD_INPUT_LENGTH = 256;
+const MAX_EMAIL_LENGTH = 200;
+const MAX_NAME_LENGTH = 200;
+const MAX_PHONE_LENGTH = 50;
 
 export type AuthResult =
   | { ok: true; userId: string; userName: string; role: string }
@@ -21,17 +27,19 @@ export async function signIn(
 ): Promise<AuthResult> {
   const normalized = email.trim().toLowerCase();
 
-  if (!validateEmail(normalized)) {
+  if (normalized.length > MAX_EMAIL_LENGTH || !validateEmail(normalized)) {
     return { ok: false, error: "Please enter a valid email address", field: "email" };
   }
   if (!password) {
     return { ok: false, error: "Password is required", field: "password" };
   }
+  if (password.length > MAX_PASSWORD_INPUT_LENGTH) {
+    return { ok: false, error: "Invalid email or password", field: "password" };
+  }
 
-  // Get IP and user agent
   const headersList = await headers();
-  const ipAddress = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || headersList.get("x-real-ip") || "unknown";
-  const userAgent = headersList.get("user-agent") || "unknown";
+  const ipAddress = clientIpFromHeaders(headersList);
+  const userAgent = normalizeUserAgent(headersList.get("user-agent"));
 
   const loginLimit = await rateLimit("login", ipAddress);
   if (!loginLimit.allowed) {
@@ -42,9 +50,11 @@ export async function signIn(
     if (!twoFactorLimit.allowed) {
       return { ok: false, error: "Too many verification attempts. Please try again later." };
     }
+    if (!/^\d{6}$/.test(twoFactorToken)) {
+      return { ok: false, error: "Enter a valid 6-digit authentication code" };
+    }
   }
 
-  // Use secure login function
   const result = await secureLogin(normalized, password, ipAddress, userAgent, twoFactorToken, remember);
 
   if (!result.success) {
@@ -54,10 +64,9 @@ export async function signIn(
     return { ok: false, error: result.error || "Login failed" };
   }
 
-  // Set session cookie
   if (result.sessionToken) {
     const jar = await cookies();
-    const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8; // 30 days or 8 hours
+    const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
     jar.set("rsl_session_token", result.sessionToken, {
       path: "/",
       httpOnly: true,
@@ -88,13 +97,22 @@ export async function signUp(input: {
 }): Promise<AuthResult> {
   const { name, email, password, confirmPassword, phone } = input;
   const normalized = email.trim().toLowerCase();
+  const normalizedName = name.trim();
+  const normalizedPhone = phone?.trim() || "";
 
-  if (!name || name.trim().length < 2) {
-    return { ok: false, error: "Name must be at least 2 characters", field: "name" };
+  if (normalizedName.length < 2 || normalizedName.length > MAX_NAME_LENGTH) {
+    return { ok: false, error: `Name must be between 2 and ${MAX_NAME_LENGTH} characters`, field: "name" };
   }
-  if (!validateEmail(normalized)) {
+  if (normalized.length > MAX_EMAIL_LENGTH || !validateEmail(normalized)) {
     return { ok: false, error: "Please enter a valid email address", field: "email" };
   }
+  if (password.length > MAX_PASSWORD_INPUT_LENGTH || confirmPassword.length > MAX_PASSWORD_INPUT_LENGTH) {
+    return { ok: false, error: `Password must not exceed ${MAX_PASSWORD_INPUT_LENGTH} characters`, field: "password" };
+  }
+  if (normalizedPhone.length > MAX_PHONE_LENGTH) {
+    return { ok: false, error: `Phone number must not exceed ${MAX_PHONE_LENGTH} characters`, field: "phone" };
+  }
+
   const strength = validatePasswordStrength(password);
   if (!strength.valid) {
     return { ok: false, error: strength.errors[0], field: "password" };
@@ -109,8 +127,8 @@ export async function signUp(input: {
   }
 
   const headersList = await headers();
-  const ipAddress = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || headersList.get("x-real-ip") || "unknown";
-  const userAgent = headersList.get("user-agent") || "unknown";
+  const ipAddress = clientIpFromHeaders(headersList);
+  const userAgent = normalizeUserAgent(headersList.get("user-agent"));
   const signupLimit = await rateLimit("signup", `ip:${ipAddress}`);
   if (!signupLimit.allowed) {
     return { ok: false, error: "Too many account-creation attempts. Please try again later." };
@@ -121,8 +139,6 @@ export async function signUp(input: {
   const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
 
   const created = await db.transaction(async (tx) => {
-    // Serialise account bootstrap so concurrent sign-ups cannot create multiple
-    // initial administrators or permanently consume the bootstrap slot.
     await tx.execute(sql`select pg_advisory_xact_lock(78654219)`);
 
     const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, normalized));
@@ -139,9 +155,6 @@ export async function signUp(input: {
     const isDevelopmentFirstUser = process.env.NODE_ENV !== "production" && Number(userCount?.n || 0) === 0;
     const role = noSuperAdmin && (isBootstrapIdentity || isDevelopmentFirstUser) ? "super_admin" : "viewer";
 
-    // If a production deployment has no administrator, only the configured
-    // bootstrap identity may claim that role. Other accounts can safely exist
-    // as viewers without blocking the administrator from registering later.
     if (process.env.NODE_ENV === "production" && noSuperAdmin && !bootstrapEmail) {
       return {
         ok: false as const,
@@ -152,23 +165,23 @@ export async function signUp(input: {
 
     await tx.insert(users).values({
       id,
-      name: name.trim(),
+      name: normalizedName,
       email: normalized,
       role,
       passwordHash,
-      phone: phone?.trim() || null,
+      phone: normalizedPhone || null,
       isActive: true,
     });
 
     await tx.insert(auditLogs).values({
       id: newId(),
       userId: id,
-      userName: name.trim(),
+      userName: normalizedName,
       action: "create",
       entityType: "user",
       entityId: id,
       entityLabel: normalized,
-      summary: `New account created: ${name.trim()} (${normalized})`,
+      summary: `New account created: ${normalizedName} (${normalized})`,
     });
 
     return { ok: true as const, role };
@@ -176,7 +189,6 @@ export async function signUp(input: {
 
   if (!created.ok) return created;
 
-  // Auto sign in using the same revocable session mechanism as normal login.
   const { createSession } = await import("@/lib/security");
   const sessionToken = await createSession(id, ipAddress, userAgent, { remember: false });
   const jar = await cookies();
@@ -191,13 +203,13 @@ export async function signUp(input: {
   await db.insert(auditLogs).values({
     id: newId(),
     userId: id,
-    userName: name.trim(),
+    userName: normalizedName,
     action: "login",
     entityType: "user",
     entityId: id,
     entityLabel: normalized,
-    summary: `${name.trim()} signed up and logged in`,
+    summary: `${normalizedName} signed up and logged in`,
   });
 
-  return { ok: true, userId: id, userName: name.trim(), role: created.role };
+  return { ok: true, userId: id, userName: normalizedName, role: created.role };
 }

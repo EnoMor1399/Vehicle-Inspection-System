@@ -2,28 +2,34 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildContentSecurityPolicy } from "@/lib/csp";
-
-function clientIp(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "unknown";
-}
+import { clientIpFromHeaders, normalizeRequestId } from "@/lib/request-context";
 
 async function apiRateIdentity(request: NextRequest, ip: string): Promise<string> {
   const authorization = request.headers.get("authorization") || "";
   const rawKey = request.headers.get("x-api-key") || authorization.replace(/^Bearer\s+/i, "").trim();
-  if (!rawKey) return `ip:${ip}`;
+  if (!rawKey || rawKey.length > 512) return `ip:${ip}`;
 
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawKey));
   const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
   return `credential:${hex.slice(0, 32)}`;
 }
 
+function normalizeOrigin(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 function allowedOrigins(request: NextRequest): Set<string> {
   const configured = (process.env.ALLOWED_ORIGINS || "")
     .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+    .map((value) => normalizeOrigin(value.trim()))
+    .filter((value): value is string => Boolean(value));
   configured.push(request.nextUrl.origin);
   return new Set(configured);
 }
@@ -46,6 +52,7 @@ function rateLimited(result: Awaited<ReturnType<typeof rateLimit>>, requestId: s
         "X-RateLimit-Remaining": String(result.remaining),
         "X-RateLimit-Reset": String(result.reset),
         "X-Request-ID": requestId,
+        "Cache-Control": "no-store",
       },
     }
   );
@@ -60,8 +67,8 @@ function rejected(message: string, status: number, requestId: string) {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const ip = clientIp(request);
-  const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
+  const ip = clientIpFromHeaders(request.headers);
+  const requestId = normalizeRequestId(request.headers.get("x-request-id"), crypto.randomUUID());
   const nonce = crypto.randomUUID().replaceAll("-", "");
   const csp = buildContentSecurityPolicy(nonce, process.env.NODE_ENV === "production");
   let appliedRateLimit: Awaited<ReturnType<typeof rateLimit>> | null = null;
@@ -74,14 +81,21 @@ export async function proxy(request: NextRequest) {
 
     const mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     if (mutating) {
-      const origin = request.headers.get("origin");
-      if (origin && !allowedOrigins(request).has(origin)) {
+      const originHeader = request.headers.get("origin");
+      const origin = normalizeOrigin(originHeader);
+      if (originHeader && (!origin || !allowedOrigins(request).has(origin))) {
         return rejected("Origin not allowed", 403, requestId);
       }
 
-      const contentLength = Number(request.headers.get("content-length") || 0);
-      if (Number.isFinite(contentLength) && contentLength > 10 * 1024 * 1024) {
-        return rejected("Request body exceeds 10 MB limit", 413, requestId);
+      const contentLengthHeader = request.headers.get("content-length");
+      if (contentLengthHeader) {
+        if (!/^\d+$/.test(contentLengthHeader)) {
+          return rejected("Invalid Content-Length header", 400, requestId);
+        }
+        const contentLength = Number(contentLengthHeader);
+        if (!Number.isSafeInteger(contentLength) || contentLength > 10 * 1024 * 1024) {
+          return rejected("Request body exceeds 10 MB limit", 413, requestId);
+        }
       }
     }
   }
@@ -95,7 +109,6 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
   requestHeaders.set("x-nonce", nonce);
-  // Next.js reads the request CSP to apply this nonce to framework scripts.
   requestHeaders.set("Content-Security-Policy", csp);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });

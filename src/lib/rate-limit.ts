@@ -4,13 +4,17 @@ import { Ratelimit } from "@upstash/ratelimit";
 type Policy = "login" | "signup" | "twoFactor" | "api" | "verify" | "error";
 type Window = `${number} ${"s" | "m" | "h" | "d"}`;
 
-type LimitResult = {
+export type LimitResult = {
   allowed: boolean;
   limit: number;
   remaining: number;
   reset: number;
   backend: "upstash" | "memory";
 };
+
+export type MemoryRateEntry = { count: number; reset: number };
+
+type MemoryPolicyConfig = { limit: number; windowMs: number };
 
 function positiveInt(value: string | undefined, fallback: number, max: number): number {
   const parsed = Number(value);
@@ -20,6 +24,7 @@ function positiveInt(value: string | undefined, fallback: number, max: number): 
 const apiLimit = positiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100, 100_000);
 const apiWindowMs = positiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60_000, 86_400_000);
 const apiWindow: Window = `${Math.max(1, Math.ceil(apiWindowMs / 1000))} s`;
+const memoryEntryLimit = positiveInt(process.env.RATE_LIMIT_MEMORY_MAX_ENTRIES, 5_000, 50_000);
 
 const policyConfig: Record<Policy, { limit: number; windowMs: number; window: Window }> = {
   login: { limit: 10, windowMs: 15 * 60_000, window: "15 m" },
@@ -48,32 +53,41 @@ const distributed: Partial<Record<Policy, Ratelimit>> = redis
     )
   : {};
 
-const memory = new Map<string, { count: number; reset: number }>();
+const memory = new Map<string, MemoryRateEntry>();
+let lastDistributedWarningAt = 0;
 
-export async function rateLimit(policy: Policy, identifier: string): Promise<LimitResult> {
-  const config = policyConfig[policy];
-  const limiter = distributed[policy];
-  if (limiter) {
-    const result = await limiter.limit(identifier);
-    return {
-      allowed: result.success,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset,
-      backend: "upstash",
-    };
+function pruneMemoryStore(store: Map<string, MemoryRateEntry>, now: number, maxEntries: number, incomingKey: string) {
+  for (const [key, value] of store) {
+    if (value.reset <= now) store.delete(key);
   }
 
-  const now = Date.now();
+  if (store.has(incomingKey)) return;
+  while (store.size >= maxEntries) {
+    const oldestKey = store.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    store.delete(oldestKey);
+  }
+}
+
+export function applyMemoryRateLimit(
+  store: Map<string, MemoryRateEntry>,
+  policy: string,
+  identifier: string,
+  config: MemoryPolicyConfig,
+  now = Date.now(),
+  maxEntries = 5_000
+): LimitResult {
+  const safeMaxEntries = Math.max(1, Math.floor(maxEntries));
   const key = `${policy}:${identifier}`;
-  let row = memory.get(key);
+  pruneMemoryStore(store, now, safeMaxEntries, key);
+
+  let row = store.get(key);
   if (!row || row.reset <= now) row = { count: 0, reset: now + config.windowMs };
   row.count += 1;
-  memory.set(key, row);
 
-  if (memory.size > 5000) {
-    for (const [k, v] of memory) if (v.reset <= now) memory.delete(k);
-  }
+  // Refresh insertion order so eviction behaves like a bounded LRU fallback.
+  store.delete(key);
+  store.set(key, row);
 
   return {
     allowed: row.count <= config.limit,
@@ -82,4 +96,35 @@ export async function rateLimit(policy: Policy, identifier: string): Promise<Lim
     reset: row.reset,
     backend: "memory",
   };
+}
+
+function warnDistributedFallback() {
+  const now = Date.now();
+  if (now - lastDistributedWarningAt < 60_000) return;
+  lastDistributedWarningAt = now;
+  console.warn("[rate-limit] distributed limiter unavailable; using bounded in-memory fallback");
+}
+
+export async function rateLimit(policy: Policy, identifier: string): Promise<LimitResult> {
+  const config = policyConfig[policy];
+  const limiter = distributed[policy];
+
+  if (limiter) {
+    try {
+      const result = await limiter.limit(identifier);
+      return {
+        allowed: result.success,
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: result.reset,
+        backend: "upstash",
+      };
+    } catch {
+      // Availability must not depend on Redis being reachable. The fallback is
+      // deliberately bounded and local to the current server process.
+      warnDistributedFallback();
+    }
+  }
+
+  return applyMemoryRateLimit(memory, policy, identifier, config, Date.now(), memoryEntryLimit);
 }
