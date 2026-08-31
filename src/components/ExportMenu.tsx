@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { Download, FileSpreadsheet, FileText, Table, ChevronDown, Loader2, File } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 

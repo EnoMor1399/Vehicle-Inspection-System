@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Download, Printer, Mail, Loader2 } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 

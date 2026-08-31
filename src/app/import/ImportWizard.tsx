@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { Button, Card, Field, Select, Badge } from "@/components/ui";
 import { Upload, AlertTriangle, CheckCircle2, ArrowRight } from "lucide-react";
 import { submitImport } from "./server";
