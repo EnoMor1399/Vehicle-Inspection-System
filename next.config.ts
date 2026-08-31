@@ -41,7 +41,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Next 16.3.x + Vercel's build adapter does not emit the root NFT files that
+  // standalone packaging expects. Vercel does not consume the standalone output,
+  // so retain it only for Docker/self-hosted builds.
+  output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   compress: true,
   async headers() {
