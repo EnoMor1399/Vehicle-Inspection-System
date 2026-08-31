@@ -26,6 +26,7 @@ function isSafeExample(file, match) {
     || lower.includes("127.0.0.1")
     || lower.includes("example")
     || lower.includes("replace-with")
+    || lower.includes("secure_password")
     || lower.includes("<password>")
     || lower.includes("${");
 }
