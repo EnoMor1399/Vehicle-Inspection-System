@@ -1,0 +1,55 @@
+name: Production database upgrade
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type APPLY_VIMS_DB_UPGRADE"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-db-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    name: Apply idempotent VIMS migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: production
+    steps:
+      - name: Validate confirmation
+        shell: bash
+        run: |
+          if [[ "$DB_UPGRADE_CONFIRMATION" != "APPLY_VIMS_DB_UPGRADE" ]]; then
+            echo "Confirmation does not match APPLY_VIMS_DB_UPGRADE."
+            exit 1
+          fi
+        env:
+          DB_UPGRADE_CONFIRMATION: ${{ inputs.confirmation }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply database upgrades
+        run: npm run db:upgrade
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Confirm production health
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 \
+            https://vehicle-inspection-system-sigma.vercel.app/api/health
