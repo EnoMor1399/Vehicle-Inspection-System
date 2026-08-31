@@ -37,7 +37,18 @@ jobs:
         run: |
           npm uninstall xlsx
           npm install --save-exact @e965/xlsx@0.20.3
-          node -e 'const fs=require("fs"); const p="src/app/import/ImportWizard.tsx"; const s=fs.readFileSync(p,"utf8"); fs.writeFileSync(p,s.replace("from \"xlsx\";","from \"@e965/xlsx\";"));'
+          node <<'NODE'
+          const fs = require("fs");
+          const paths = [
+            "src/app/import/ImportWizard.tsx",
+            "src/app/reports/ReportsActions.tsx",
+            "src/components/ExportMenu.tsx",
+          ];
+          for (const path of paths) {
+            const source = fs.readFileSync(path, "utf8");
+            fs.writeFileSync(path, source.replace('from "xlsx";', 'from "@e965/xlsx";'));
+          }
+          NODE
 
       - name: Validate TypeScript
         run: npm run typecheck
@@ -53,6 +64,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json src/app/import/ImportWizard.tsx
+          git add package.json package-lock.json src/app/import/ImportWizard.tsx src/app/reports/ReportsActions.tsx src/components/ExportMenu.tsx
           git commit -m "Replace vulnerable spreadsheet parser package"
           git push origin HEAD:main
