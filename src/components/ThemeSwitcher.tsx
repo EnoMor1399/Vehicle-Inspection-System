@@ -90,17 +90,22 @@ export function ThemeSwitcher({
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const initial = accountMode || (isThemeMode(stored) ? stored : "system");
-    setMode(initial);
     window.localStorage.setItem(STORAGE_KEY, initial);
     applyTheme(initial);
 
-    if (authenticated && accountMode) {
-      setSyncState("synced");
-    } else if (authenticated && !accountMode && isThemeMode(stored)) {
-      syncPreference(stored);
-    } else if (authenticated) {
-      syncPreference("system");
-    }
+    // Defer React-state synchronization until after the effect has completed.
+    // The DOM theme is applied immediately, so there is no visual flash, while
+    // avoiding a synchronous effect -> setState render cascade.
+    const timer = window.setTimeout(() => {
+      setMode(initial);
+      if (authenticated && !accountMode && isThemeMode(stored)) {
+        syncPreference(stored);
+      } else if (authenticated && !accountMode) {
+        syncPreference("system");
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
     // Initial synchronization is intentionally driven only by server props.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountMode, authenticated]);
