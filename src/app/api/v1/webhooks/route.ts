@@ -1,10 +1,14 @@
+import { randomBytes } from "node:crypto";
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { webhooks } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { webhookCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { validateWebhookDestination } from "@/lib/integration-security";
+import { encryptField } from "@/lib/field-encryption";
+
+const MAX_WEBHOOKS_PER_USER = 20;
 
 export async function GET() {
   const auth = await authenticateApiRequest({ scopes: ["admin"], permission: "users" });
@@ -35,17 +39,49 @@ export async function POST(request: Request) {
     if (!destination.ok) return apiError(400, destination.reason);
 
     const id = newId();
-    await db.insert(webhooks).values({
-      id,
-      userId: auth.user.id,
-      url: destination.url.toString(),
-      events: [...new Set(body.events)],
-      secret: body.secret || null,
-      description: body.description || null,
-      isActive: true,
+    const events = [...new Set(body.events)];
+    const generatedSecret = !body.secret;
+    const signingSecret = body.secret || randomBytes(32).toString("base64url");
+
+    const creation = await db.transaction(async (tx) => {
+      // Serialize webhook creation per user so concurrent requests cannot bypass
+      // the registration cap.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('vims:webhooks'), hashtext(${auth.user.id}))`);
+      const [countRow] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(webhooks)
+        .where(eq(webhooks.userId, auth.user.id));
+
+      if (Number(countRow?.n || 0) >= MAX_WEBHOOKS_PER_USER) {
+        return { ok: false as const };
+      }
+
+      await tx.insert(webhooks).values({
+        id,
+        userId: auth.user.id,
+        url: destination.url.toString(),
+        events,
+        secret: encryptField(signingSecret),
+        description: body.description || null,
+        isActive: true,
+      });
+      return { ok: true as const };
     });
 
-    return json({ data: { id, url: destination.url.toString(), events: body.events } }, 201);
+    if (!creation.ok) {
+      return apiError(409, `Webhook registration limit reached (${MAX_WEBHOOKS_PER_USER} per user)`);
+    }
+
+    return json({
+      data: {
+        id,
+        url: destination.url.toString(),
+        events,
+        ...(generatedSecret ? { signing_secret: signingSecret } : {}),
+      },
+    }, 201, {
+      "Cache-Control": "no-store",
+    });
   } catch {
     return apiError(500, "Failed to create webhook");
   }

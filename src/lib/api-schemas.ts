@@ -5,6 +5,13 @@ const fuelType = z.enum(["petrol", "diesel", "electric", "hybrid", "cng", "lpg"]
 const transmission = z.enum(["manual", "automatic", "cvt", "semi-automatic"]);
 const inspectionResult = z.enum(["pass", "conditional_pass", "reinspection_required", "fail"]);
 const workflowStatus = z.enum(["draft", "scheduled", "in_progress", "completed", "approved", "failed", "reinspection", "archived"]);
+const webhookEvent = z.enum([
+  "vehicle.created",
+  "vehicle.updated",
+  "inspection.completed",
+  "inspection.failed",
+  "user.created",
+]);
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().nullable();
 
@@ -66,8 +73,8 @@ export const inspectionCreateSchema = z.object({
 
 export const webhookCreateSchema = z.object({
   url: z.string().url().max(2048),
-  events: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
-  secret: optionalText(500),
+  events: z.array(webhookEvent).min(1).max(5),
+  secret: z.string().trim().min(24).max(500).optional().nullable(),
   description: optionalText(1000),
 }).strict();
 
