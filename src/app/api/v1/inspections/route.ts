@@ -132,34 +132,46 @@ export async function GET(request: Request) {
   const where = [];
   if (result) where.push(eq(inspections.overallResult, result as "pass" | "conditional_pass" | "reinspection_required" | "fail"));
   if (vehicleId) where.push(eq(inspections.vehicleId, vehicleId));
+  const predicate = where.length ? and(...where) : undefined;
 
-  const rows = await db
-    .select({
-      id: inspections.id,
-      inspectionNumber: inspections.inspectionNumber,
-      inspectionDate: inspections.inspectionDate,
-      overallResult: inspections.overallResult,
-      workflowStatus: inspections.workflowStatus,
-      inspectorName: inspections.inspectorName,
-      station: inspections.station,
-      vehicleId: inspections.vehicleId,
-      vehicleRegistration: vehicles.registrationNumber,
-      vehicleMake: vehicles.make,
-      vehicleModel: vehicles.model,
-    })
-    .from(inspections)
-    .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
-    .where(where.length ? and(...where) : undefined)
-    .orderBy(desc(inspections.inspectionDate))
-    .limit(limit)
-    .offset(offset);
-
-  const [countRow] = await db.select({ n: sql<number>`count(*)::int` }).from(inspections)
-    .where(where.length ? and(...where) : undefined);
+  const started = performance.now();
+  const [rowsQuery, countQuery] = await Promise.all([
+    timeOperation("inspections_list", async () => db
+      .select({
+        id: inspections.id,
+        inspectionNumber: inspections.inspectionNumber,
+        inspectionDate: inspections.inspectionDate,
+        overallResult: inspections.overallResult,
+        workflowStatus: inspections.workflowStatus,
+        inspectorName: inspections.inspectorName,
+        station: inspections.station,
+        vehicleId: inspections.vehicleId,
+        vehicleRegistration: vehicles.registrationNumber,
+        vehicleMake: vehicles.make,
+        vehicleModel: vehicles.model,
+      })
+      .from(inspections)
+      .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
+      .where(predicate)
+      .orderBy(desc(inspections.inspectionDate))
+      .limit(limit)
+      .offset(offset)),
+    timeOperation("inspections_count", async () => db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(inspections)
+      .where(predicate)),
+  ]);
+  const totalDurationMs = performance.now() - started;
+  const [countRow] = countQuery.value;
 
   return json({
-    data: rows,
+    data: rowsQuery.value,
     pagination: { limit, offset, total: countRow?.n || 0 },
     links: { self: "/api/v1/inspections", vehicle: "/api/v1/vehicles/:id", inspection: "/api/v1/inspections/:id" },
+  }, 200, {
+    "Server-Timing": formatServerTiming([
+      { name: "inspections_list", durationMs: rowsQuery.durationMs },
+      { name: "inspections_count", durationMs: countQuery.durationMs },
+    ], totalDurationMs),
   });
 }
