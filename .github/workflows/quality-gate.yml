@@ -42,7 +42,6 @@ jobs:
     name: Dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -56,5 +55,5 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Audit high-severity dependencies
+      - name: Block high-severity dependencies
         run: npm audit --audit-level=high
