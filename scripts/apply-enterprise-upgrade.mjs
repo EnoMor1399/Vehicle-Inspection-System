@@ -3,8 +3,24 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import pg from "pg";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required");
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error("DATABASE_URL is required");
+
+function normalizePostgresSslMode(value) {
+  try {
+    const url = new URL(value);
+    // Preserve pg's current certificate verification behavior explicitly so a
+    // future pg major release cannot weaken sslmode=require semantics.
+    if (url.searchParams.get("sslmode")?.toLowerCase() === "require") {
+      url.searchParams.set("sslmode", "verify-full");
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+const connectionString = normalizePostgresSslMode(databaseUrl);
 
 const migrationPaths = [
   "migrations/20260820_enterprise_upgrade.sql",
@@ -15,7 +31,6 @@ const migrationPaths = [
 
 const client = new pg.Client({
   connectionString,
-  ssl: /sslmode=require/i.test(connectionString) ? { rejectUnauthorized: false } : undefined,
   application_name: "vims-db-upgrade",
   connectionTimeoutMillis: 15_000,
   statement_timeout: 120_000,
