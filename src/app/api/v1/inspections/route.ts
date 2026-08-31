@@ -10,6 +10,7 @@ import { inspectionCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { parseApiPagination } from "@/lib/api-pagination";
 import { assessInspectionOutcome, deriveVehicleStatusAfterInspection } from "@/lib/inspection-policy";
 import { getSettings } from "@/lib/settings";
+import { formatServerTiming, timeOperation } from "@/lib/performance";
 
 const RESULTS = new Set(["pass", "conditional_pass", "reinspection_required", "fail"]);
 
