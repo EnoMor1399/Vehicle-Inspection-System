@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { vehicles, transporters } from "@/db/schema";
 import { eq, desc, sql, isNull, and } from "drizzle-orm";
 import { vehicleCreateSchema, zodDetails } from "@/lib/api-schemas";
+import { parseApiPagination } from "@/lib/api-pagination";
 
 const VEHICLE_STATUSES = new Set(["active", "under_inspection", "failed", "passed", "suspended", "decommissioned"]);
 
@@ -11,11 +12,14 @@ export async function GET(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   const url = new URL(request.url);
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50)));
-  const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
+  const pagination = parseApiPagination(url.searchParams);
+  if (!pagination.ok) return apiError(400, pagination.message);
+  const { limit, offset } = pagination;
+
   const status = url.searchParams.get("status");
-  const transporterId = url.searchParams.get("transporter_id");
+  const transporterId = url.searchParams.get("transporter_id")?.trim() || null;
   if (status && !VEHICLE_STATUSES.has(status)) return apiError(400, "Invalid vehicle status");
+  if (transporterId && transporterId.length > 64) return apiError(400, "transporter_id is too long");
 
   const where = [];
   if (status) where.push(eq(vehicles.status, status as typeof vehicles.status.enumValues[number]));

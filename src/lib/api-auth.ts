@@ -5,6 +5,7 @@ import { eq, or } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { hashApiKey, legacyApiKeyHash } from "@/lib/api-keys";
+import { shouldRefreshApiKeyUsage } from "@/lib/api-key-usage";
 
 export type ApiScope = "read" | "write" | "inspect" | "admin";
 
@@ -67,14 +68,25 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
         return { ok: false, status: 403, message: "User does not have permission for this resource" };
       }
 
-      await db
-        .update(apiKeys)
-        .set({
-          lastUsedAt: new Date(),
-          // Transparently upgrade legacy unsalted hashes after a successful use.
-          ...(keyRow.keyHash === legacyHash && currentHash !== legacyHash ? { keyHash: currentHash } : {}),
-        })
-        .where(eq(apiKeys.id, keyRow.id));
+      const now = new Date();
+      const upgradingLegacyHash = keyRow.keyHash === legacyHash && currentHash !== legacyHash;
+      if (upgradingLegacyHash || shouldRefreshApiKeyUsage(keyRow.lastUsedAt, now)) {
+        try {
+          await db
+            .update(apiKeys)
+            .set({
+              lastUsedAt: now,
+              // Transparently upgrade legacy unsalted hashes after a successful use.
+              ...(upgradingLegacyHash ? { keyHash: currentHash } : {}),
+            })
+            .where(eq(apiKeys.id, keyRow.id));
+        } catch (error) {
+          // Usage telemetry must not turn a valid authenticated request into an outage.
+          // Never log the raw API key or either key hash.
+          const message = error instanceof Error ? error.message : "unknown error";
+          console.warn(`[api-auth] API key usage metadata refresh failed: ${message}`);
+        }
+      }
 
       return { ok: true, user, authType: "api_key", scopes: keyRow.scopes || [] };
     }

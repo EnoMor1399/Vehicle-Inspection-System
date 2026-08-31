@@ -7,6 +7,9 @@ import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import { canApprove } from "@/lib/auth";
 import { inspectionCreateSchema, zodDetails } from "@/lib/api-schemas";
+import { parseApiPagination } from "@/lib/api-pagination";
+import { assessInspectionOutcome, deriveVehicleStatusAfterInspection } from "@/lib/inspection-policy";
+import { getSettings } from "@/lib/settings";
 
 const RESULTS = new Set(["pass", "conditional_pass", "reinspection_required", "fail"]);
 
@@ -25,13 +28,24 @@ export async function POST(request: Request) {
 
     const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, body.vehicleId));
     if (!vehicle) return apiError(404, "Vehicle not found");
+    if (vehicle.status === "decommissioned") {
+      return apiError(409, "A decommissioned vehicle cannot be inspected");
+    }
 
-    const failedItems = body.sectionData.flatMap((section) => section.items).filter((item) => item.result === "fail");
-    if (body.overallResult === "pass" && failedItems.length > 0) {
-      return apiError(422, "A PASS result cannot contain failed inspection items", {
-        failed_items: failedItems.map((item) => item.name).slice(0, 25),
+    const assessment = assessInspectionOutcome(body.overallResult, body.sectionData);
+    if (!assessment.ok) {
+      return apiError(422, assessment.message || "Inspection outcome is inconsistent with the checklist", {
+        failed_items: assessment.failedNames,
+        critical_failed_items: assessment.criticalFailedNames,
       });
     }
+
+    const settings = await getSettings();
+    const nextVehicleStatus = deriveVehicleStatusAfterInspection(
+      body.overallResult,
+      body.workflowStatus,
+      settings.requireSupervisorApproval
+    );
 
     const now = new Date();
     const id = newId();
@@ -55,22 +69,26 @@ export async function POST(request: Request) {
       })),
     }));
 
-    await db.insert(inspections).values({
-      id,
-      inspectionNumber,
-      vehicleId: body.vehicleId,
-      inspectionDate: now,
-      overallResult: body.overallResult,
-      inspectorId: auth.user.id,
-      inspectorName: body.inspectorName || auth.user.name,
-      station: body.station || null,
-      workflowStatus: body.workflowStatus,
-      sectionData,
-    });
+    await db.transaction(async (tx) => {
+      await tx.insert(inspections).values({
+        id,
+        inspectionNumber,
+        vehicleId: body.vehicleId,
+        inspectionDate: now,
+        overallResult: body.overallResult,
+        inspectorId: auth.user.id,
+        inspectorName: body.inspectorName || auth.user.name,
+        station: body.station || null,
+        workflowStatus: body.workflowStatus,
+        sectionData,
+      });
 
-    await db.update(vehicles)
-      .set({ status: body.overallResult === "pass" ? "passed" : "failed", updatedAt: new Date() })
-      .where(eq(vehicles.id, body.vehicleId));
+      if (nextVehicleStatus) {
+        await tx.update(vehicles)
+          .set({ status: nextVehicleStatus as any, updatedAt: new Date() })
+          .where(eq(vehicles.id, body.vehicleId));
+      }
+    });
 
     await logAudit({
       userId: auth.user.id,
@@ -80,7 +98,13 @@ export async function POST(request: Request) {
       entityId: id,
       entityLabel: inspectionNumber,
       summary: `Created inspection for vehicle ${vehicle.registrationNumber}`,
-      after: { overallResult: body.overallResult, workflowStatus: body.workflowStatus, failedItemCount: failedItems.length },
+      after: {
+        overallResult: body.overallResult,
+        workflowStatus: body.workflowStatus,
+        failedItemCount: assessment.failedCount,
+        criticalFailedItemCount: assessment.criticalFailedCount,
+        vehicleStatus: nextVehicleStatus,
+      },
     });
 
     return json({ data: { id, inspectionNumber } }, 201);
@@ -95,11 +119,14 @@ export async function GET(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   const url = new URL(request.url);
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50)));
-  const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
+  const pagination = parseApiPagination(url.searchParams);
+  if (!pagination.ok) return apiError(400, pagination.message);
+  const { limit, offset } = pagination;
+
   const result = url.searchParams.get("result");
-  const vehicleId = url.searchParams.get("vehicle_id");
+  const vehicleId = url.searchParams.get("vehicle_id")?.trim() || null;
   if (result && !RESULTS.has(result)) return apiError(400, "Invalid inspection result");
+  if (vehicleId && vehicleId.length > 64) return apiError(400, "vehicle_id is too long");
 
   const where = [];
   if (result) where.push(eq(inspections.overallResult, result as "pass" | "conditional_pass" | "reinspection_required" | "fail"));

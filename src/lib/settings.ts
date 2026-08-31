@@ -1,23 +1,44 @@
 import { db } from "@/db";
 import { systemSettings } from "@/db/schema";
-import { newId } from "./utils";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 export type SystemSettings = typeof systemSettings.$inferSelect;
 
 const SETTINGS_ID = "singleton";
 
-export async function getSettings(): Promise<SystemSettings> {
-  const [settings] = await db.select().from(systemSettings);
-  if (settings) return settings;
+async function getLatestSettings(): Promise<SystemSettings | undefined> {
+  const [settings] = await db
+    .select()
+    .from(systemSettings)
+    .orderBy(desc(systemSettings.updatedAt))
+    .limit(1);
+  return settings;
+}
 
-  // Initialize with defaults
-  const id = newId();
+export async function getSettings(): Promise<SystemSettings> {
+  const existing = await getLatestSettings();
+  if (existing) return existing;
+
+  // Use a deterministic primary key so simultaneous first requests cannot
+  // create multiple competing settings rows.
   const [created] = await db
     .insert(systemSettings)
-    .values({ id })
+    .values({ id: SETTINGS_ID })
+    .onConflictDoNothing()
     .returning();
-  return created;
+  if (created) return created;
+
+  // Another request may have won the initialization race.
+  const [concurrent] = await db
+    .select()
+    .from(systemSettings)
+    .where(eq(systemSettings.id, SETTINGS_ID))
+    .limit(1);
+  if (concurrent) return concurrent;
+
+  const fallback = await getLatestSettings();
+  if (!fallback) throw new Error("System settings could not be initialized");
+  return fallback;
 }
 
 export async function updateSettings(
@@ -32,4 +53,3 @@ export async function updateSettings(
     .returning();
   return updated;
 }
-
