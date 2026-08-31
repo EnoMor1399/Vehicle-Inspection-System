@@ -3,6 +3,28 @@ import { sessions, securityEvents, loginAttempts } from "@/db/schema";
 import { eq, and, gt, lt, desc, count, ne } from "drizzle-orm";
 import { randomBytes, createHash } from "crypto";
 import { generateSecret, generateURI, verify } from "otplib";
+import { normalizeClientIp, normalizeUserAgent } from "@/lib/request-context";
+
+const MAX_SECURITY_DESCRIPTION_LENGTH = 2_000;
+const MAX_SECURITY_METADATA_BYTES = 16_000;
+const MAX_SECURITY_EVENTS_PAGE = 200;
+
+function boundedText(value: string | null | undefined, maxLength: number): string | null {
+  if (!value) return null;
+  const normalized = value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, maxLength) : null;
+}
+
+function boundedSecurityMetadata(data?: Record<string, unknown>): Record<string, unknown> | null {
+  if (!data) return null;
+  try {
+    const serialized = JSON.stringify(data);
+    if (serialized.length <= MAX_SECURITY_METADATA_BYTES) return data;
+    return { truncated: true, originalSize: serialized.length };
+  } catch {
+    return { dropped: true, reason: "non_serializable" };
+  }
+}
 
 // ============ Two-Factor Authentication ============
 
@@ -15,18 +37,14 @@ export function generateTwoFactorQRCodeURI(
   secret: string,
   issuer: string = "RSL VIMS"
 ): string {
-  return generateURI({
-    issuer,
-    label: email,
-    secret,
-  });
+  return generateURI({ issuer, label: email, secret });
 }
 
 export async function verifyTwoFactorToken(secret: string, token: string): Promise<boolean> {
   try {
     const result = await verify({ token, secret });
     return result.valid;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -42,22 +60,22 @@ export async function createSession(
   const token = randomBytes(64).toString("hex");
   const ttlMs = options.remember ? 30 * 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
   const expiresAt = new Date(Date.now() + ttlMs);
-  
-  // Parse user agent for device info
-  const deviceInfo = parseUserAgent(userAgent);
-  
+  const safeIp = normalizeClientIp(ipAddress);
+  const safeUserAgent = normalizeUserAgent(userAgent);
+  const deviceInfo = parseUserAgent(safeUserAgent);
+
   await db.insert(sessions).values({
     id: randomBytes(16).toString("hex"),
     userId,
     token: hashToken(token),
-    ipAddress,
-    userAgent,
+    ipAddress: safeIp,
+    userAgent: safeUserAgent,
     deviceInfo,
     isActive: true,
     expiresAt,
     lastActivityAt: new Date(),
   });
-  
+
   return token;
 }
 
@@ -67,7 +85,7 @@ export async function validateSession(token: string): Promise<{
   sessionId?: string;
 }> {
   const hashedToken = hashToken(token);
-  
+
   const [session] = await db
     .select()
     .from(sessions)
@@ -79,64 +97,48 @@ export async function validateSession(token: string): Promise<{
       )
     )
     .limit(1);
-  
-  if (!session) {
-    return { valid: false };
-  }
-  
-  // Check for session inactivity timeout (30 minutes)
+
+  if (!session) return { valid: false };
+
   const configuredTimeout = Number(process.env.SESSION_TIMEOUT_MINUTES || 30);
-  const INACTIVITY_TIMEOUT = Math.min(24 * 60, Math.max(5, configuredTimeout)) * 60 * 1000;
+  const inactivityTimeout = Math.min(24 * 60, Math.max(5, configuredTimeout)) * 60 * 1000;
   const lastActivity = session.lastActivityAt ? new Date(session.lastActivityAt).getTime() : Date.now();
   const now = Date.now();
-  
-  if (now - lastActivity > INACTIVITY_TIMEOUT) {
-    // Session has been inactive for too long
+
+  if (now - lastActivity > inactivityTimeout) {
     await db
       .update(sessions)
       .set({ isActive: false })
       .where(eq(sessions.id, session.id));
-    
+
     await logSecurityEvent("session_timeout", "info", {
       userId: session.userId,
       ipAddress: session.ipAddress || undefined,
       userAgent: session.userAgent || undefined,
       description: "Session expired due to inactivity",
-      data: { sessionId: session.id, inactivityMinutes: Math.floor((now - lastActivity) / 60000) },
+      data: { sessionId: session.id, inactivityMinutes: Math.floor((now - lastActivity) / 60_000) },
     });
-    
+
     return { valid: false };
   }
-  
-  // Throttle activity writes. Validation can run many times during a single page
-  // request; writing on every check creates unnecessary database load.
-  const ACTIVITY_WRITE_INTERVAL = 2 * 60 * 1000;
-  if (now - lastActivity >= ACTIVITY_WRITE_INTERVAL) {
+
+  const activityWriteInterval = 2 * 60 * 1000;
+  if (now - lastActivity >= activityWriteInterval) {
     await db
       .update(sessions)
       .set({ lastActivityAt: new Date(now) })
       .where(eq(sessions.id, session.id));
   }
-  
-  return {
-    valid: true,
-    userId: session.userId,
-    sessionId: session.id,
-  };
+
+  return { valid: true, userId: session.userId, sessionId: session.id };
 }
 
 export async function revokeSession(sessionId: string): Promise<void> {
-  await db
-    .update(sessions)
-    .set({ isActive: false })
-    .where(eq(sessions.id, sessionId));
+  await db.update(sessions).set({ isActive: false }).where(eq(sessions.id, sessionId));
 }
 
 export async function revokeAllUserSessions(userId: string): Promise<void> {
-  await db
-    .update(sessions)
-    .set({ isActive: false })
-    .where(eq(sessions.userId, userId));
+  await db.update(sessions).set({ isActive: false }).where(eq(sessions.userId, userId));
 }
 
 export async function revokeAllOtherUserSessions(userId: string, currentSessionId: string): Promise<void> {
@@ -161,9 +163,7 @@ export async function getUserActiveSessions(userId: string) {
 }
 
 export async function cleanExpiredSessions(): Promise<void> {
-  await db
-    .delete(sessions)
-    .where(lt(sessions.expiresAt, new Date()));
+  await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
 }
 
 // ============ Security Events ============
@@ -176,28 +176,32 @@ export async function logSecurityEvent(
     ipAddress?: string;
     userAgent?: string;
     description?: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   }
 ): Promise<void> {
+  const safeEventType = boundedText(eventType, 50) || "security_event";
   await db.insert(securityEvents).values({
     id: randomBytes(16).toString("hex"),
-    userId: metadata.userId || null,
-    eventType,
+    userId: boundedText(metadata.userId, 36),
+    eventType: safeEventType,
     severity,
-    ipAddress: metadata.ipAddress || null,
-    userAgent: metadata.userAgent || null,
-    description: metadata.description || null,
-    metadata: metadata.data || null,
+    ipAddress: metadata.ipAddress ? normalizeClientIp(metadata.ipAddress) : null,
+    userAgent: metadata.userAgent ? normalizeUserAgent(metadata.userAgent) : null,
+    description: boundedText(metadata.description, MAX_SECURITY_DESCRIPTION_LENGTH),
+    metadata: boundedSecurityMetadata(metadata.data),
     resolved: false,
   });
 }
 
 export async function getRecentSecurityEvents(limit: number = 50) {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(MAX_SECURITY_EVENTS_PAGE, Math.max(1, Math.floor(limit)))
+    : 50;
   return await db
     .select()
     .from(securityEvents)
     .orderBy(desc(securityEvents.createdAt))
-    .limit(limit);
+    .limit(safeLimit);
 }
 
 // ============ Login Attempt Tracking ============
@@ -212,52 +216,50 @@ export async function logLoginAttempt(
 ): Promise<void> {
   await db.insert(loginAttempts).values({
     id: randomBytes(16).toString("hex"),
-    email,
-    ipAddress,
-    userAgent,
+    email: (boundedText(email.toLowerCase(), 200) || "unknown").slice(0, 200),
+    ipAddress: normalizeClientIp(ipAddress),
+    userAgent: normalizeUserAgent(userAgent),
     success,
     twoFactorRequired,
-    failureReason: failureReason || null,
+    failureReason: boundedText(failureReason, 100),
   });
 }
 
 export async function getRecentFailedLogins(
   email: string,
-  windowMs: number = 900000 // 15 minutes
+  windowMs: number = 900_000
 ): Promise<number> {
-  const since = new Date(Date.now() - windowMs);
-  
+  const safeWindow = Math.min(24 * 60 * 60 * 1000, Math.max(1_000, windowMs));
+  const since = new Date(Date.now() - safeWindow);
   const result = await db
     .select({ count: count() })
     .from(loginAttempts)
     .where(
       and(
-        eq(loginAttempts.email, email),
+        eq(loginAttempts.email, email.slice(0, 200).toLowerCase()),
         eq(loginAttempts.success, false),
         gt(loginAttempts.createdAt, since)
       )
     );
-  
   return result[0]?.count || 0;
 }
 
 export async function getFailedLoginsByIP(
   ipAddress: string,
-  windowMs: number = 3600000 // 1 hour
+  windowMs: number = 3_600_000
 ): Promise<number> {
-  const since = new Date(Date.now() - windowMs);
-  
+  const safeWindow = Math.min(24 * 60 * 60 * 1000, Math.max(1_000, windowMs));
+  const since = new Date(Date.now() - safeWindow);
   const result = await db
     .select({ count: count() })
     .from(loginAttempts)
     .where(
       and(
-        eq(loginAttempts.ipAddress, ipAddress),
+        eq(loginAttempts.ipAddress, normalizeClientIp(ipAddress)),
         eq(loginAttempts.success, false),
         gt(loginAttempts.createdAt, since)
       )
     );
-  
   return result[0]?.count || 0;
 }
 
@@ -267,33 +269,26 @@ export async function detectSuspiciousActivity(
   email: string,
   ipAddress: string,
   userAgent: string
-): Promise<{
-  suspicious: boolean;
-  reasons: string[];
-}> {
+): Promise<{ suspicious: boolean; reasons: string[] }> {
   const reasons: string[] = [];
-  
-  // Check for rapid failed login attempts
-  const failedAttempts = await getRecentFailedLogins(email, 900000); // 15 min
+  const [failedAttempts, ipFailedAttempts] = await Promise.all([
+    getRecentFailedLogins(email, 900_000),
+    getFailedLoginsByIP(ipAddress, 3_600_000),
+  ]);
+
   if (failedAttempts >= 3) {
     reasons.push(`Multiple failed login attempts (${failedAttempts} in last 15 minutes)`);
   }
-  
-  // Check for high volume of failed attempts from IP
-  const ipFailedAttempts = await getFailedLoginsByIP(ipAddress, 3600000); // 1 hour
   if (ipFailedAttempts >= 10) {
     reasons.push(`High volume of failed logins from IP (${ipFailedAttempts} in last hour)`);
   }
-  
-  // Check for unusual user agent (basic check)
-  if (userAgent.includes("bot") || userAgent.includes("crawler") || userAgent.includes("spider")) {
+
+  const lowerUserAgent = normalizeUserAgent(userAgent).toLowerCase();
+  if (lowerUserAgent.includes("bot") || lowerUserAgent.includes("crawler") || lowerUserAgent.includes("spider")) {
     reasons.push("Suspicious user agent detected (bot/crawler)");
   }
-  
-  return {
-    suspicious: reasons.length > 0,
-    reasons,
-  };
+
+  return { suspicious: reasons.length > 0, reasons };
 }
 
 // ============ Utility Functions ============
@@ -302,62 +297,35 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function parseUserAgent(userAgent: string): {
-  browser?: string;
-  os?: string;
-  device?: string;
-} {
+function parseUserAgent(userAgent: string): { browser?: string; os?: string; device?: string } {
   const info: { browser?: string; os?: string; device?: string } = {};
-  
-  // Simple parsing (in production, use a library like ua-parser-js)
+
   if (userAgent.includes("Chrome")) info.browser = "Chrome";
   else if (userAgent.includes("Firefox")) info.browser = "Firefox";
   else if (userAgent.includes("Safari")) info.browser = "Safari";
   else if (userAgent.includes("Edge")) info.browser = "Edge";
-  
+
   if (userAgent.includes("Windows")) info.os = "Windows";
   else if (userAgent.includes("Mac")) info.os = "macOS";
   else if (userAgent.includes("Linux")) info.os = "Linux";
   else if (userAgent.includes("Android")) info.os = "Android";
   else if (userAgent.includes("iOS") || userAgent.includes("iPhone")) info.os = "iOS";
-  
+
   if (userAgent.includes("Mobile")) info.device = "Mobile";
   else if (userAgent.includes("Tablet")) info.device = "Tablet";
   else info.device = "Desktop";
-  
+
   return info;
 }
 
 // ============ Password Security ============
 
-export function validatePasswordStrength(password: string): {
-  valid: boolean;
-  errors: string[];
-} {
+export function validatePasswordStrength(password: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
-  if (password.length < 12) {
-    errors.push("Password must be at least 12 characters long");
-  }
-  
-  if (!/[A-Z]/.test(password)) {
-    errors.push("Password must contain at least one uppercase letter");
-  }
-  
-  if (!/[a-z]/.test(password)) {
-    errors.push("Password must contain at least one lowercase letter");
-  }
-  
-  if (!/[0-9]/.test(password)) {
-    errors.push("Password must contain at least one number");
-  }
-  
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push("Password must contain at least one special character");
-  }
-  
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+  if (password.length < 12) errors.push("Password must be at least 12 characters long");
+  if (!/[A-Z]/.test(password)) errors.push("Password must contain at least one uppercase letter");
+  if (!/[a-z]/.test(password)) errors.push("Password must contain at least one lowercase letter");
+  if (!/[0-9]/.test(password)) errors.push("Password must contain at least one number");
+  if (!/[!@#$%^&*(),.?\":{}|<>]/.test(password)) errors.push("Password must contain at least one special character");
+  return { valid: errors.length === 0, errors };
 }

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { applyMemoryRateLimit, type MemoryRateEntry } from "../src/lib/rate-limit";
 import {
   clientIpFromHeaders,
@@ -46,4 +47,11 @@ test("memory rate-limit fallback remains bounded and enforces limits", () => {
   const reset = applyMemoryRateLimit(store, "api", "b", config, 2_500, 2);
   assert.equal(reset.allowed, true);
   assert.equal(reset.remaining, 1);
+});
+
+test("failed-login lockout increments from the database row rather than stale user state", () => {
+  const source = readFileSync("src/lib/auth.ts", "utf8");
+  assert.match(source, /failedLoginAttempts:\s*sql<number>`\$\{users\.failedLoginAttempts\} \+ 1`/);
+  assert.match(source, /\.returning\(\{\s*failedAttempts: users\.failedLoginAttempts,\s*lockedUntil: users\.lockedUntil,/s);
+  assert.doesNotMatch(source, /\(user\.failedLoginAttempts \|\| 0\) \+ 1/);
 });
