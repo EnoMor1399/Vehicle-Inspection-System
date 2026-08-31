@@ -7,9 +7,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "preflight": "tsx scripts/preflight-check.ts",
     "security:audit": "npm audit --audit-level=high",
-    "verify": "npm run typecheck && npm run lint && npm run build",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "db:upgrade": "node scripts/apply-enterprise-upgrade.mjs",
     "api-key:create": "tsx scripts/create-api-key.ts"
   },

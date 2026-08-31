@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./theme-system.css";
@@ -80,6 +81,7 @@ function buildThemeBootstrap(accountMode: ThemeMode | null) {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") || undefined;
   const settings = await getSettings();
   let shellUser: { role: string; name: string; allowedResources: string[] } | null = null;
   let accountTheme: ThemeMode | null = null;
@@ -102,12 +104,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href={settings.logoDataUrl || "/icons/icon-192.png"} />
         <meta name="theme-color" content={settings.themeColor} />
-        <style>{`:root { --brand-color: ${settings.themeColor}; --brand-accent: ${settings.accentColor}; }`}</style>
+        <style nonce={nonce}>{`:root { --brand-color: ${settings.themeColor}; --brand-accent: ${settings.accentColor}; }`}</style>
       </head>
       <body className="antialiased">
         <ErrorBoundary>

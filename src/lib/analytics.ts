@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { inspections, vehicles, transporters } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { calculateFleetReadiness } from "@/lib/metrics";
 
 export interface DashboardStats {
   totalVehicles: number;
@@ -8,6 +9,9 @@ export interface DashboardStats {
   activeVehicles: number;
   suspendedVehicles: number;
   failedVehicles: number;
+  readyVehicles: number;
+  eligibleVehicles: number;
+  fleetReadinessRate: number;
   totalInspections: number;
   monthlyInspections: number;
   todayInspections: number;
@@ -19,6 +23,7 @@ export interface DashboardStats {
   dueInspections: number;
   passRate: number;
   failRate: number;
+  /** Backward-compatible alias for fleetReadinessRate. */
   complianceRate: number;
 }
 
@@ -33,8 +38,10 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
     .select({
       total: sql<number>`count(*)::int`,
       active: sql<number>`count(*) filter (where ${vehicles.status} = 'active')::int`,
+      passed: sql<number>`count(*) filter (where ${vehicles.status} = 'passed')::int`,
       suspended: sql<number>`count(*) filter (where ${vehicles.status} = 'suspended')::int`,
       failed: sql<number>`count(*) filter (where ${vehicles.status} = 'failed')::int`,
+      decommissioned: sql<number>`count(*) filter (where ${vehicles.status} = 'decommissioned')::int`,
     })
     .from(vehicles);
 
@@ -78,9 +85,12 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
   const total = inspectionStats.total || 0;
   const passRate = total ? Math.round((inspectionStats.pass / total) * 100) : 0;
   const failRate = total ? Math.round((inspectionStats.fail / total) * 100) : 0;
-  const complianceRate = vehicleStats.total
-    ? Math.round(((vehicleStats.active + vehicleStats.total - vehicleStats.failed - vehicleStats.suspended) / vehicleStats.total) * 100)
-    : 0;
+  const readiness = calculateFleetReadiness({
+    total: vehicleStats.total,
+    active: vehicleStats.active,
+    passed: vehicleStats.passed,
+    decommissioned: vehicleStats.decommissioned,
+  });
 
   return {
     totalVehicles: vehicleStats.total,
@@ -88,6 +98,9 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
     activeVehicles: vehicleStats.active,
     suspendedVehicles: vehicleStats.suspended,
     failedVehicles: vehicleStats.failed,
+    readyVehicles: readiness.readyVehicles,
+    eligibleVehicles: readiness.eligibleVehicles,
+    fleetReadinessRate: readiness.fleetReadinessRate,
     totalInspections: total,
     monthlyInspections: inspectionStats.month,
     todayInspections: inspectionStats.today,
@@ -99,7 +112,7 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
     dueInspections: dueStats.count,
     passRate,
     failRate,
-    complianceRate: Math.min(100, complianceRate),
+    complianceRate: readiness.fleetReadinessRate,
   };
 }
 

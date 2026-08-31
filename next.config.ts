@@ -10,21 +10,6 @@ const configuredOrigins = (process.env.ALLOWED_ORIGINS || "localhost:3000")
     catch { return value; }
   });
 
-const csp = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'self'",
-  "form-action 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline'",
-  "connect-src 'self' https:",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-].join("; ");
-
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   ...(isProduction ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }] : []),
@@ -37,7 +22,6 @@ const securityHeaders = [
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
   { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
   { key: "Origin-Agent-Cluster", value: "?1" },
-  { key: "Content-Security-Policy", value: csp },
 ];
 
 const nextConfig: NextConfig = {

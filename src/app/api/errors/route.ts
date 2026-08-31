@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { securityEvents } from "@/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 import { validateWebhookDestination } from "@/lib/integration-security";
+import { sanitizeTelemetryUrl } from "@/lib/telemetry";
 
 const frontendErrorSchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -20,26 +21,35 @@ function clientIp(request: NextRequest) {
     || "unknown";
 }
 
+function jsonResponse(body: Record<string, unknown>, status: number, requestId: string) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "X-Request-ID": requestId, "Cache-Control": "no-store" },
+  });
+}
+
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get("x-request-id") || randomBytes(12).toString("hex");
   const contentLength = Number(request.headers.get("content-length") || 0);
   if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
-    return NextResponse.json({ success: false, error: "Payload too large" }, { status: 413 });
+    return jsonResponse({ success: false, error: "Payload too large" }, 413, requestId);
   }
 
   const ipAddress = clientIp(request);
   const limit = await rateLimit("error", `ip:${ipAddress}`);
   if (!limit.allowed) {
-    return NextResponse.json({ success: false, error: "Rate limit exceeded" }, { status: 429 });
+    return jsonResponse({ success: false, error: "Rate limit exceeded" }, 429, requestId);
   }
 
   try {
     const parsed = frontendErrorSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return NextResponse.json({ success: false, error: "Invalid error report" }, { status: 400 });
+      return jsonResponse({ success: false, error: "Invalid error report" }, 400, requestId);
     }
 
     const userAgent = (request.headers.get("user-agent") || "unknown").slice(0, 1000);
     const { message, stack, componentStack, timestamp, url } = parsed.data;
+    const safeUrl = sanitizeTelemetryUrl(url);
 
     await db.insert(securityEvents).values({
       id: randomBytes(16).toString("hex"),
@@ -48,7 +58,7 @@ export async function POST(request: NextRequest) {
       ipAddress,
       userAgent,
       description: message,
-      metadata: { stack, componentStack, timestamp, url },
+      metadata: { stack, componentStack, timestamp, url: safeUrl, requestId },
       createdAt: new Date(),
     });
 
@@ -60,7 +70,7 @@ export async function POST(request: NextRequest) {
           await fetch(destination.url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ source: "rsl-vims-frontend", level: "warning", message, stack, url, timestamp }),
+            body: JSON.stringify({ source: "rsl-vims-frontend", level: "warning", message, stack, url: safeUrl, timestamp, requestId }),
             signal: AbortSignal.timeout(5000),
           });
         } catch {
@@ -69,8 +79,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    return jsonResponse({ success: true, requestId }, 200, requestId);
   } catch {
-    return NextResponse.json({ success: false, error: "Failed to log error" }, { status: 500 });
+    return jsonResponse({ success: false, error: "Failed to log error", requestId }, 500, requestId);
   }
 }
