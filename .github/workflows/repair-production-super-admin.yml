@@ -3,9 +3,29 @@ name: Repair production Super Admin
 on:
   workflow_dispatch:
     inputs:
-      confirmation:
-        description: "Type REPAIR_ADMIN:morganenoch1@gmail.com"
+      mode:
+        description: "Preview the repair, or execute it after preview"
         required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - execute
+      super_admin_name:
+        description: "Super Administrator display name"
+        required: true
+        type: string
+      super_admin_email:
+        description: "Super Administrator email"
+        required: true
+        type: string
+      confirmation:
+        description: "Execute only: type REPAIR_ADMIN:<super_admin_email>"
+        required: false
+        type: string
+      security_acknowledgement:
+        description: "Execute only: type I_UNDERSTAND_THIS_RESETS_ADMIN_SECURITY_STATE"
+        required: false
         type: string
 
 permissions:
@@ -17,22 +37,66 @@ concurrency:
 
 jobs:
   repair:
+    name: Preview or execute Super Administrator repair
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     environment: production
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Require main ref
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Production administrator repair may run only from refs/heads/main."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - name: Repair and verify production Super Administrator
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Preview administrator repair
         run: node scripts/repair-production-super-admin.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPER_ADMIN_NAME: Enoch Morgan
-          SUPER_ADMIN_EMAIL: morganenoch1@gmail.com
-          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
+          SUPER_ADMIN_NAME: ${{ inputs.super_admin_name }}
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
+          REPAIR_MODE: preview
+
+      - name: Validate repair acknowledgements
+        if: ${{ inputs.mode == 'execute' }}
+        shell: bash
+        run: |
+          expected="REPAIR_ADMIN:${SUPER_ADMIN_EMAIL,,}"
+          if [[ "$REPAIR_CONFIRMATION" != "$expected" ]]; then
+            echo "Confirmation does not match the selected administrator email."
+            exit 1
+          fi
+          if [[ "$REPAIR_SECURITY_ACK" != "I_UNDERSTAND_THIS_RESETS_ADMIN_SECURITY_STATE" ]]; then
+            echo "Security-state acknowledgement does not match."
+            exit 1
+          fi
+        env:
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
           REPAIR_CONFIRMATION: ${{ inputs.confirmation }}
+          REPAIR_SECURITY_ACK: ${{ inputs.security_acknowledgement }}
+
+      - name: Repair and verify production Super Administrator
+        if: ${{ inputs.mode == 'execute' }}
+        run: node scripts/repair-production-super-admin.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPER_ADMIN_NAME: ${{ inputs.super_admin_name }}
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
+          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
+          REPAIR_MODE: execute
+          REPAIR_CONFIRMATION: ${{ inputs.confirmation }}
+          REPAIR_SECURITY_ACK: ${{ inputs.security_acknowledgement }}
           PASSWORD_BCRYPT_ROUNDS: "12"

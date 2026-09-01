@@ -3,9 +3,29 @@ name: Production account cutover
 on:
   workflow_dispatch:
     inputs:
-      confirmation:
-        description: "Type RESET_OPERATIONAL_DATA:morganenoch1@gmail.com"
+      mode:
+        description: "Preview the cutover, or execute it after preview"
         required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - execute
+      super_admin_name:
+        description: "Super Administrator display name"
+        required: true
+        type: string
+      super_admin_email:
+        description: "Super Administrator email"
+        required: true
+        type: string
+      confirmation:
+        description: "Execute only: type RESET_OPERATIONAL_DATA:<super_admin_email>"
+        required: false
+        type: string
+      destructive_acknowledgement:
+        description: "Execute only: type I_UNDERSTAND_THIS_DELETES_OPERATIONAL_DATA"
+        required: false
         type: string
 
 permissions:
@@ -17,26 +37,24 @@ concurrency:
 
 jobs:
   cutover:
-    name: Reset operational data and create Super Administrator
+    name: Preview or execute operational-data cutover
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     environment: production
     steps:
-      - name: Validate confirmation
+      - name: Require main ref
         shell: bash
         run: |
-          if [[ "$RESET_CONFIRMATION" != "RESET_OPERATIONAL_DATA:morganenoch1@gmail.com" ]]; then
-            echo "Confirmation does not match the required production cutover phrase."
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Production cutover may run only from refs/heads/main."
             exit 1
           fi
-        env:
-          RESET_CONFIRMATION: ${{ inputs.confirmation }}
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -44,12 +62,41 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run guarded production cutover
+      - name: Preview production cutover
         run: node scripts/reset-production-data.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPER_ADMIN_NAME: Enoch Morgan
-          SUPER_ADMIN_EMAIL: morganenoch1@gmail.com
-          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
+          SUPER_ADMIN_NAME: ${{ inputs.super_admin_name }}
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
+          CUTOVER_MODE: preview
+
+      - name: Validate destructive execution acknowledgements
+        if: ${{ inputs.mode == 'execute' }}
+        shell: bash
+        run: |
+          expected="RESET_OPERATIONAL_DATA:${SUPER_ADMIN_EMAIL,,}"
+          if [[ "$RESET_CONFIRMATION" != "$expected" ]]; then
+            echo "Confirmation does not match the selected administrator email."
+            exit 1
+          fi
+          if [[ "$RESET_DESTRUCTIVE_ACK" != "I_UNDERSTAND_THIS_DELETES_OPERATIONAL_DATA" ]]; then
+            echo "Destructive-action acknowledgement does not match."
+            exit 1
+          fi
+        env:
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
           RESET_CONFIRMATION: ${{ inputs.confirmation }}
+          RESET_DESTRUCTIVE_ACK: ${{ inputs.destructive_acknowledgement }}
+
+      - name: Execute guarded production cutover
+        if: ${{ inputs.mode == 'execute' }}
+        run: node scripts/reset-production-data.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPER_ADMIN_NAME: ${{ inputs.super_admin_name }}
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
+          SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
+          CUTOVER_MODE: execute
+          RESET_CONFIRMATION: ${{ inputs.confirmation }}
+          RESET_DESTRUCTIVE_ACK: ${{ inputs.destructive_acknowledgement }}
           PASSWORD_BCRYPT_ROUNDS: "12"

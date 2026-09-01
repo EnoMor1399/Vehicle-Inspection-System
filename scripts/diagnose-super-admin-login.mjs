@@ -2,13 +2,31 @@ import bcrypt from "bcryptjs";
 import pg from "pg";
 
 const { Client } = pg;
-const email = (process.env.SUPER_ADMIN_EMAIL || "morganenoch1@gmail.com").trim().toLowerCase();
+const DATABASE_URL = process.env.DATABASE_URL || "";
+const email = (process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
 const expectedPassword = process.env.SUPER_ADMIN_PASSWORD || "";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-if (!expectedPassword) throw new Error("SUPER_ADMIN_PASSWORD is required");
+function fail(message) {
+  throw new Error(`Administrator diagnosis aborted: ${message}`);
+}
 
-const client = new Client({ connectionString: process.env.DATABASE_URL });
+function normalizeDatabaseUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.searchParams.get("sslmode") === "require") {
+      url.searchParams.set("sslmode", "verify-full");
+    }
+    return url.toString();
+  } catch {
+    fail("DATABASE_URL is invalid");
+  }
+}
+
+if (!DATABASE_URL) fail("DATABASE_URL is required");
+if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("SUPER_ADMIN_EMAIL is invalid");
+if (!expectedPassword) fail("SUPER_ADMIN_PASSWORD is required");
+
+const client = new Client({ connectionString: normalizeDatabaseUrl(DATABASE_URL) });
 
 try {
   await client.connect();
@@ -31,6 +49,15 @@ try {
     [email]
   );
 
+  const { rows: sessionRows } = user
+    ? await client.query(
+        `SELECT count(*)::int AS total,
+                count(*) FILTER (WHERE is_active = true AND expires_at > now())::int AS active
+         FROM sessions WHERE user_id = $1`,
+        [user.id]
+      )
+    : { rows: [{ total: 0, active: 0 }] };
+
   console.log(JSON.stringify({
     accountExists: Boolean(user),
     email: user?.email || email,
@@ -40,6 +67,10 @@ try {
     passwordMatchesGitHubSecret: passwordMatchesSecret,
     failedLoginAttempts: user?.failed_login_attempts || 0,
     lockedUntil: user?.locked_until || null,
+    sessions: {
+      total: Number(sessionRows[0]?.total || 0),
+      active: Number(sessionRows[0]?.active || 0),
+    },
     recentLoginAttempts: attempts,
   }, null, 2));
 

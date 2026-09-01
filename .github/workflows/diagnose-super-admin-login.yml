@@ -2,9 +2,18 @@ name: Diagnose production Super Admin login
 
 on:
   workflow_dispatch:
+    inputs:
+      super_admin_email:
+        description: "Super Administrator email to diagnose"
+        required: true
+        type: string
 
 permissions:
   contents: read
+
+concurrency:
+  group: diagnose-production-super-admin
+  cancel-in-progress: true
 
 jobs:
   diagnose:
@@ -12,15 +21,29 @@ jobs:
     timeout-minutes: 10
     environment: production
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Require main ref
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Production administrator diagnosis may run only from refs/heads/main."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+
+      - name: Install locked dependencies
+        run: npm ci
+
       - name: Verify administrator and recent login results
         run: node scripts/diagnose-super-admin-login.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPER_ADMIN_EMAIL: morganenoch1@gmail.com
+          SUPER_ADMIN_EMAIL: ${{ inputs.super_admin_email }}
           SUPER_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_SUPER_ADMIN_PASSWORD }}
