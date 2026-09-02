@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const vehicleStatus = z.enum(["active", "under_inspection", "failed", "passed", "suspended", "decommissioned"]);
+const vehicleCreateStatus = z.enum(["active", "suspended"]);
 const fuelType = z.enum(["petrol", "diesel", "electric", "hybrid", "cng", "lpg"]);
 const transmission = z.enum(["manual", "automatic", "cvt", "semi-automatic"]);
 const inspectionResult = z.enum(["pass", "conditional_pass", "reinspection_required", "fail"]);
@@ -30,7 +31,7 @@ export const vehicleCreateSchema = z.object({
   engine_number: optionalText(100),
   fuel_type: fuelType.optional().nullable(),
   transmission: transmission.optional().nullable(),
-  status: vehicleStatus.optional().default("active"),
+  status: vehicleCreateStatus.optional().default("active"),
 }).strict();
 
 export const vehiclePatchSchema = vehicleCreateSchema
@@ -39,6 +40,7 @@ export const vehiclePatchSchema = vehicleCreateSchema
     registration_number: z.string().trim().min(2).max(50).optional(),
     make: z.string().trim().min(1).max(100).optional(),
     odometer_reading: z.coerce.number().int().min(0).max(20_000_000).optional().nullable(),
+    status: vehicleStatus.optional(),
   })
   .partial()
   .strict();
