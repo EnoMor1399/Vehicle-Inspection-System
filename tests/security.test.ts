@@ -30,6 +30,9 @@ test("telemetry URLs drop query parameters and fragments", () => {
 test("password and email security validators retain expected behavior", () => {
   assert.equal(validatePasswordStrength("Password123!").valid, false);
   assert.equal(validatePasswordStrength("Strong-Unique-Password-2026!").valid, true);
+  assert.equal(validatePasswordStrength("Strong Password 2026!").valid, false);
+  assert.equal(validatePasswordStrength(`A1!${"x".repeat(126)}`).valid, false);
+  assert.equal(validatePasswordStrength("password123!").valid, false);
   assert.equal(validateEmail("user@example.com"), true);
   assert.equal(validateEmail("invalid-address"), false);
 });

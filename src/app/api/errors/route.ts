@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { z } from "zod";
 import { db } from "@/db";
 import { securityEvents } from "@/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
-import { validateWebhookDestination } from "@/lib/integration-security";
+import { validateResolvedWebhookDestination, validateWebhookDestination } from "@/lib/integration-security";
 import { sanitizeTelemetryUrl } from "@/lib/telemetry";
+import { clientIpFromHeaders, normalizeRequestId, normalizeUserAgent } from "@/lib/request-context";
+import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 
 const frontendErrorSchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -15,12 +17,6 @@ const frontendErrorSchema = z.object({
   url: z.string().max(2000).optional(),
 }).strict();
 
-function clientIp(request: NextRequest) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "unknown";
-}
-
 function jsonResponse(body: Record<string, unknown>, status: number, requestId: string) {
   return NextResponse.json(body, {
     status,
@@ -29,25 +25,25 @@ function jsonResponse(body: Record<string, unknown>, status: number, requestId: 
 }
 
 export async function POST(request: NextRequest) {
-  const requestId = request.headers.get("x-request-id") || randomBytes(12).toString("hex");
-  const contentLength = Number(request.headers.get("content-length") || 0);
-  if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
-    return jsonResponse({ success: false, error: "Payload too large" }, 413, requestId);
-  }
-
-  const ipAddress = clientIp(request);
+  const requestId = normalizeRequestId(request.headers.get("x-request-id"), randomUUID());
+  const ipAddress = clientIpFromHeaders(request.headers);
   const limit = await rateLimit("error", `ip:${ipAddress}`);
   if (!limit.allowed) {
     return jsonResponse({ success: false, error: "Rate limit exceeded" }, 429, requestId);
   }
 
+  const body = await readJsonBody(request, API_SMALL_JSON_BODY_LIMIT);
+  if (!body.ok) {
+    return jsonResponse({ success: false, error: body.message }, body.status, requestId);
+  }
+
   try {
-    const parsed = frontendErrorSchema.safeParse(await request.json());
+    const parsed = frontendErrorSchema.safeParse(body.value);
     if (!parsed.success) {
       return jsonResponse({ success: false, error: "Invalid error report" }, 400, requestId);
     }
 
-    const userAgent = (request.headers.get("user-agent") || "unknown").slice(0, 1000);
+    const userAgent = normalizeUserAgent(request.headers.get("user-agent"));
     const { message, stack, componentStack, timestamp, url } = parsed.data;
     const safeUrl = sanitizeTelemetryUrl(url);
 
@@ -66,15 +62,18 @@ export async function POST(request: NextRequest) {
     if (webhook) {
       const destination = validateWebhookDestination(webhook);
       if (destination.ok) {
-        try {
-          await fetch(destination.url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ source: "rsl-vims-frontend", level: "warning", message, stack, url: safeUrl, timestamp, requestId }),
-            signal: AbortSignal.timeout(5000),
-          });
-        } catch {
-          // Error reporting must never break the user-facing request.
+        const resolved = await validateResolvedWebhookDestination(destination.url);
+        if (resolved.ok) {
+          try {
+            await fetch(destination.url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ source: "rsl-vims-frontend", level: "warning", message, stack, url: safeUrl, timestamp, requestId }),
+              signal: AbortSignal.timeout(5000),
+            });
+          } catch {
+            // Error reporting must never break the user-facing request.
+          }
         }
       }
     }

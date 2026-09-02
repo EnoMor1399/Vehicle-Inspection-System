@@ -33,14 +33,14 @@ API endpoints are rate-limited per API credential (or per IP when no credential 
 
 Rate limit headers are included in responses:
 - `X-RateLimit-Limit`: Maximum requests per window
-- `X-RateLimit-Remaining`: Remaining requests in current window
+- `X-RateLimit-Remaining`: Requests remaining in the current window
 - `X-RateLimit-Reset`: Unix timestamp when the window resets
 
 API keys are generated as one-time secrets and only a salted/HMAC hash is stored. Use `npm run api-key:create -- <user-email> <scopes> "<name>"` to issue a new integration credential.
 
 ## Response Format
 
-All API responses follow a consistent format:
+All API responses follow a consistent format.
 
 ### Success Response
 
@@ -128,120 +128,24 @@ Retrieve a list of vehicles.
 **Query Parameters**:
 - `page` (integer, default: 1): Page number
 - `limit` (integer, default: 50, max: 100): Items per page
-- `status` (string, optional): Filter by status (active, inactive, suspended)
-- `search` (string, optional): Search by registration number, make, or model
-- `transporterId` (string, optional): Filter by transporter ID
-
-**Response**:
-```json
-{
-  "data": [
-    {
-      "id": "veh_abc123",
-      "registrationNumber": "GT-1234-22",
-      "make": "Toyota",
-      "model": "Hiace",
-      "year": 2022,
-      "status": "active",
-      "transporter": {
-        "id": "trp_xyz789",
-        "name": "Metro Mass Transit"
-      },
-      "lastInspection": {
-        "id": "ins_def456",
-        "date": "2026-01-15",
-        "result": "pass"
-      },
-      "createdAt": "2026-01-01T00:00:00Z",
-      "updatedAt": "2026-01-15T10:30:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 500,
-    "totalPages": 10
-  }
-}
-```
+- `status` (string, optional): Filter by vehicle status
+- `transporter_id` (string, optional): Filter by transporter ID
 
 #### GET /vehicles/:id
 
 Retrieve a specific vehicle by ID.
 
-**Response**:
-```json
-{
-  "data": {
-    "id": "veh_abc123",
-    "registrationNumber": "GT-1234-22",
-    "make": "Toyota",
-    "model": "Hiace",
-    "year": 2022,
-    "vin": "1HGCM82633A123456",
-    "chassisNumber": "CH123456",
-    "engineNumber": "ENG789012",
-    "status": "active",
-    "transporter": {
-      "id": "trp_xyz789",
-      "name": "Metro Mass Transit"
-    },
-    "inspections": [
-      {
-        "id": "ins_def456",
-        "date": "2026-01-15",
-        "result": "pass",
-        "inspector": "John Mensah"
-      }
-    ],
-    "createdAt": "2026-01-01T00:00:00Z",
-    "updatedAt": "2026-01-15T10:30:00Z"
-  }
-}
-```
-
 #### POST /vehicles
 
-Create a new vehicle.
+Create a new vehicle. The request is validated against the bounded vehicle creation schema. Successful creation emits the `vehicle.created` webhook event.
 
-**Request Body**:
-```json
-{
-  "registrationNumber": "GT-1234-22",
-  "make": "Toyota",
-  "model": "Hiace",
-  "year": 2022,
-  "vin": "1HGCM82633A123456",
-  "chassisNumber": "CH123456",
-  "engineNumber": "ENG789012",
-  "transporterId": "trp_xyz789"
-}
-```
+#### PATCH /vehicles/:id
 
-**Response**: `201 Created`
-```json
-{
-  "data": {
-    "id": "veh_abc123",
-    "registrationNumber": "GT-1234-22",
-    ...
-  }
-}
-```
-
-#### PUT /vehicles/:id
-
-Update an existing vehicle.
-
-**Request Body**: Same as POST (partial updates supported)
-
-**Response**: `200 OK`
+Partially update an existing vehicle. Vehicle lifecycle transitions are validated and successful changes emit `vehicle.updated`.
 
 #### DELETE /vehicles/:id
 
-Delete a vehicle (soft delete).
-
-**Response**: `204 No Content`
+Decommission a vehicle while preserving referential and audit history. This operation emits `vehicle.updated` with status `decommissioned`.
 
 ---
 
@@ -249,56 +153,7 @@ Delete a vehicle (soft delete).
 
 #### GET /transporters
 
-Retrieve a list of transporters.
-
-**Query Parameters**:
-- `page` (integer, default: 1): Page number
-- `limit` (integer, default: 50, max: 100): Items per page
-- `search` (string, optional): Search by name or registration number
-- `region` (string, optional): Filter by region
-
-**Response**:
-```json
-{
-  "data": [
-    {
-      "id": "trp_xyz789",
-      "name": "Metro Mass Transit",
-      "registrationNumber": "MMT-001",
-      "region": "Greater Accra",
-      "contactPerson": "Kwame Asante",
-      "phone": "+233 20 123 4567",
-      "email": "info@metromass.com",
-      "vehicleCount": 50,
-      "complianceRate": 95.5,
-      "createdAt": "2026-01-01T00:00:00Z",
-      "updatedAt": "2026-01-15T10:30:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 25,
-    "totalPages": 1
-  }
-}
-```
-
-#### GET /transporters/:id
-
-Retrieve a specific transporter by ID.
-
-#### POST /transporters
-
-Create a new transporter.
-
-#### PUT /transporters/:id
-
-Update an existing transporter.
-
-#### DELETE /transporters/:id
-
-Delete a transporter (soft delete).
+Retrieve a paginated list of active transporters. Optional `region` filtering is supported.
 
 ---
 
@@ -306,157 +161,17 @@ Delete a transporter (soft delete).
 
 #### GET /inspections
 
-Retrieve a list of inspections.
-
-**Query Parameters**:
-- `page` (integer, default: 1): Page number
-- `limit` (integer, default: 50, max: 100): Items per page
-- `result` (string, optional): Filter by result (pass, fail, conditional_pass)
-- `vehicleId` (string, optional): Filter by vehicle ID
-- `inspectorId` (string, optional): Filter by inspector ID
-- `fromDate` (string, optional): Filter inspections from date (YYYY-MM-DD)
-- `toDate` (string, optional): Filter inspections to date (YYYY-MM-DD)
-
-**Response**:
-```json
-{
-  "data": [
-    {
-      "id": "ins_def456",
-      "inspectionNumber": "RSL-INS-2026-0001",
-      "vehicle": {
-        "id": "veh_abc123",
-        "registrationNumber": "GT-1234-22"
-      },
-      "inspector": {
-        "id": "usr_ins789",
-        "name": "John Mensah"
-      },
-      "date": "2026-01-15T10:30:00Z",
-      "result": "pass",
-      "passRate": 98.5,
-      "criticalDefects": 0,
-      "majorDefects": 0,
-      "minorDefects": 2,
-      "createdAt": "2026-01-15T10:30:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 1200,
-    "totalPages": 24
-  }
-}
-```
+Retrieve a paginated list of comprehensive inspections. Supported filters include `result` and `vehicle_id`.
 
 #### GET /inspections/:id
 
-Retrieve a specific inspection with full details.
-
-**Response**:
-```json
-{
-  "data": {
-    "id": "ins_def456",
-    "inspectionNumber": "RSL-INS-2026-0001",
-    "vehicle": { ... },
-    "inspector": { ... },
-    "date": "2026-01-15T10:30:00Z",
-    "result": "pass",
-    "sections": [
-      {
-        "name": "Brakes",
-        "items": [
-          {
-            "name": "Brake Pads",
-            "status": "pass",
-            "notes": ""
-          }
-        ]
-      }
-    ],
-    "summary": {
-      "totalItems": 150,
-      "passed": 148,
-      "failed": 0,
-      "na": 2,
-      "passRate": 98.5
-    },
-    "certificate": {
-      "id": "cert_ghi012",
-      "issuedAt": "2026-01-15T11:00:00Z",
-      "validUntil": "2026-07-15T11:00:00Z",
-      "qrCode": "https://your-domain.com/verify/cert_ghi012"
-    }
-  }
-}
-```
+Retrieve a specific inspection subject to API authentication and inspection permissions.
 
 #### POST /inspections
 
-Create a new inspection.
+Create a comprehensive inspection. Checklist outcome consistency, evidence limits, permissions and vehicle lifecycle rules are validated before persistence.
 
-**Request Body**:
-```json
-{
-  "vehicleId": "veh_abc123",
-  "inspectorId": "usr_ins789",
-  "sections": [
-    {
-      "name": "Brakes",
-      "items": [
-        {
-          "name": "Brake Pads",
-          "status": "pass",
-          "notes": ""
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Response**: `201 Created`
-
----
-
-### Daily Inspections
-
-#### GET /daily-inspections
-
-Retrieve a list of daily pre-trip inspections.
-
-**Query Parameters**:
-- `page`, `limit`, `vehicleId`, `driverId`, `date`, `status`
-
-#### POST /daily-inspections
-
-Create a new daily inspection.
-
----
-
-### Users
-
-#### GET /users
-
-Retrieve a list of users (admin only).
-
-#### GET /users/:id
-
-Retrieve a specific user.
-
-#### POST /users
-
-Create a new user (admin only).
-
-#### PUT /users/:id
-
-Update a user.
-
-#### DELETE /users/:id
-
-Deactivate a user.
+A successful non-failing inspection emits `inspection.completed`. An inspection with overall result `fail` emits `inspection.failed`.
 
 ---
 
@@ -464,11 +179,7 @@ Deactivate a user.
 
 #### GET /locations
 
-Retrieve a list of inspection stations.
-
-#### GET /locations/:id
-
-Retrieve a specific location.
+Retrieve inspection stations. Requires the `read` API scope and location permission.
 
 ---
 
@@ -476,23 +187,19 @@ Retrieve a specific location.
 
 #### GET /powerbi
 
-OData v4 compliant endpoint for Power BI DirectQuery.
+OData-style reporting endpoint for Power BI. Reporting fields are explicitly allow-listed and query parameters are bounded.
 
-**Query Parameters**:
-- `$filter`: OData filter expression
-- `$select`: Fields to select
-- `$orderby`: Sort order
-- `$top`: Limit results
-- `$skip`: Skip results
-
-**Example**:
-```
-GET /api/v1/powerbi?$filter=OverallResult eq 'pass'&$top=100
-```
+Supported query parameters include:
+- `$filter`
+- `$select`
+- `$orderby`
+- `$top`
+- `$skip`
+- `$count`
 
 #### GET /powerbi/$metadata
 
-Retrieve OData metadata schema.
+Retrieve metadata matching the allow-listed Power BI reporting contract.
 
 ---
 
@@ -500,31 +207,23 @@ Retrieve OData metadata schema.
 
 #### GET /stats
 
-Retrieve system statistics.
+Retrieve system statistics. Requires the `read` API scope and reports permission.
 
-**Response**:
-```json
-{
-  "data": {
-    "totalVehicles": 500,
-    "activeVehicles": 450,
-    "totalInspections": 1200,
-    "passRate": 92.5,
-    "topDefects": [
-      {
-        "name": "Worn Brake Pads",
-        "count": 45
-      }
-    ],
-    "inspectionsByMonth": [
-      {
-        "month": "2026-01",
-        "count": 150
-      }
-    ]
-  }
-}
-```
+---
+
+### Predictive Maintenance
+
+#### GET /predictive-maintenance
+
+Retrieve predictive-maintenance analysis using bounded batched inspection history queries.
+
+---
+
+### AI Defect Detection
+
+#### POST /ai/detect-defects
+
+Submit supported inspection evidence for defect analysis. AI request bodies and evidence are bounded by the API safety policy.
 
 ---
 
@@ -564,73 +263,95 @@ A tag that is actively assigned to another vehicle returns HTTP `409` rather tha
 
 ## Webhooks
 
-### Configuring Webhooks
+### Registration
 
-Webhooks can be configured to receive real-time notifications for events:
+`POST /webhooks` requires the `admin` API scope and user-management permission. Each API user can register at most 20 webhook destinations. A destination is validated as a public network target before persistence; production destinations must use HTTPS. Embedded credentials, local/internal names and private/reserved IP ranges are rejected.
+
+The accepted event names are:
 
 - `vehicle.created`
 - `vehicle.updated`
 - `inspection.completed`
 - `inspection.failed`
-- `user.created`
+
+If no signing secret is supplied, VIMS generates a strong secret and returns it once in the registration response. At rest the secret is encrypted using the configured field-encryption key.
+
+### Delivery Coverage
+
+The four events above are emitted from both the REST mutation routes and the corresponding web-administration Server Actions, so webhook behavior does not depend on which supported interface performed the operation.
+
+Webhook failures are best-effort integration failures and do not roll back an already committed operational vehicle or inspection transaction. Delivery attempts update `lastTriggeredAt`; successful delivery resets `failureCount` and failed delivery increments it.
 
 ### Webhook Payload
 
 ```json
 {
+  "id": "delivery-uuid",
   "event": "inspection.completed",
-  "timestamp": "2026-01-XXT12:00:00Z",
+  "timestamp": "2026-09-02T12:00:00.000Z",
   "data": {
-    "id": "ins_def456",
-    "vehicleId": "veh_abc123",
-    "result": "pass"
+    "id": "inspection-uuid",
+    "inspectionNumber": "RSL-INS-20260902-ABC12345",
+    "vehicleId": "vehicle-uuid",
+    "vehicleRegistration": "GT-1234-22",
+    "overallResult": "pass",
+    "workflowStatus": "completed",
+    "failedItemCount": 0,
+    "criticalFailedItemCount": 0
   }
 }
 ```
 
-### Webhook Security
+Event payloads intentionally contain only integration-relevant identifiers, status and outcome information; inspection evidence, signatures, identity secrets and full vehicle records are not included.
 
-Webhooks are signed with HMAC-SHA256. Verify the signature using the `X-Webhook-Signature` header.
+### Delivery Security
 
-## SDKs and Libraries
+Before **every** delivery VIMS validates the stored URL again, resolves the destination hostname, rejects any non-public result, and opens the outbound connection to the already validated public IP while preserving the original hostname for the HTTP `Host` header and TLS SNI/certificate verification. This prevents ordinary DNS-rebinding between validation and connection. HTTP redirects are not followed automatically. Delivery has a five-second network timeout.
 
-### JavaScript/TypeScript
+Each request includes:
+
+- `X-Webhook-ID`: unique delivery-envelope identifier
+- `X-Webhook-Event`: event name
+- `X-Webhook-Timestamp`: ISO-8601 timestamp used in the signature
+- `X-Webhook-Signature`: `sha256=<hex HMAC>`
+- `Content-Type: application/json`
+
+The HMAC-SHA256 input is the exact UTF-8 string:
+
+```text
+<X-Webhook-Timestamp>.<raw request body>
+```
+
+Verification example in Node.js:
 
 ```javascript
-const client = new RSLVIMSClient({
-  apiKey: 'your-api-key',
-  baseUrl: 'https://your-domain.com/api/v1'
-});
+import { createHmac, timingSafeEqual } from "node:crypto";
 
-const vehicles = await client.vehicles.list({ page: 1, limit: 50 });
+function verifyWebhook({ rawBody, timestamp, signature, secret }) {
+  const expected = `sha256=${createHmac("sha256", secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest("hex")}`;
+
+  const receivedBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  return receivedBytes.length === expectedBytes.length
+    && timingSafeEqual(receivedBytes, expectedBytes);
+}
 ```
 
-### Python
-
-```python
-from rsl_vims import Client
-
-client = Client(api_key='your-api-key', base_url='https://your-domain.com/api/v1')
-vehicles = client.vehicles.list(page=1, limit=50)
-```
-
-## Support
-
-For API support, contact:
-- Email: api-support@rsl.gh
-- Documentation: https://docs.rsl.gh/api
-- Status Page: https://status.rsl.gh
-
-## Changelog
-
-### v1.0.0 (2026-01-XX)
-- Initial API release
-- Vehicle, Transporter, Inspection endpoints
-- Power BI integration
-- RFID support
-- Webhook support
-
+Consumers should also reject timestamps outside their accepted replay window and deduplicate on `X-Webhook-ID` or the envelope `id`.
 
 ## Cryptographically Signed Certificate Verification
 
 Version 2 certificates contain a QR code pointing to `/verify/<inspection-id>?sig=<signature>`. The signature is an HMAC over immutable certificate identity/result fields. If certificate data is altered after issuance, the old signed link will fail verification. Unsigned legacy links remain viewable but are explicitly marked as legacy/unsigned.
+
+## Release Notes
+
+### Enterprise V2.4 source-hardening candidate (2026-09-02)
+- Hardened authentication, sessions, RBAC and transporter boundaries.
+- Added bounded request/evidence/import handling and export formula neutralization.
+- Added least-privilege Power BI reporting contracts and signed public certificate verification.
+- Added production-quality Docker/liveness acceptance gates.
+- Implemented signed, delivery-time SSRF-protected webhook dispatch for the documented vehicle and inspection events.
+
+Production promotion remains a separate intentional operation; this source-only branch does not deploy or migrate production automatically.

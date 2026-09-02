@@ -3,11 +3,15 @@ import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { inspections, vehicles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { API_AI_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 
 const requestSchema = z.object({
-  vehicle_id: z.string().min(1).max(36),
+  vehicle_id: z.string().uuid(),
   section: z.string().max(20).optional().default(""),
-  image_data: z.string().max(8_000_000).optional(),
+  // Image data is accepted only for compatibility signaling. VIMS does not
+  // currently run computer vision, so keep this bounded to avoid receiving
+  // large evidence blobs that the endpoint cannot analyze.
+  image_data: z.string().max(750_000).optional(),
 }).strict();
 
 // Compatibility endpoint: provides historical defect-risk signals only.
@@ -18,7 +22,10 @@ export async function POST(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   try {
-    const parsed = requestSchema.safeParse(await request.json());
+    const bodyResult = await readJsonBody(request, API_AI_JSON_BODY_LIMIT);
+    if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+    const parsed = requestSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid risk-analysis request");
     const analysis = await analyzeHistoricalDefectRisk(parsed.data.vehicle_id, parsed.data.section);
     return json({
@@ -32,7 +39,8 @@ export async function POST(request: Request) {
       processed_at: new Date().toISOString(),
     });
   } catch (error) {
-    return apiError(500, error instanceof Error ? error.message : "Risk analysis failed");
+    console.error("Historical defect-risk analysis failed:", error instanceof Error ? error.message : "unknown error");
+    return apiError(500, "Risk analysis failed");
   }
 }
 
@@ -43,15 +51,21 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const vehicleId = url.searchParams.get("vehicle_id") || "";
   const section = url.searchParams.get("section") || "";
-  if (!vehicleId || vehicleId.length > 36) return apiError(400, "vehicle_id is required");
+  const parsedVehicleId = z.string().uuid().safeParse(vehicleId);
+  if (!parsedVehicleId.success) return apiError(400, "vehicle_id must be a valid UUID");
   if (section.length > 20) return apiError(400, "section is invalid");
 
-  const analysis = await analyzeHistoricalDefectRisk(vehicleId, section);
-  return json({
-    data: { ...analysis, image_analysis: null, image_analysis_status: "not_requested" },
-    model: "historical-defect-risk-v2",
-    methodology: "deterministic_historical_heuristic",
-  });
+  try {
+    const analysis = await analyzeHistoricalDefectRisk(parsedVehicleId.data, section);
+    return json({
+      data: { ...analysis, image_analysis: null, image_analysis_status: "not_requested" },
+      model: "historical-defect-risk-v2",
+      methodology: "deterministic_historical_heuristic",
+    });
+  } catch (error) {
+    console.error("Historical defect-risk lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return apiError(500, "Risk analysis failed");
+  }
 }
 
 async function analyzeHistoricalDefectRisk(vehicleId: string, section: string) {

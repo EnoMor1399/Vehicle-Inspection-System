@@ -5,7 +5,8 @@ import { webhooks } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { webhookCreateSchema, zodDetails } from "@/lib/api-schemas";
-import { validateWebhookDestination } from "@/lib/integration-security";
+import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
+import { validateResolvedWebhookDestination, validateWebhookDestination } from "@/lib/integration-security";
 import { encryptField } from "@/lib/field-encryption";
 
 const MAX_WEBHOOKS_PER_USER = 20;
@@ -32,11 +33,17 @@ export async function POST(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   try {
-    const parsed = webhookCreateSchema.safeParse(await request.json());
+    const bodyResult = await readJsonBody(request, API_SMALL_JSON_BODY_LIMIT);
+    if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+    const parsed = webhookCreateSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid webhook payload", zodDetails(parsed.error));
     const body = parsed.data;
     const destination = validateWebhookDestination(body.url);
     if (!destination.ok) return apiError(400, destination.reason);
+
+    const resolvedDestination = await validateResolvedWebhookDestination(destination.url);
+    if (!resolvedDestination.ok) return apiError(400, resolvedDestination.reason);
 
     const id = newId();
     const events = [...new Set(body.events)];

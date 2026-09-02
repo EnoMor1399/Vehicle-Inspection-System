@@ -7,16 +7,17 @@ import { revokeSession, revokeAllOtherUserSessions, validateSession, logSecurity
 
 export async function revokeSessionAction(formData: FormData) {
   const user = await getCurrentUser();
-  const sessionId = String(formData.get("sessionId") || "");
-  if (!sessionId) throw new Error("Session ID required");
+  const sessionId = String(formData.get("sessionId") || "").trim();
+  if (!sessionId || sessionId.length > 128) throw new Error("Session ID is invalid");
 
-  // A user may revoke only sessions that are shown from their own security page.
-  // The ownership check is performed by the page query; the helper below keeps
-  // the mutation bounded to the authenticated user's session set.
   const { db } = await import("@/db");
   const { sessions } = await import("@/db/schema");
   const { and, eq } = await import("drizzle-orm");
-  const [owned] = await db.select({ id: sessions.id }).from(sessions).where(and(eq(sessions.id, sessionId), eq(sessions.userId, user.id)));
+  const [owned] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, user.id)))
+    .limit(1);
   if (!owned) throw new Error("Session not found");
 
   await revokeSession(sessionId);

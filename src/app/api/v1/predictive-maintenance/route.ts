@@ -1,7 +1,13 @@
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, lte, sql, and } from "drizzle-orm";
+
+type VehicleRecord = typeof vehicles.$inferSelect;
+type HistoryRecord = Pick<
+  typeof inspections.$inferSelect,
+  "inspectionDate" | "overallResult" | "sectionData"
+>;
 
 // Historical maintenance-risk endpoint.
 // This endpoint intentionally reports evidence-based risk indicators rather than
@@ -11,15 +17,65 @@ export async function GET(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   const url = new URL(request.url);
-  const vehicleId = url.searchParams.get("vehicle_id");
+  const vehicleId = url.searchParams.get("vehicle_id")?.trim() || null;
+  if (vehicleId && vehicleId.length > 64) return apiError(400, "vehicle_id is invalid");
 
   if (!vehicleId) {
-    const allVehicles = await db.select().from(vehicles).limit(100);
-    const assessments = [];
-    for (const vehicle of allVehicles) {
-      const assessment = await assessVehicleRisk(vehicle.id);
-      if (assessment) assessments.push({ vehicle, assessment });
+    const selectedVehicles = await db
+      .select()
+      .from(vehicles)
+      .orderBy(desc(vehicles.createdAt))
+      .limit(100);
+
+    if (selectedVehicles.length === 0) {
+      return json({
+        methodology: "deterministic_historical_heuristic_v2",
+        disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
+        data: [],
+      });
     }
+
+    const vehicleIds = selectedVehicles.map((vehicle) => vehicle.id);
+    const rankedHistory = db
+      .select({
+        vehicleId: inspections.vehicleId,
+        inspectionDate: inspections.inspectionDate,
+        overallResult: inspections.overallResult,
+        sectionData: inspections.sectionData,
+        rank: sql<number>`row_number() over (partition by ${inspections.vehicleId} order by ${inspections.inspectionDate} desc)`.as("inspection_rank"),
+      })
+      .from(inspections)
+      .as("ranked_history");
+
+    const historyRows = await db
+      .select({
+        vehicleId: rankedHistory.vehicleId,
+        inspectionDate: rankedHistory.inspectionDate,
+        overallResult: rankedHistory.overallResult,
+        sectionData: rankedHistory.sectionData,
+      })
+      .from(rankedHistory)
+      .where(and(
+        inArray(rankedHistory.vehicleId, vehicleIds),
+        lte(rankedHistory.rank, 12)
+      ));
+
+    const historyByVehicle = new Map<string, HistoryRecord[]>();
+    for (const row of historyRows) {
+      const history = historyByVehicle.get(row.vehicleId) || [];
+      history.push({
+        inspectionDate: row.inspectionDate,
+        overallResult: row.overallResult,
+        sectionData: row.sectionData,
+      });
+      historyByVehicle.set(row.vehicleId, history);
+    }
+
+    const assessments = selectedVehicles.map((vehicle) => ({
+      vehicle,
+      assessment: assessVehicleRiskFromHistory(vehicle, historyByVehicle.get(vehicle.id) || []),
+    }));
+
     assessments.sort((a, b) => b.assessment.risk_score - a.assessment.risk_score);
     return json({
       methodology: "deterministic_historical_heuristic_v2",
@@ -28,18 +84,8 @@ export async function GET(request: Request) {
     });
   }
 
-  const assessment = await assessVehicleRisk(vehicleId);
-  if (!assessment) return apiError(404, "Vehicle not found");
-  return json({
-    methodology: "deterministic_historical_heuristic_v2",
-    disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
-    data: assessment,
-  });
-}
-
-async function assessVehicleRisk(vehicleId: string) {
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId));
-  if (!vehicle) return null;
+  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
+  if (!vehicle) return apiError(404, "Vehicle not found");
 
   const history = await db
     .select({
@@ -52,9 +98,17 @@ async function assessVehicleRisk(vehicleId: string) {
     .orderBy(desc(inspections.inspectionDate))
     .limit(12);
 
+  return json({
+    methodology: "deterministic_historical_heuristic_v2",
+    disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
+    data: assessVehicleRiskFromHistory(vehicle, history),
+  });
+}
+
+export function assessVehicleRiskFromHistory(vehicle: VehicleRecord, history: HistoryRecord[]) {
   if (history.length === 0) {
     return {
-      vehicle_id: vehicleId,
+      vehicle_id: vehicle.id,
       registration: vehicle.registrationNumber,
       status: "insufficient_data",
       risk_score: 0,
@@ -107,7 +161,7 @@ async function assessVehicleRisk(vehicleId: string) {
   }
 
   return {
-    vehicle_id: vehicleId,
+    vehicle_id: vehicle.id,
     registration: vehicle.registrationNumber,
     status,
     risk_score: Math.round(riskScore * 100) / 100,

@@ -1,0 +1,50 @@
+name: Post-deployment verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "HTTPS base URL of the deployed VIMS environment"
+        required: true
+        type: string
+      expected_version:
+        description: "Expected VIMS release version"
+        required: true
+        default: "2.4.0"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-post-deploy-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify VIMS liveness and readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: production
+    steps:
+      - name: Require main ref
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Production verification may run only from refs/heads/main."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Verify deployed release without changing it
+        run: node scripts/post-deploy-smoke.mjs
+        env:
+          VIMS_BASE_URL: ${{ inputs.base_url }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}

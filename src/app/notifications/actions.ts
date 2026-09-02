@@ -9,7 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 export async function markRead(formData: FormData) {
   const user = await getCurrentUser();
   const id = String(formData.get("id") || "").trim();
-  if (!id) return;
+  if (!id || id.length > 64) return;
 
   await db
     .update(notifications)

@@ -1,8 +1,14 @@
 import bcrypt from "bcryptjs";
 
-const BCRYPT_ROUNDS = Math.min(14, Math.max(10, Number(process.env.PASSWORD_BCRYPT_ROUNDS || 12)));
-const MIN_LENGTH = Math.min(64, Math.max(10, Number(process.env.PASSWORD_MIN_LENGTH || 12)));
-const MAX_LENGTH = 128;
+function boundedIntegerEnv(name: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(process.env[name]);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+export const PASSWORD_MIN_LENGTH = boundedIntegerEnv("PASSWORD_MIN_LENGTH", 12, 10, 64);
+export const PASSWORD_MAX_LENGTH = 128;
+const BCRYPT_ROUNDS = boundedIntegerEnv("PASSWORD_BCRYPT_ROUNDS", 12, 10, 14);
 
 const COMMON_PASSWORDS = new Set([
   "password123!",
@@ -26,8 +32,8 @@ export function validatePasswordStrength(password: string): {
   errors: string[];
 } {
   const errors: string[] = [];
-  if (password.length < MIN_LENGTH) errors.push(`Password must be at least ${MIN_LENGTH} characters`);
-  if (password.length > MAX_LENGTH) errors.push(`Password must not exceed ${MAX_LENGTH} characters`);
+  if (password.length < PASSWORD_MIN_LENGTH) errors.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+  if (password.length > PASSWORD_MAX_LENGTH) errors.push(`Password must not exceed ${PASSWORD_MAX_LENGTH} characters`);
   if (!/[A-Z]/.test(password)) errors.push("Password must include an uppercase letter");
   if (!/[a-z]/.test(password)) errors.push("Password must include a lowercase letter");
   if (!/[0-9]/.test(password)) errors.push("Password must include a number");

@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { applyMemoryRateLimit, type MemoryRateEntry } from "../src/lib/rate-limit";
 import {
+  API_AI_JSON_BODY_LIMIT,
+  API_INSPECTION_JSON_BODY_LIMIT,
+  API_SMALL_JSON_BODY_LIMIT,
+} from "../src/lib/request-body";
+import {
   clientIpFromHeaders,
   normalizeClientIp,
   normalizeRequestId,
@@ -54,4 +59,15 @@ test("failed-login lockout increments from the database row rather than stale us
   assert.match(source, /failedLoginAttempts:\s*sql<number>`\$\{users\.failedLoginAttempts\} \+ 1`/);
   assert.match(source, /\.returning\(\{[\s\S]*failedAttempts: users\.failedLoginAttempts,[\s\S]*lockedUntil: users\.lockedUntil,/);
   assert.doesNotMatch(source, /\(user\.failedLoginAttempts \|\| 0\) \+ 1/);
+});
+
+test("API proxy body limits stay aligned with bounded route readers", () => {
+  assert.equal(API_SMALL_JSON_BODY_LIMIT, 64 * 1024);
+  assert.equal(API_AI_JSON_BODY_LIMIT, 1024 * 1024);
+  assert.equal(API_INSPECTION_JSON_BODY_LIMIT, 16 * 1024 * 1024);
+
+  const source = readFileSync("src/proxy.ts", "utf8");
+  assert.match(source, /pathname === "\/api\/v1\/inspections".*API_INSPECTION_JSON_BODY_LIMIT/);
+  assert.match(source, /pathname === "\/api\/v1\/ai\/detect-defects".*API_AI_JSON_BODY_LIMIT/);
+  assert.match(source, /return API_SMALL_JSON_BODY_LIMIT/);
 });

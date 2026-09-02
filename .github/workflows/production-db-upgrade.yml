@@ -63,32 +63,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Confirm production liveness
-        run: |
-          curl --fail --silent --show-error --retry 3 --retry-delay 2 \
-            https://vehicle-inspection-system-sigma.vercel.app/api/health/live
-
-      - name: Confirm production database readiness
-        shell: bash
-        run: |
-          node <<'NODE'
-          const url = "https://vehicle-inspection-system-sigma.vercel.app/api/health";
-          let last = null;
-          for (let attempt = 1; attempt <= 5; attempt += 1) {
-            try {
-              const response = await fetch(url, { headers: { "cache-control": "no-cache" } });
-              const body = await response.json();
-              last = { http: response.status, status: body?.status, database: body?.checks?.database?.status };
-              console.log(`Readiness attempt ${attempt}:`, JSON.stringify(last));
-              if (response.ok && body?.status === "healthy" && body?.checks?.database?.status === "healthy") {
-                process.exit(0);
-              }
-            } catch (error) {
-              last = { error: error instanceof Error ? error.message : String(error) };
-              console.log(`Readiness attempt ${attempt}:`, JSON.stringify(last));
-            }
-            await new Promise((resolve) => setTimeout(resolve, 4000));
-          }
-          console.error("Production readiness did not become healthy:", JSON.stringify(last));
-          process.exit(1);
-          NODE
+      - name: Verify upgraded database directly
+        run: npm run db:verify
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

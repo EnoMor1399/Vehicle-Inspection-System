@@ -1,211 +1,186 @@
 import { authenticateApiRequest } from "@/lib/api-auth";
+import { hasPermission } from "@/lib/auth";
 
-// OData v4 $metadata endpoint — returns EDMX XML schema
-// Power BI uses this to discover the data model
+// OData v4 $metadata endpoint. The schema intentionally mirrors the exact
+// least-privilege fields exposed by the Power BI data endpoint.
 
-export async function GET(request: Request) {
+type PropertyDefinition = {
+  name: string;
+  type: string;
+  nullable?: boolean;
+};
+
+type EntityDefinition = {
+  setName: string;
+  typeName: string;
+  keys: string[];
+  properties: PropertyDefinition[];
+  permission?: string;
+};
+
+const ENTITIES: EntityDefinition[] = [
+  {
+    setName: "Inspections",
+    typeName: "Inspection",
+    keys: ["id"],
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "InspectionNumber", type: "Edm.String" },
+      { name: "InspectionDate", type: "Edm.DateTimeOffset" },
+      { name: "OverallResult", type: "Edm.String" },
+      { name: "WorkflowStatus", type: "Edm.String" },
+      { name: "VehicleRegistration", type: "Edm.String" },
+      { name: "InspectorName", type: "Edm.String" },
+      { name: "TransporterName", type: "Edm.String" },
+      { name: "StationName", type: "Edm.String" },
+    ],
+  },
+  {
+    setName: "PreTripInspections",
+    typeName: "PreTripInspection",
+    keys: ["id"],
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "InspectionDate", type: "Edm.Date" },
+      { name: "Status", type: "Edm.String" },
+      { name: "ClearedForTrip", type: "Edm.Boolean" },
+      { name: "VehicleRegistration", type: "Edm.String" },
+      { name: "DriverName", type: "Edm.String" },
+      { name: "PassedItems", type: "Edm.Int32" },
+      { name: "FailedItems", type: "Edm.Int32" },
+      { name: "TransporterName", type: "Edm.String" },
+    ],
+  },
+  {
+    setName: "Vehicles",
+    typeName: "Vehicle",
+    keys: ["id"],
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "RegistrationNumber", type: "Edm.String" },
+      { name: "Make", type: "Edm.String" },
+      { name: "Model", type: "Edm.String" },
+      { name: "Status", type: "Edm.String" },
+      { name: "Category", type: "Edm.String" },
+      { name: "TransporterName", type: "Edm.String" },
+      { name: "InsuranceExpiry", type: "Edm.Date" },
+      { name: "RoadworthyExpiry", type: "Edm.Date" },
+      { name: "TotalInspections", type: "Edm.Int32" },
+    ],
+  },
+  {
+    setName: "Transporters",
+    typeName: "Transporter",
+    keys: ["id"],
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "CompanyName", type: "Edm.String" },
+      { name: "Region", type: "Edm.String" },
+      { name: "District", type: "Edm.String" },
+      { name: "FleetSize", type: "Edm.Int32" },
+      { name: "PassCount", type: "Edm.Int32" },
+      { name: "FailCount", type: "Edm.Int32" },
+    ],
+  },
+  {
+    setName: "Stations",
+    typeName: "Station",
+    keys: ["id"],
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "Name", type: "Edm.String" },
+      { name: "Code", type: "Edm.String" },
+      { name: "Region", type: "Edm.String" },
+      { name: "Capacity", type: "Edm.Int32" },
+      { name: "InspectionCount", type: "Edm.Int32" },
+      { name: "PassCount", type: "Edm.Int32" },
+      { name: "FailCount", type: "Edm.Int32" },
+    ],
+  },
+  {
+    setName: "Defects",
+    typeName: "Defect",
+    keys: ["InspectionNumber", "SectionCode", "ItemName"],
+    properties: [
+      { name: "InspectionNumber", type: "Edm.String", nullable: false },
+      { name: "InspectionDate", type: "Edm.DateTimeOffset" },
+      { name: "VehicleRegistration", type: "Edm.String" },
+      { name: "SectionCode", type: "Edm.String", nullable: false },
+      { name: "ItemName", type: "Edm.String", nullable: false },
+      { name: "Severity", type: "Edm.String" },
+      { name: "PhotoCount", type: "Edm.Int32" },
+    ],
+  },
+  {
+    setName: "Documents",
+    typeName: "Document",
+    keys: ["id"],
+    permission: "documents",
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "Name", type: "Edm.String" },
+      { name: "Type", type: "Edm.String" },
+      { name: "OwnerType", type: "Edm.String" },
+      { name: "ExpiryDate", type: "Edm.Date" },
+      { name: "Version", type: "Edm.Int32" },
+      { name: "UploadedBy", type: "Edm.String" },
+    ],
+  },
+  {
+    setName: "AuditLogs",
+    typeName: "AuditLog",
+    keys: ["id"],
+    permission: "audit",
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "Action", type: "Edm.String" },
+      { name: "EntityType", type: "Edm.String" },
+      { name: "UserName", type: "Edm.String" },
+      { name: "Summary", type: "Edm.String" },
+      { name: "IPAddress", type: "Edm.String" },
+      { name: "CreatedAt", type: "Edm.DateTimeOffset" },
+    ],
+  },
+  {
+    setName: "Users",
+    typeName: "User",
+    keys: ["id"],
+    permission: "users",
+    properties: [
+      { name: "id", type: "Edm.String", nullable: false },
+      { name: "Name", type: "Edm.String" },
+      { name: "Email", type: "Edm.String" },
+      { name: "Role", type: "Edm.String" },
+      { name: "IsActive", type: "Edm.Boolean" },
+      { name: "LastLoginAt", type: "Edm.DateTimeOffset" },
+      { name: "StationName", type: "Edm.String" },
+    ],
+  },
+];
+
+export async function GET() {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) {
     return new Response(JSON.stringify({ error: auth.message }), {
       status: auth.status,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" },
     });
   }
+
+  const entities = ENTITIES.filter((entity) => !entity.permission || hasPermission(auth.user, entity.permission));
+  const entityTypes = entities.map(renderEntityType).join("\n");
+  const entitySets = entities
+    .map((entity) => `        <EntitySet Name="${entity.setName}" EntityType="RSL.VIMS.${entity.typeName}"/>`)
+    .join("\n");
 
   const edmx = `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
   <edmx:DataServices>
     <Schema Namespace="RSL.VIMS" xmlns="http://docs.oasis-open.org/odata/ns/edm">
-
-      <EntityType Name="Inspection">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="InspectionNumber" Type="Edm.String"/>
-        <Property Name="InspectionDate" Type="Edm.DateTimeOffset"/>
-        <Property Name="OverallResult" Type="Edm.String"/>
-        <Property Name="WorkflowStatus" Type="Edm.String"/>
-        <Property Name="InspectorName" Type="Edm.String"/>
-        <Property Name="Station" Type="Edm.String"/>
-        <Property Name="ServiceBrakeEfficiency" Type="Edm.Decimal"/>
-        <Property Name="ParkingBrakeEfficiency" Type="Edm.Decimal"/>
-        <Property Name="SmokeTest" Type="Edm.String"/>
-        <Property Name="OpacityTest" Type="Edm.Decimal"/>
-        <Property Name="TotalPhotos" Type="Edm.Int32"/>
-        <Property Name="TemplateType" Type="Edm.String"/>
-        <Property Name="NextInspectionDate" Type="Edm.Date"/>
-        <Property Name="ReinspectionDate" Type="Edm.Date"/>
-        <Property Name="VehicleRegistration" Type="Edm.String"/>
-        <Property Name="VehicleMake" Type="Edm.String"/>
-        <Property Name="VehicleModel" Type="Edm.String"/>
-        <Property Name="VehicleBodyType" Type="Edm.String"/>
-        <Property Name="VehicleCategory" Type="Edm.String"/>
-        <Property Name="VehicleYear" Type="Edm.Int32"/>
-        <Property Name="VehicleFuelType" Type="Edm.String"/>
-        <Property Name="TransporterName" Type="Edm.String"/>
-        <Property Name="TransporterRegion" Type="Edm.String"/>
-        <Property Name="StationName" Type="Edm.String"/>
-        <Property Name="StationRegion" Type="Edm.String"/>
-      </EntityType>
-
-      <EntityType Name="PreTripInspection">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="InspectionDate" Type="Edm.Date"/>
-        <Property Name="StartTime" Type="Edm.DateTimeOffset"/>
-        <Property Name="CompletedAt" Type="Edm.DateTimeOffset"/>
-        <Property Name="DriverName" Type="Edm.String"/>
-        <Property Name="Odometer" Type="Edm.Int32"/>
-        <Property Name="TripPurpose" Type="Edm.String"/>
-        <Property Name="RouteDescription" Type="Edm.String"/>
-        <Property Name="Status" Type="Edm.String"/>
-        <Property Name="TotalItems" Type="Edm.Int32"/>
-        <Property Name="PassedItems" Type="Edm.Int32"/>
-        <Property Name="FailedItems" Type="Edm.Int32"/>
-        <Property Name="ClearedForTrip" Type="Edm.Boolean"/>
-        <Property Name="SupervisorReview" Type="Edm.Boolean"/>
-        <Property Name="Notes" Type="Edm.String"/>
-        <Property Name="VehicleRegistration" Type="Edm.String"/>
-        <Property Name="VehicleMake" Type="Edm.String"/>
-        <Property Name="VehicleModel" Type="Edm.String"/>
-        <Property Name="TransporterName" Type="Edm.String"/>
-        <Property Name="TransporterRegion" Type="Edm.String"/>
-      </EntityType>
-
-      <EntityType Name="Vehicle">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="RegistrationNumber" Type="Edm.String"/>
-        <Property Name="Make" Type="Edm.String"/>
-        <Property Name="Model" Type="Edm.String"/>
-        <Property Name="BodyType" Type="Edm.String"/>
-        <Property Name="Category" Type="Edm.String"/>
-        <Property Name="VehicleClass" Type="Edm.String"/>
-        <Property Name="Colour" Type="Edm.String"/>
-        <Property Name="ManufacturingYear" Type="Edm.Int32"/>
-        <Property Name="FuelType" Type="Edm.String"/>
-        <Property Name="Transmission" Type="Edm.String"/>
-        <Property Name="SeatingCapacity" Type="Edm.Int32"/>
-        <Property Name="GrossWeight" Type="Edm.Decimal"/>
-        <Property Name="NumberOfAxles" Type="Edm.Int32"/>
-        <Property Name="OdometerReading" Type="Edm.Int32"/>
-        <Property Name="Status" Type="Edm.String"/>
-        <Property Name="InsuranceExpiry" Type="Edm.Date"/>
-        <Property Name="RoadworthyExpiry" Type="Edm.Date"/>
-        <Property Name="RoadFundExpiry" Type="Edm.Date"/>
-        <Property Name="VIN" Type="Edm.String"/>
-        <Property Name="ChassisNumber" Type="Edm.String"/>
-        <Property Name="TransporterName" Type="Edm.String"/>
-        <Property Name="TransporterRegion" Type="Edm.String"/>
-        <Property Name="TotalInspections" Type="Edm.Int32"/>
-        <Property Name="PassCount" Type="Edm.Int32"/>
-        <Property Name="FailCount" Type="Edm.Int32"/>
-      </EntityType>
-
-      <EntityType Name="Transporter">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="CompanyName" Type="Edm.String"/>
-        <Property Name="RegistrationNumber" Type="Edm.String"/>
-        <Property Name="TIN" Type="Edm.String"/>
-        <Property Name="Region" Type="Edm.String"/>
-        <Property Name="District" Type="Edm.String"/>
-        <Property Name="ContactPerson" Type="Edm.String"/>
-        <Property Name="Mobile" Type="Edm.String"/>
-        <Property Name="Email" Type="Edm.String"/>
-        <Property Name="InsuranceCompany" Type="Edm.String"/>
-        <Property Name="InsuranceExpiry" Type="Edm.Date"/>
-        <Property Name="FleetSize" Type="Edm.Int32"/>
-        <Property Name="PassCount" Type="Edm.Int32"/>
-        <Property Name="FailCount" Type="Edm.Int32"/>
-      </EntityType>
-
-      <EntityType Name="Station">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="Name" Type="Edm.String"/>
-        <Property Name="Code" Type="Edm.String"/>
-        <Property Name="Region" Type="Edm.String"/>
-        <Property Name="District" Type="Edm.String"/>
-        <Property Name="Address" Type="Edm.String"/>
-        <Property Name="Phone" Type="Edm.String"/>
-        <Property Name="Email" Type="Edm.String"/>
-        <Property Name="Capacity" Type="Edm.Int32"/>
-        <Property Name="Status" Type="Edm.String"/>
-        <Property Name="InspectorCount" Type="Edm.Int32"/>
-        <Property Name="InspectionCount" Type="Edm.Int32"/>
-        <Property Name="PassCount" Type="Edm.Int32"/>
-        <Property Name="FailCount" Type="Edm.Int32"/>
-      </EntityType>
-
-      <EntityType Name="Defect">
-        <Key><PropertyRef Name="InspectionNumber"/><PropertyRef Name="ItemName"/></Key>
-        <Property Name="InspectionNumber" Type="Edm.String"/>
-        <Property Name="InspectionDate" Type="Edm.DateTimeOffset"/>
-        <Property Name="InspectionResult" Type="Edm.String"/>
-        <Property Name="VehicleRegistration" Type="Edm.String"/>
-        <Property Name="VehicleMake" Type="Edm.String"/>
-        <Property Name="VehicleModel" Type="Edm.String"/>
-        <Property Name="SectionCode" Type="Edm.String"/>
-        <Property Name="SectionTitle" Type="Edm.String"/>
-        <Property Name="ItemName" Type="Edm.String"/>
-        <Property Name="Result" Type="Edm.String"/>
-        <Property Name="Severity" Type="Edm.String"/>
-        <Property Name="Remarks" Type="Edm.String"/>
-        <Property Name="PhotoCount" Type="Edm.Int32"/>
-      </EntityType>
-
-      <EntityType Name="Document">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="Name" Type="Edm.String"/>
-        <Property Name="Type" Type="Edm.String"/>
-        <Property Name="OwnerType" Type="Edm.String"/>
-        <Property Name="OwnerId" Type="Edm.String"/>
-        <Property Name="MimeType" Type="Edm.String"/>
-        <Property Name="SizeBytes" Type="Edm.Int32"/>
-        <Property Name="Version" Type="Edm.Int32"/>
-        <Property Name="ExpiryDate" Type="Edm.Date"/>
-        <Property Name="CreatedAt" Type="Edm.DateTimeOffset"/>
-        <Property Name="UploadedBy" Type="Edm.String"/>
-      </EntityType>
-
-      <EntityType Name="AuditLog">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="Action" Type="Edm.String"/>
-        <Property Name="EntityType" Type="Edm.String"/>
-        <Property Name="EntityId" Type="Edm.String"/>
-        <Property Name="EntityLabel" Type="Edm.String"/>
-        <Property Name="Summary" Type="Edm.String"/>
-        <Property Name="UserName" Type="Edm.String"/>
-        <Property Name="IPAddress" Type="Edm.String"/>
-        <Property Name="CreatedAt" Type="Edm.DateTimeOffset"/>
-      </EntityType>
-
-      <EntityType Name="User">
-        <Key><PropertyRef Name="id"/></Key>
-        <Property Name="id" Type="Edm.String" Nullable="false"/>
-        <Property Name="Name" Type="Edm.String"/>
-        <Property Name="Email" Type="Edm.String"/>
-        <Property Name="Role" Type="Edm.String"/>
-        <Property Name="IsActive" Type="Edm.Boolean"/>
-        <Property Name="LastLoginAt" Type="Edm.DateTimeOffset"/>
-        <Property Name="CreatedAt" Type="Edm.DateTimeOffset"/>
-        <Property Name="StationName" Type="Edm.String"/>
-      </EntityType>
-
+${entityTypes}
       <EntityContainer Name="VIMSContainer">
-        <EntitySet Name="Inspections" EntityType="RSL.VIMS.Inspection"/>
-        <EntitySet Name="PreTripInspections" EntityType="RSL.VIMS.PreTripInspection"/>
-        <EntitySet Name="Vehicles" EntityType="RSL.VIMS.Vehicle"/>
-        <EntitySet Name="Transporters" EntityType="RSL.VIMS.Transporter"/>
-        <EntitySet Name="Stations" EntityType="RSL.VIMS.Station"/>
-        <EntitySet Name="Defects" EntityType="RSL.VIMS.Defect"/>
-        <EntitySet Name="Documents" EntityType="RSL.VIMS.Document"/>
-        <EntitySet Name="AuditLogs" EntityType="RSL.VIMS.AuditLog"/>
-        <EntitySet Name="Users" EntityType="RSL.VIMS.User"/>
+${entitySets}
       </EntityContainer>
-
     </Schema>
   </edmx:DataServices>
 </edmx:Edmx>`;
@@ -214,6 +189,19 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": "application/xml;charset=utf-8",
       "OData-Version": "4.0",
+      "Cache-Control": "private, no-store",
     },
   });
+}
+
+function renderEntityType(entity: EntityDefinition): string {
+  const keys = entity.keys.map((key) => `<PropertyRef Name="${key}"/>`).join("");
+  const properties = entity.properties
+    .map((property) => `        <Property Name="${property.name}" Type="${property.type}"${property.nullable === false ? ' Nullable="false"' : ""}/>`)
+    .join("\n");
+
+  return `      <EntityType Name="${entity.typeName}">
+        <Key>${keys}</Key>
+${properties}
+      </EntityType>`;
 }

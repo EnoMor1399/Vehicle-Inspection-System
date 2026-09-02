@@ -79,3 +79,81 @@ jobs:
 
       - name: Block high-severity dependencies
         run: npm audit --audit-level=high
+
+  production-build:
+    name: Production build
+    needs: [security-policy, validate, dependency-audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://vims_ci:vims_ci@127.0.0.1:5432/vims_ci?sslmode=disable
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      JWT_SECRET: ci-only-jwt-secret-value-000000000000000000000000
+      SESSION_SECRET: ci-only-session-secret-value-000000000000000000000
+      CSRF_SECRET: ci-only-csrf-secret-value-000000000000000000000000
+      API_KEY_SALT: ci-only-api-key-salt-value-00000000000000000000000
+      FIELD_ENCRYPTION_KEY: ci-only-field-encryption-key-0000000000000000000000
+      CERTIFICATE_SIGNING_SECRET: ci-only-certificate-signing-secret-000000000000000000
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies including build toolchain
+        run: npm ci --include=dev
+
+      - name: Build production application
+        run: npm run build
+
+  docker-smoke:
+    name: Docker image and liveness smoke
+    needs: [production-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build runtime and migrator images
+        shell: bash
+        run: |
+          docker build --target runner --tag "vims-ci:${GITHUB_SHA}" .
+          docker build --target migrator --tag "vims-migrator-ci:${GITHUB_SHA}" .
+
+      - name: Start production container and verify liveness
+        shell: bash
+        run: |
+          container_id="$(docker run --detach --rm --no-healthcheck --publish 3000:3000 \
+            --env DATABASE_URL=postgresql://vims_ci:vims_ci@127.0.0.1:5432/vims_ci?sslmode=disable \
+            --env NEXT_PUBLIC_APP_URL=http://localhost:3000 \
+            --env JWT_SECRET=ci-only-jwt-secret-value-000000000000000000000000 \
+            --env SESSION_SECRET=ci-only-session-secret-value-000000000000000000000 \
+            --env CSRF_SECRET=ci-only-csrf-secret-value-000000000000000000000000 \
+            --env API_KEY_SALT=ci-only-api-key-salt-value-00000000000000000000000 \
+            --env FIELD_ENCRYPTION_KEY=ci-only-field-encryption-key-0000000000000000000000 \
+            --env CERTIFICATE_SIGNING_SECRET=ci-only-certificate-signing-secret-000000000000000000 \
+            "vims-ci:${GITHUB_SHA}")"
+
+          cleanup() {
+            docker logs "$container_id" || true
+            docker stop "$container_id" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/live > /tmp/vims-live.json; then
+              cat /tmp/vims-live.json
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "VIMS container did not become live within the smoke-test window."
+          exit 1

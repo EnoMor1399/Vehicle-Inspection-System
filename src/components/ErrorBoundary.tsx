@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, ErrorInfo, ReactNode } from "react";
+import Link from "next/link";
 
 interface Props {
   children: ReactNode;
@@ -24,14 +25,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
-    
-    // Log to error tracking service
-    this.logErrorToService(error, errorInfo);
+
+    // Error reporting is best effort and must never block recovery UI.
+    void this.logErrorToService(error, errorInfo);
   }
 
   private async logErrorToService(error: Error, errorInfo: ErrorInfo) {
     try {
-      // In production, send to error tracking service (Sentry, LogRocket, etc.)
       if (process.env.NODE_ENV === "production") {
         await fetch("/api/errors", {
           method: "POST",
@@ -42,8 +42,8 @@ export class ErrorBoundary extends Component<Props, State> {
             componentStack: errorInfo.componentStack,
             timestamp: new Date().toISOString(),
             url: window.location.href,
-            userAgent: navigator.userAgent,
           }),
+          keepalive: true,
         });
       }
     } catch (loggingError) {
@@ -93,17 +93,18 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => window.location.reload()}
                 className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
               >
                 Reload Page
               </button>
-              <button
-                onClick={() => window.location.href = "/"}
-                className="flex-1 px-4 py-2 bg-slate-100 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+              <Link
+                href="/"
+                className="flex-1 px-4 py-2 bg-slate-100 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium text-center"
               >
                 Go Home
-              </button>
+              </Link>
             </div>
           </div>
         </div>

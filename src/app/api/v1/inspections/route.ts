@@ -8,9 +8,11 @@ import { logAudit } from "@/lib/audit";
 import { canApprove } from "@/lib/auth";
 import { inspectionCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { parseApiPagination } from "@/lib/api-pagination";
+import { API_INSPECTION_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { assessInspectionOutcome, deriveVehicleStatusAfterInspection } from "@/lib/inspection-policy";
 import { getSettings } from "@/lib/settings";
 import { formatServerTiming, timeOperation } from "@/lib/performance";
+import { emitWebhookEvent } from "@/lib/webhook-delivery";
 
 const RESULTS = new Set(["pass", "conditional_pass", "reinspection_required", "fail"]);
 
@@ -19,7 +21,10 @@ export async function POST(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   try {
-    const parsed = inspectionCreateSchema.safeParse(await request.json());
+    const bodyResult = await readJsonBody(request, API_INSPECTION_JSON_BODY_LIMIT);
+    if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+    const parsed = inspectionCreateSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid inspection payload", zodDetails(parsed.error));
     const body = parsed.data;
 
@@ -106,6 +111,18 @@ export async function POST(request: Request) {
         criticalFailedItemCount: assessment.criticalFailedCount,
         vehicleStatus: nextVehicleStatus,
       },
+    });
+
+    const event = body.overallResult === "fail" ? "inspection.failed" : "inspection.completed";
+    await emitWebhookEvent(event, {
+      id,
+      inspectionNumber,
+      vehicleId: body.vehicleId,
+      vehicleRegistration: vehicle.registrationNumber,
+      overallResult: body.overallResult,
+      workflowStatus: body.workflowStatus,
+      failedItemCount: assessment.failedCount,
+      criticalFailedItemCount: assessment.criticalFailedCount,
     });
 
     return json({ data: { id, inspectionNumber } }, 201);

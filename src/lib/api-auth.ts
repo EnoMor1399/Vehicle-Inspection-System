@@ -44,13 +44,16 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
     if (apiKey) {
       const currentHash = hashApiKey(apiKey);
       const legacyHash = legacyApiKeyHash(apiKey);
-      const [keyRow] = await db
-        .select()
+      const [row] = await db
+        .select({ key: apiKeys, user: users })
         .from(apiKeys)
+        .innerJoin(users, eq(users.id, apiKeys.userId))
         .where(or(eq(apiKeys.keyHash, currentHash), eq(apiKeys.keyHash, legacyHash)))
         .limit(1);
 
-      if (!keyRow) return { ok: false, status: 401, message: "Invalid API key" };
+      if (!row) return { ok: false, status: 401, message: "Invalid API key" };
+      const { key: keyRow, user } = row;
+
       if (!keyRow.isActive) return { ok: false, status: 401, message: "API key revoked" };
       if (keyRow.expiresAt && new Date(keyRow.expiresAt) <= new Date()) {
         return { ok: false, status: 401, message: "API key expired" };
@@ -58,9 +61,7 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
       if (!scopesAllowed(keyRow.scopes, options.scopes)) {
         return { ok: false, status: 403, message: "API key does not have the required scope" };
       }
-
-      const [user] = await db.select().from(users).where(eq(users.id, keyRow.userId));
-      if (!user || !user.isActive) return { ok: false, status: 401, message: "API key owner is inactive" };
+      if (!user.isActive) return { ok: false, status: 401, message: "API key owner is inactive" };
       if (user.role === "transporter_user") {
         return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
       }
@@ -95,18 +96,16 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
     const sessionToken = jar.get("rsl_session_token")?.value;
     if (sessionToken) {
       const session = await validateSession(sessionToken);
-      if (session.valid && session.userId) {
-        const [user] = await db.select().from(users).where(eq(users.id, session.userId));
-        if (user?.isActive) {
-          if (user.role === "transporter_user") {
-            return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
-          }
-          if (!userAllowed(user, options.permission)) {
-            return { ok: false, status: 403, message: "You do not have permission for this resource" };
-          }
-          // Browser sessions inherit the user's permissions rather than API-key scopes.
-          return { ok: true, user, authType: "session", scopes: ["read", "write", "inspect"] };
+      const user = session.user;
+      if (session.valid && session.userId && user?.isActive) {
+        if (user.role === "transporter_user") {
+          return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
         }
+        if (!userAllowed(user, options.permission)) {
+          return { ok: false, status: 403, message: "You do not have permission for this resource" };
+        }
+        // Browser sessions inherit the user's permissions rather than API-key scopes.
+        return { ok: true, user, authType: "session", scopes: ["read", "write", "inspect"] };
       }
     }
 

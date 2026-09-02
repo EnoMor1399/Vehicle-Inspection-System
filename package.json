@@ -14,6 +14,8 @@
     "security:maintenance": "node scripts/maintenance-workflow-guard.mjs",
     "verify": "npm run security:secrets && npm run security:maintenance && npm run typecheck && npm run lint && npm test && npm run build",
     "db:upgrade": "node scripts/apply-enterprise-upgrade.mjs",
+    "db:verify": "node scripts/verify-enterprise-upgrade.mjs",
+    "release:smoke": "node scripts/post-deploy-smoke.mjs",
     "api-key:create": "tsx scripts/create-api-key.ts"
   },
   "dependencies": {
@@ -55,5 +57,5 @@
     "tsx": "^4.23.12",
     "typescript": "5.9.3"
   },
-  "version": "2.3.0"
+  "version": "2.4.0"
 }

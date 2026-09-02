@@ -1,561 +1,220 @@
-# RSL VIMS Deployment Guide
+# VIMS Enterprise V2.4 — Host-Neutral Deployment and Operations Guide
 
-## Overview
+## Scope
 
-This guide provides step-by-step instructions for deploying the Road Safety Limited Vehicle Inspection Management System (RSL VIMS) to production environments.
+This guide covers the production-ready, non-Vercel path for the Vehicle Inspection Management System (VIMS) Enterprise V2.4.
 
-## Prerequisites
+The `source-only-hardening` branch is intentionally **not a deployment branch**. The current work may be built, tested and reviewed in GitHub without changing the live application. Production promotion must remain a separate, explicit operation.
 
-### System Requirements
+## Supported baseline
 
-- **Node.js**: v20.x or higher
-- **PostgreSQL**: v15.x or higher
-- **Memory**: Minimum 2GB RAM (4GB recommended)
-- **Storage**: Minimum 10GB SSD (50GB recommended for production)
-- **CPU**: 2 cores minimum (4 cores recommended)
+- Node.js 22
+- PostgreSQL 18
+- Docker Engine with Docker Compose v2 for the recommended container path
+- HTTPS termination at the selected production platform or reverse proxy
+- At least 2 CPU cores and 4 GB RAM recommended for the application runtime
+- Managed, encrypted backup storage for production database backups
 
-### Software Dependencies
+## Required production configuration
 
-- Docker and Docker Compose (for containerized deployment)
-- Nginx or Apache (for reverse proxy)
-- SSL/TLS certificates (Let's Encrypt recommended)
-- Backup storage (S3, GCS, or local)
+Set secrets in the production platform or protected runtime secret store. Do not commit a production `.env` file.
 
-## Deployment Options
+Required values:
 
-### Option 1: Docker Compose (Recommended)
+```text
+DATABASE_URL
+NEXT_PUBLIC_APP_URL
+JWT_SECRET
+SESSION_SECRET
+CSRF_SECRET
+API_KEY_SALT
+FIELD_ENCRYPTION_KEY
+CERTIFICATE_SIGNING_SECRET
+```
 
-#### 1. Clone the Repository
+Optional integrations may also require Upstash Redis, SMTP, object storage or error-tracking configuration.
+
+All secret values should be independently generated. Database connections using `sslmode=require` are normalized by VIMS database-maintenance tooling to certificate-verifying TLS.
+
+## Release validation before production
+
+Every production candidate must first pass the GitHub `VIMS Quality Gate`:
+
+1. committed-secret and workflow-policy scan;
+2. TypeScript validation;
+3. ESLint;
+4. regression tests;
+5. high-severity dependency audit;
+6. production-mode Next.js build;
+7. production runtime and migrator Docker-image build;
+8. local production-container liveness smoke test.
+
+These checks build and start artifacts inside GitHub Actions only. They do not publish or deploy them.
+
+## Recommended container deployment path
+
+### 1. Clone the approved release
 
 ```bash
-git clone https://github.com/your-org/rsl-vims.git
-cd rsl-vims
+git clone https://github.com/EnoMor1399/Vehicle-Inspection-System.git
+cd Vehicle-Inspection-System
+git checkout <approved-release-ref>
 ```
 
-#### 2. Configure Environment Variables
+Use an reviewed commit or release tag. Do not deploy an unreviewed moving branch.
 
-Create a `.env` file in the root directory:
+### 2. Create the production environment file
+
+Example structure only:
+
+```dotenv
+POSTGRES_USER=vims
+POSTGRES_PASSWORD=<strong-database-password>
+POSTGRES_DB=vims
+NEXT_PUBLIC_APP_URL=https://vims.example.com
+JWT_SECRET=<independent-secret>
+SESSION_SECRET=<independent-secret>
+CSRF_SECRET=<independent-secret>
+API_KEY_SALT=<independent-secret>
+FIELD_ENCRYPTION_KEY=<independent-secret>
+CERTIFICATE_SIGNING_SECRET=<independent-secret>
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
+
+For a managed PostgreSQL service such as Neon, supply its protected `DATABASE_URL` to the application/migration runtime rather than exposing database credentials in source control.
+
+### 3. Build the images
 
 ```bash
-# Database Configuration
-DATABASE_URL=postgresql://rsl_user:secure_password@db:5432/rsl_vims
-DATABASE_POOL_SIZE=20
-
-# Application Configuration
-NODE_ENV=production
-NEXT_PUBLIC_APP_URL=https://vims.rsl.gh
-APP_VERSION=1.0.0
-
-# Authentication
-JWT_SECRET=your-secure-jwt-secret-min-32-chars
-SESSION_SECRET=your-secure-session-secret-min-32-chars
-CSRF_SECRET=your-secure-csrf-secret-min-32-chars
-
-# API Keys
-API_KEY_SALT=your-secure-api-key-salt-min-32-chars
-
-# Email Configuration (Optional)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=noreply@rsl.gh
-SMTP_PASSWORD=your-email-password
-SMTP_FROM=RSL VIMS <noreply@rsl.gh>
-
-# Error Tracking (Optional)
-SENTRY_DSN=https://your-sentry-dsn
-ERROR_TRACKING_WEBHOOK=https://your-webhook-url
-
-# File Storage (Optional)
-S3_BUCKET=rsl-vims-uploads
-S3_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-
-# Security
-RATE_LIMIT_MAX_REQUESTS=100
-RATE_LIMIT_WINDOW_MS=60000
-SESSION_TIMEOUT_MINUTES=30
-MAX_LOGIN_ATTEMPTS=5
-ACCOUNT_LOCKOUT_MINUTES=15
-
-# 2FA Configuration
-TWO_FACTOR_ISSUER=RSL VIMS
-
-# Logging
-LOG_LEVEL=info
-LOG_FORMAT=json
+docker compose build app migrate
 ```
 
-**Important**: Generate secure secrets using:
-```bash
-openssl rand -hex 32
-```
+The application builder installs the development build toolchain even under production mode, while the final runtime image remains minimal and non-root.
 
-#### 3. Build and Start Services
+### 4. Back up the database before migration
+
+For a PostgreSQL database reachable from the deployment host:
 
 ```bash
-# Build the application
-docker-compose build
-
-# Start all services
-docker-compose up -d
-
-# Check service status
-docker-compose ps
-
-# View logs
-docker-compose logs -f app
+pg_dump --format=custom --no-owner --no-acl "$DATABASE_URL" > "vims-pre-2.4-$(date +%Y%m%d-%H%M%S).dump"
 ```
 
-#### 4. Run Database Migrations
+Store the dump in encrypted backup storage with access controls and a documented retention policy. A backup is not considered proven until a restore has been tested in an isolated database.
+
+### 5. Apply and verify database upgrades
+
+Using Docker Compose:
 
 ```bash
-# Push schema to database
-docker-compose exec app npx drizzle-kit push
-
-# Or run migrations if using migration files
-docker-compose exec app npx drizzle-kit migrate
+docker compose run --rm migrate
 ```
 
-#### 5. Verify Deployment
+The migration service runs both:
+
+```text
+npm run db:upgrade
+npm run db:verify
+```
+
+`db:verify` confirms the V2.4 security/operations indexes are present and the redundant indexes are absent. Do not continue a rollout if verification fails.
+
+The protected GitHub `Production database upgrade` workflow is an alternative for an intentionally promoted `main` release. It is manual, main-ref-only, production-environment-protected and requires the exact confirmation phrase `APPLY_VIMS_DB_UPGRADE`.
+
+### 6. Start the application
 
 ```bash
-# Check health endpoint
-curl https://vims.rsl.gh/api/health
-
-# Expected response:
-# {
-#   "status": "healthy",
-#   "timestamp": "2026-01-XXT12:00:00Z",
-#   "version": "1.0.0",
-#   ...
-# }
+docker compose up -d app
 ```
 
----
-
-### Option 2: Manual Deployment
-
-#### 1. Install Dependencies
+Then inspect status and logs:
 
 ```bash
-# Install Node.js 20.x
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Install PostgreSQL 15
-sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-sudo apt-get update
-sudo apt-get install -y postgresql-15
+docker compose ps
+docker compose logs --tail=200 app
 ```
 
-#### 2. Configure PostgreSQL
+### 7. Verify health
+
+Liveness does not require a database connection:
 
 ```bash
-# Switch to postgres user
-sudo -u postgres psql
-
-# Create database and user
-CREATE DATABASE rsl_vims;
-CREATE USER rsl_user WITH ENCRYPTED PASSWORD 'secure_password';
-GRANT ALL PRIVILEGES ON DATABASE rsl_vims TO rsl_user;
-\q
+curl -fsS https://vims.example.com/api/health/live
 ```
 
-#### 3. Install Application
+Readiness verifies the database:
 
 ```bash
-# Clone repository
-git clone https://github.com/your-org/rsl-vims.git
-cd rsl-vims
-
-# Install dependencies
-npm ci --production
-
-# Build application
-npm run build
+curl -fsS https://vims.example.com/api/health
 ```
 
-#### 4. Configure Systemd Service
+The release must report version `2.4.0`. The readiness endpoint must report `healthy` before production traffic is accepted.
 
-Create `/etc/systemd/system/rsl-vims.service`:
-
-```ini
-[Unit]
-Description=RSL VIMS Application
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/var/www/rsl-vims
-Environment="NODE_ENV=production"
-Environment="DATABASE_URL=postgresql://rsl_user:secure_password@localhost:5432/rsl_vims"
-Environment="NEXT_PUBLIC_APP_URL=https://vims.rsl.gh"
-ExecStart=/usr/bin/node /var/www/rsl-vims/server.js
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
+The source-controlled smoke verifier can perform both checks:
 
 ```bash
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable rsl-vims
-sudo systemctl start rsl-vims
-
-# Check status
-sudo systemctl status rsl-vims
+VIMS_BASE_URL=https://vims.example.com EXPECTED_VERSION=2.4.0 npm run release:smoke
 ```
 
-#### 5. Configure Nginx Reverse Proxy
-
-Create `/etc/nginx/sites-available/rsl-vims`:
-
-```nginx
-server {
-    listen 80;
-    server_name vims.rsl.gh;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name vims.rsl.gh;
-
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/vims.rsl.gh/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/vims.rsl.gh/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # Security Headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    # Gzip Compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-
-    # Proxy to Node.js
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    # Static files
-    location /_next/static {
-        proxy_pass http://localhost:3000;
-        proxy_cache_valid 200 60m;
-        expires 60m;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Health check
-    location /api/health {
-        proxy_pass http://localhost:3000;
-        access_log off;
-    }
-}
-```
-
-```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/rsl-vims /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-#### 6. Setup SSL Certificate
-
-```bash
-# Install Certbot
-sudo apt-get install certbot python3-certbot-nginx
-
-# Obtain certificate
-sudo certbot --nginx -d vims.rsl.gh
-
-# Auto-renewal (already configured by certbot)
-sudo systemctl status certbot.timer
-```
-
----
-
-## Database Backup Strategy
-
-### Automated Daily Backups
-
-Create `/usr/local/bin/backup-rsl-vims.sh`:
-
-```bash
-#!/bin/bash
-
-# Configuration
-BACKUP_DIR="/var/backups/rsl-vims"
-DATE=$(date +%Y%m%d_%H%M%S)
-DB_NAME="rsl_vims"
-DB_USER="rsl_user"
-RETENTION_DAYS=30
+The protected `Post-deployment verification` GitHub workflow runs the same verifier against an explicitly supplied production URL and does not modify the target.
 
-# Create backup directory
-mkdir -p $BACKUP_DIR
+## Required post-deployment verification
 
-# Database backup
-pg_dump -U $DB_USER -d $DB_NAME -F c -f $BACKUP_DIR/db_$DATE.dump
+After the runtime and database are live, verify all of the following before closing the release:
 
-# Compress backup
-gzip $BACKUP_DIR/db_$DATE.dump
+- Super Administrator login and session renewal/revocation;
+- disabled-account rejection;
+- vehicle create, update and decommission lifecycle rules;
+- transporter scoping and tenant isolation;
+- inspection create/update workflow and checklist navigation;
+- reports and analytics generation;
+- audit-log creation and sensitive-field redaction;
+- rate limiting and suspicious-login controls;
+- webhook/integration registration and public-address enforcement;
+- notification retrieval;
+- health/readiness latency and error logs;
+- backup creation and isolated restore validation.
 
-# Upload to S3 (optional)
-if [ -n "$S3_BUCKET" ]; then
-    aws s3 cp $BACKUP_DIR/db_$DATE.dump.gz s3://$S3_BUCKET/backups/
-fi
+## Reverse proxy and HTTPS
 
-# Remove old backups
-find $BACKUP_DIR -name "db_*.dump.gz" -type f -mtime +$RETENTION_DAYS -delete
+Terminate HTTPS at the chosen production platform or a hardened reverse proxy. Forward the original host, client address and protocol headers. Redirect HTTP to HTTPS and enable HSTS only after HTTPS is confirmed across the intended domain/subdomains.
 
-# Log backup
-echo "[$DATE] Backup completed: db_$DATE.dump.gz" >> $BACKUP_DIR/backup.log
-```
+Do not expose PostgreSQL directly to the public internet. The provided Docker Compose file binds the local database port to `127.0.0.1`.
 
-```bash
-# Make executable
-chmod +x /usr/local/bin/backup-rsl-vims.sh
+## Monitoring and alerting
 
-# Add to crontab (daily at 2 AM)
-crontab -e
-0 2 * * * /usr/local/bin/backup-rsl-vims.sh
-```
+Monitor at minimum:
 
-### Manual Backup
+- `/api/health/live` for process availability;
+- `/api/health` for database readiness and latency;
+- HTTP 5xx rate;
+- authentication failures and account lockouts;
+- database connection saturation;
+- application memory/CPU;
+- failed background/integration operations;
+- backup success and restore-test age.
 
-```bash
-# Database backup
-pg_dump -U rsl_user -d rsl_vims -F c -f backup.dump
+Alerting should distinguish liveness failure from database degradation so operations can identify whether the application process or a dependency is failing.
 
-# Restore
-pg_restore -U rsl_user -d rsl_vims -c backup.dump
-```
+## Rollback
 
----
+Application rollback and database rollback are separate decisions.
 
-## Monitoring and Alerting
+1. Stop new traffic or place the system in the chosen maintenance mode.
+2. Capture current logs and database state.
+3. Redeploy the last approved application image/commit if the failure is application-only.
+4. Restore the pre-upgrade database backup only when a database rollback is actually required and the data-loss implications are understood.
+5. Run liveness/readiness and the complete post-deployment verification checklist again.
 
-### Health Checks
+Never restore a production database over the current database without an explicit rollback decision and a preserved copy of the current state.
 
-Configure monitoring to check:
+## Current V2.4 promotion boundary
 
-```bash
-# Application health
-curl -f https://vims.rsl.gh/api/health
+The source candidate may be validated and hardened in GitHub now. It must not be described as production-applied until all of these are true:
 
-# Database connectivity
-pg_isready -h localhost -p 5432 -U rsl_user
-
-# Disk space
-df -h /var/lib/postgresql
-
-# Memory usage
-free -m
-
-# CPU usage
-top -bn1 | grep "Cpu(s)"
-```
-
-### Log Monitoring
-
-```bash
-# Application logs
-journalctl -u rsl-vims -f
-
-# Nginx logs
-tail -f /var/log/nginx/access.log
-tail -f /var/log/nginx/error.log
-
-# PostgreSQL logs
-tail -f /var/log/postgresql/postgresql-15-main.log
-```
-
-### Alerting Rules
-
-Configure alerts for:
-- Application health check failures
-- High CPU usage (>80% for 5 minutes)
-- High memory usage (>85% for 5 minutes)
-- Low disk space (<20% remaining)
-- Database connection failures
-- High error rates (>1% of requests)
-- Slow response times (>2s average)
-
----
-
-## Scaling
-
-### Horizontal Scaling
-
-1. **Load Balancer**: Use Nginx, HAProxy, or cloud load balancer
-2. **Multiple App Instances**: Run multiple Node.js instances
-3. **Session Storage**: Use Redis for session storage
-4. **Database**: Use read replicas for read-heavy workloads
-
-### Vertical Scaling
-
-1. **Increase Resources**: Add more CPU, memory, or storage
-2. **Optimize Database**: Add indexes, optimize queries
-3. **Caching**: Implement Redis caching layer
-
----
-
-## Security Hardening
-
-### Firewall Configuration
-
-```bash
-# Allow only necessary ports
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # HTTP
-sudo ufw allow 443/tcp   # HTTPS
-sudo ufw enable
-```
-
-### Database Security
-
-```bash
-# Configure PostgreSQL to only accept local connections
-# Edit /etc/postgresql/15/main/pg_hba.conf
-local   all             all                                     peer
-host    all             all             127.0.0.1/32            md5
-host    all             all             ::1/128                 md5
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql
-```
-
-### Application Security
-
-- Keep dependencies updated: `npm audit`
-- Use security headers (already configured in Nginx)
-- Implement rate limiting (already configured)
-- Use HTTPS everywhere
-- Regular security audits
-
----
-
-## Maintenance
-
-### Updating the Application
-
-```bash
-# Pull latest changes
-cd /var/www/rsl-vims
-git pull origin main
-
-# Install dependencies
-npm ci --production
-
-# Build application
-npm run build
-
-# Restart service
-sudo systemctl restart rsl-vims
-
-# Or for Docker
-docker-compose pull
-docker-compose up -d
-```
-
-### Database Maintenance
-
-```bash
-# Vacuum database (weekly)
-vacuumdb -U rsl_user -d rsl_vims -z
-
-# Reindex database (monthly)
-reindexdb -U rsl_user -d rsl_vims
-
-# Analyze database (weekly)
-psql -U rsl_user -d rsl_vims -c "ANALYZE;"
-```
-
----
-
-## Troubleshooting
-
-### Application Won't Start
-
-```bash
-# Check logs
-journalctl -u rsl-vims -n 50
-
-# Check Node.js version
-node --version
-
-# Check database connection
-psql $DATABASE_URL -c "SELECT 1;"
-```
-
-### High CPU Usage
-
-```bash
-# Check running processes
-top -c
-
-# Check Node.js processes
-ps aux | grep node
-
-# Check database queries
-psql -U rsl_user -d rsl_vims -c "SELECT * FROM pg_stat_activity WHERE state = 'active';"
-```
-
-### Database Connection Issues
-
-```bash
-# Check PostgreSQL status
-sudo systemctl status postgresql
-
-# Check connection pool
-psql -U rsl_user -d rsl_vims -c "SELECT count(*) FROM pg_stat_activity;"
-
-# Check for locks
-psql -U rsl_user -d rsl_vims -c "SELECT * FROM pg_locks WHERE NOT granted;"
-```
-
----
-
-## Support
-
-For deployment support:
-- Email: devops@rsl.gh
-- Documentation: https://docs.rsl.gh/deployment
-- Status Page: https://status.rsl.gh
-
----
-
-## Changelog
-
-### v1.0.0 (2026-01-XX)
-- Initial deployment guide
-- Docker Compose setup
-- Manual deployment instructions
-- Backup procedures
-- Monitoring configuration
+- the final GitHub quality gate is green;
+- an intentional production promotion is authorized;
+- the selected non-Vercel runtime is deployed;
+- production database migrations pass `db:verify`;
+- live post-deployment checks pass;
+- backup/restore readiness is confirmed.
