@@ -17,8 +17,11 @@ export async function updateUserAccess(input: {
 }) {
   const actor = await getCurrentUser();
   if (!canManageUsers(actor)) throw new Error("You do not have permission to manage users");
-  if (!isUserRole(actor.role)) throw new Error("Your account role is not recognized");
-  if (!isUserRole(input.role)) throw new Error("Invalid user role");
+
+  const actorRole = actor.role;
+  const requestedRole = input.role;
+  if (!isUserRole(actorRole)) throw new Error("Your account role is not recognized");
+  if (!isUserRole(requestedRole)) throw new Error("Invalid user role");
   if (!input.userId || input.userId.length > 64) throw new Error("Invalid user account identifier");
 
   const result = await db.transaction(async (tx) => {
@@ -28,16 +31,18 @@ export async function updateUserAccess(input: {
 
     const [target] = await tx.select().from(users).where(eq(users.id, input.userId)).limit(1);
     if (!target) return { ok: false as const, error: "User account not found" };
-    if (!isUserRole(target.role)) return { ok: false as const, error: "Target account role is not recognized" };
 
-    const delegated = validateDelegatedRoleChange(actor.role, target.role, input.role);
+    const targetRole = target.role;
+    if (!isUserRole(targetRole)) return { ok: false as const, error: "Target account role is not recognized" };
+
+    const delegated = validateDelegatedRoleChange(actorRole, targetRole, requestedRole);
     if (!delegated.ok) return { ok: false as const, error: delegated.message };
 
-    if (target.id === actor.id && (!input.isActive || input.role !== actor.role)) {
+    if (target.id === actor.id && (!input.isActive || requestedRole !== actorRole)) {
       return { ok: false as const, error: "You cannot deactivate or change the role of your own active session" };
     }
 
-    if (target.role === "super_admin" && (input.role !== "super_admin" || !input.isActive)) {
+    if (targetRole === "super_admin" && (requestedRole !== "super_admin" || !input.isActive)) {
       // Lock all currently-active Super Administrator rows so two concurrent
       // demotions cannot both observe a safe count and leave the system orphaned.
       await tx.execute(sql`select id from users where role = 'super_admin' and is_active = true for update`);
@@ -56,8 +61,8 @@ export async function updateUserAccess(input: {
       if (!location) return { ok: false as const, error: "Selected inspection station does not exist" };
     }
 
-    const transporterId = input.role === "transporter_user" ? input.transporterId || null : null;
-    if (input.role === "transporter_user") {
+    const transporterId = requestedRole === "transporter_user" ? input.transporterId || null : null;
+    if (requestedRole === "transporter_user") {
       if (!transporterId) return { ok: false as const, error: "Transporter portal users must be linked to a transporter" };
       const [transporter] = await tx
         .select({ id: transporters.id, deletedAt: transporters.deletedAt })
@@ -69,8 +74,8 @@ export async function updateUserAccess(input: {
       }
     }
 
-    const patch = {
-      role: input.role,
+    const patch: Partial<typeof users.$inferInsert> = {
+      role: requestedRole,
       isActive: input.isActive,
       locationId,
       transporterId,
@@ -78,7 +83,7 @@ export async function updateUserAccess(input: {
     };
 
     const securitySensitiveChange =
-      target.role !== input.role
+      targetRole !== requestedRole
       || target.isActive !== input.isActive
       || target.transporterId !== transporterId;
 
