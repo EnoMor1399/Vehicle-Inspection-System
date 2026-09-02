@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  MAX_COMBINED_EVIDENCE_PHOTO_CHARS,
+  MAX_EVIDENCE_PHOTO_DATA_URL_CHARS,
+  MAX_EVIDENCE_PHOTOS_PER_INSPECTION,
+  MAX_EVIDENCE_PHOTOS_PER_ITEM,
+  isSupportedEvidenceImageDataUrl,
+} from "@/lib/inspection-evidence";
 
 const vehicleStatus = z.enum(["active", "under_inspection", "failed", "passed", "suspended", "decommissioned"]);
 const vehicleCreateStatus = z.enum(["active", "suspended"]);
@@ -46,11 +53,8 @@ export const vehiclePatchSchema = vehicleCreateSchema
   .strict();
 
 const evidenceImageDataUrl = z.string()
-  .max(3_000_000)
-  .regex(
-    /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
-    "Evidence photo must be a base64 JPEG, PNG, or WebP data URL"
-  );
+  .max(MAX_EVIDENCE_PHOTO_DATA_URL_CHARS)
+  .refine(isSupportedEvidenceImageDataUrl, "Evidence photo must be a bounded base64 JPEG, PNG, or WebP data URL");
 
 const inspectionItemSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -62,7 +66,7 @@ const inspectionItemSchema = z.object({
     dataUrl: evidenceImageDataUrl,
     caption: optionalText(500),
     takenAt: z.string().max(100),
-  })).max(5).optional(),
+  })).max(MAX_EVIDENCE_PHOTOS_PER_ITEM).optional(),
 });
 
 const inspectionSectionSchema = z.object({
@@ -91,15 +95,15 @@ export const inspectionCreateSchema = z.object({
     }
   }
 
-  if (photoCount > 50) {
+  if (photoCount > MAX_EVIDENCE_PHOTOS_PER_INSPECTION) {
     ctx.addIssue({
       code: "custom",
       path: ["sectionData"],
-      message: "Inspection evidence is limited to 50 photos per inspection",
+      message: `Inspection evidence is limited to ${MAX_EVIDENCE_PHOTOS_PER_INSPECTION} photos per inspection`,
     });
   }
 
-  if (photoDataCharacters > 12_000_000) {
+  if (photoDataCharacters > MAX_COMBINED_EVIDENCE_PHOTO_CHARS) {
     ctx.addIssue({
       code: "custom",
       path: ["sectionData"],
