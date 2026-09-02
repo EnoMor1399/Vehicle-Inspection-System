@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { rfidTags, vehicles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { rfidAssociationSchema, zodDetails } from "@/lib/api-schemas";
+import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { newId } from "@/lib/utils";
 
 export async function GET(request: Request) {
@@ -37,7 +38,10 @@ export async function POST(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["write"], permission: "vehicles" });
   if (!auth.ok) return apiError(auth.status, auth.message);
 
-  const parsed = rfidAssociationSchema.safeParse(await request.json());
+  const bodyResult = await readJsonBody(request, API_SMALL_JSON_BODY_LIMIT);
+  if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+  const parsed = rfidAssociationSchema.safeParse(bodyResult.value);
   if (!parsed.success) return apiError(400, "Invalid RFID payload", zodDetails(parsed.error));
   const { tag, vehicle_id } = parsed.data;
 
