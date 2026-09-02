@@ -3,6 +3,10 @@ import { systemSettings } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 export type SystemSettings = typeof systemSettings.$inferSelect;
+export type EditableSystemSettings = Omit<
+  SystemSettings,
+  "id" | "defaultStationId" | "updatedAt" | "updatedBy"
+>;
 
 const SETTINGS_ID = "singleton";
 
@@ -42,7 +46,7 @@ export async function getSettings(): Promise<SystemSettings> {
 }
 
 export async function updateSettings(
-  updates: Partial<Omit<SystemSettings, "id" | "updatedAt" | "updatedBy">>,
+  updates: Partial<EditableSystemSettings>,
   updatedBy: string
 ): Promise<SystemSettings> {
   const existing = await getSettings();
