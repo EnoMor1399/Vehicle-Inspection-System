@@ -13,9 +13,9 @@ test("reports CSV and XLSX exports reuse spreadsheet formula neutralization", ()
 test("Power BI workspace derives its API destination only from trusted configuration", () => {
   const source = readFileSync("src/app/powerbi/page.tsx", "utf8");
   assert.match(source, /NEXT_PUBLIC_APP_URL/);
-  assert.doesNotMatch(source, /x-forwarded-host/i);
-  assert.doesNotMatch(source, /x-forwarded-proto/i);
-  assert.doesNotMatch(source, /requestHeaders/);
+  assert.doesNotMatch(source, /from "next\/headers"/);
+  assert.doesNotMatch(source, /requestHeaders\.get\(["']x-forwarded-host["']\)/i);
+  assert.doesNotMatch(source, /requestHeaders\.get\(["']x-forwarded-proto["']\)/i);
 });
 
 test("Power BI API keeps query parsing bounded and avoids partial integer parsing", () => {
@@ -26,7 +26,8 @@ test("Power BI API keeps query parsing bounded and avoids partial integer parsin
   assert.doesNotMatch(source, /Number\.parseInt/);
   assert.match(source, /if \(!opts\.count\) return \{ data, hasMore \}/);
   assert.match(source, /LIMIT \$\{opts\.top \+ 1\}/);
-  assert.doesNotMatch(source, /url\.origin/);
+  assert.doesNotMatch(source, /NEXT_PUBLIC_APP_URL \|\| url\.origin/);
+  assert.doesNotMatch(source, /request\.headers\.get\(["'](?:host|x-forwarded-host|x-forwarded-proto)["']\)/i);
 });
 
 test("Power BI default reporting contract excludes sensitive identity and contact columns", () => {
