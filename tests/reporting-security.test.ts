@@ -22,7 +22,7 @@ test("Power BI API keeps query parsing bounded and avoids partial integer parsin
   const source = readFileSync("src/app/api/v1/powerbi/route.ts", "utf8");
   assert.match(source, /MAX_FILTER_LENGTH = 2000/);
   assert.match(source, /MAX_FILTER_CONDITIONS = 20/);
-  assert.match(source, /\^\\d\+\$/.source ? /); // source contains a strict digits-only pagination regex
+  assert.equal(source.includes("if (!/^\\d+$/.test(value))"), true);
   assert.doesNotMatch(source, /Number\.parseInt/);
   assert.match(source, /if \(!opts\.count\) return \{ data, hasMore \}/);
   assert.match(source, /LIMIT \$\{opts\.top \+ 1\}/);
