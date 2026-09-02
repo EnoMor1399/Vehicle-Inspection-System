@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { getCurrentUser, canEditVehicles, canAccessTransporterScope } from "@/lib/auth";
 import { adminValidationMessage, vehicleAdminSchema } from "@/lib/admin-entity-policy";
 import { validateGenericVehicleStatusTransition } from "@/lib/vehicle-lifecycle";
+import { emitWebhookEvent } from "@/lib/webhook-delivery";
 
 export type VehicleFormData = {
   transporterId?: string | null;
@@ -140,6 +141,14 @@ export async function createVehicle(data: VehicleFormData) {
     summary: `Created vehicle ${payload.registrationNumber}`,
     after: payload,
   });
+
+  await emitWebhookEvent("vehicle.created", {
+    id,
+    registrationNumber: payload.registrationNumber,
+    transporterId,
+    status,
+  });
+
   revalidatePath("/vehicles");
   return { id };
 }
@@ -185,6 +194,14 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
     before,
     after: payload,
   });
+
+  await emitWebhookEvent("vehicle.updated", {
+    id,
+    registrationNumber: payload.registrationNumber,
+    transporterId,
+    status: requestedStatus,
+  });
+
   revalidatePath(`/vehicles/${id}`);
   revalidatePath("/vehicles");
 }
@@ -208,6 +225,14 @@ export async function decommissionVehicle(id: string) {
     before: { status: vehicle.status },
     after: { status: "decommissioned" },
   });
+
+  await emitWebhookEvent("vehicle.updated", {
+    id,
+    registrationNumber: vehicle.registrationNumber,
+    transporterId: vehicle.transporterId,
+    status: "decommissioned",
+  });
+
   revalidatePath(`/vehicles/${id}`);
   revalidatePath("/vehicles");
   return { decommissioned: true, alreadyDecommissioned: false };
