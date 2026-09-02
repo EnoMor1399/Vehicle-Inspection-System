@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { validateResolvedWebhookDestination, validateWebhookDestination } from "@/lib/integration-security";
 import { sanitizeTelemetryUrl } from "@/lib/telemetry";
 import { clientIpFromHeaders, normalizeRequestId, normalizeUserAgent } from "@/lib/request-context";
+import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 
 const frontendErrorSchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -23,28 +24,21 @@ function jsonResponse(body: Record<string, unknown>, status: number, requestId: 
   });
 }
 
-function payloadTooLarge(request: NextRequest): boolean {
-  const raw = request.headers.get("content-length");
-  if (!raw) return false;
-  if (!/^\d+$/.test(raw)) return true;
-  const size = Number(raw);
-  return !Number.isSafeInteger(size) || size > 64 * 1024;
-}
-
 export async function POST(request: NextRequest) {
   const requestId = normalizeRequestId(request.headers.get("x-request-id"), randomUUID());
-  if (payloadTooLarge(request)) {
-    return jsonResponse({ success: false, error: "Payload too large or invalid" }, 413, requestId);
-  }
-
   const ipAddress = clientIpFromHeaders(request.headers);
   const limit = await rateLimit("error", `ip:${ipAddress}`);
   if (!limit.allowed) {
     return jsonResponse({ success: false, error: "Rate limit exceeded" }, 429, requestId);
   }
 
+  const body = await readJsonBody(request, API_SMALL_JSON_BODY_LIMIT);
+  if (!body.ok) {
+    return jsonResponse({ success: false, error: body.message }, body.status, requestId);
+  }
+
   try {
-    const parsed = frontendErrorSchema.safeParse(await request.json());
+    const parsed = frontendErrorSchema.safeParse(body.value);
     if (!parsed.success) {
       return jsonResponse({ success: false, error: "Invalid error report" }, 400, requestId);
     }
