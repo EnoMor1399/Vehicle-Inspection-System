@@ -5,7 +5,7 @@ import { webhooks } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { webhookCreateSchema, zodDetails } from "@/lib/api-schemas";
-import { validateWebhookDestination } from "@/lib/integration-security";
+import { validateResolvedWebhookDestination, validateWebhookDestination } from "@/lib/integration-security";
 import { encryptField } from "@/lib/field-encryption";
 
 const MAX_WEBHOOKS_PER_USER = 20;
@@ -37,6 +37,9 @@ export async function POST(request: Request) {
     const body = parsed.data;
     const destination = validateWebhookDestination(body.url);
     if (!destination.ok) return apiError(400, destination.reason);
+
+    const resolvedDestination = await validateResolvedWebhookDestination(destination.url);
+    if (!resolvedDestination.ok) return apiError(400, resolvedDestination.reason);
 
     const id = newId();
     const events = [...new Set(body.events)];
