@@ -4,6 +4,7 @@ import { vehicles, transporters } from "@/db/schema";
 import { eq, desc, sql, isNull, and } from "drizzle-orm";
 import { vehicleCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { parseApiPagination } from "@/lib/api-pagination";
+import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { formatServerTiming, timeOperation } from "@/lib/performance";
 
 const VEHICLE_STATUSES = new Set(["active", "under_inspection", "failed", "passed", "suspended", "decommissioned"]);
@@ -55,7 +56,10 @@ export async function POST(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   try {
-    const parsed = vehicleCreateSchema.safeParse(await request.json());
+    const bodyResult = await readJsonBody(request, API_SMALL_JSON_BODY_LIMIT);
+    if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+    const parsed = vehicleCreateSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid vehicle payload", zodDetails(parsed.error));
     const body = parsed.data;
 
