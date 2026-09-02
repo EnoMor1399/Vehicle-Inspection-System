@@ -5,6 +5,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { vehiclePatchSchema, zodDetails } from "@/lib/api-schemas";
 import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { validateGenericVehicleStatusTransition } from "@/lib/vehicle-lifecycle";
+import { emitWebhookEvent } from "@/lib/webhook-delivery";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "vehicles" });
@@ -93,6 +94,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       before: existing,
       after: updateResult.updated,
     });
+
+    await emitWebhookEvent("vehicle.updated", {
+      id,
+      registrationNumber: updateResult.updated.registrationNumber,
+      transporterId: updateResult.updated.transporterId,
+      status: updateResult.updated.status,
+      changedFields,
+    });
+
     return json({ data: { id, updated: changedFields } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -131,5 +141,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     before: existing,
     after: updated || { ...existing, status: "decommissioned" },
   });
+
+  await emitWebhookEvent("vehicle.updated", {
+    id,
+    registrationNumber: existing.registrationNumber,
+    transporterId: existing.transporterId,
+    status: "decommissioned",
+    changedFields: ["status"],
+  });
+
   return json({ data: { id, decommissioned: true, already_decommissioned: false } });
 }
