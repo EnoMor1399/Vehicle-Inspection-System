@@ -116,7 +116,7 @@ Completed in source:
 
 ## Final source acceptance result
 
-GitHub quality gate run `33627752634` passed on source head `7171d17d84b229f7ad6e890b034fcf22717e3216`:
+GitHub quality gate run `33628174418` passed on final source head `f155b4afe76f22d2dc6f2320e524c290a8914708`:
 
 - Secret and workflow policy scan: **PASS**
 - Dependency audit: **PASS**
