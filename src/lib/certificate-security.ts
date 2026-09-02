@@ -9,6 +9,8 @@ export interface CertificateFingerprintInput {
   nextInspectionDate?: Date | string | null;
 }
 
+const CERTIFICATE_SIGNATURE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
 function canonical(input: CertificateFingerprintInput): string {
   const inspectionDate = new Date(input.inspectionDate).toISOString();
   const nextDate = input.nextInspectionDate ? new Date(input.nextInspectionDate).toISOString().slice(0, 10) : "";
@@ -32,15 +34,19 @@ function signingSecret(): string {
   return process.env.SESSION_SECRET || "vims-development-certificate-signing-key";
 }
 
+export function isCertificateSignatureFormat(signature?: string | null): signature is string {
+  return Boolean(signature && CERTIFICATE_SIGNATURE_PATTERN.test(signature));
+}
+
 export function createCertificateSignature(input: CertificateFingerprintInput): string {
   return createHmac("sha256", signingSecret()).update(canonical(input)).digest("base64url");
 }
 
 export function verifyCertificateSignature(input: CertificateFingerprintInput, signature?: string | null): boolean {
-  if (!signature) return false;
+  if (!isCertificateSignatureFormat(signature)) return false;
   try {
-    const expected = Buffer.from(createCertificateSignature(input));
-    const received = Buffer.from(signature);
+    const expected = Buffer.from(createCertificateSignature(input), "utf8");
+    const received = Buffer.from(signature, "utf8");
     return expected.length === received.length && timingSafeEqual(expected, received);
   } catch {
     return false;
