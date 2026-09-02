@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validateWebhookDestination } from "../src/lib/integration-security";
+import {
+  isPublicNetworkAddress,
+  validateResolvedAddresses,
+  validateWebhookDestination,
+} from "../src/lib/integration-security";
 import { webhookCreateSchema } from "../src/lib/api-schemas";
 
 const blockedDestinations = [
@@ -34,6 +38,17 @@ test("webhook destination accepts public HTTPS and removes fragments", () => {
   }
 });
 
+test("resolved webhook addresses must all be public network destinations", () => {
+  assert.equal(isPublicNetworkAddress("8.8.8.8"), true);
+  assert.equal(isPublicNetworkAddress("2606:4700:4700::1111"), true);
+  assert.equal(isPublicNetworkAddress("127.0.0.1"), false);
+  assert.equal(isPublicNetworkAddress("169.254.169.254"), false);
+  assert.equal(isPublicNetworkAddress("fc00::1"), false);
+  assert.equal(validateResolvedAddresses(["8.8.8.8", "1.1.1.1"]).ok, true);
+  assert.equal(validateResolvedAddresses(["8.8.8.8", "10.0.0.8"]).ok, false);
+  assert.equal(validateResolvedAddresses([]).ok, false);
+});
+
 test("webhook subscriptions accept only documented events and strong optional secrets", () => {
   const valid = webhookCreateSchema.safeParse({
     url: "https://hooks.example.com/vims",
@@ -56,8 +71,9 @@ test("webhook subscriptions accept only documented events and strong optional se
   assert.equal(weakSecret.success, false);
 });
 
-test("webhook route encrypts signing secrets before persistence", () => {
+test("webhook route encrypts signing secrets and resolves destinations before persistence", () => {
   const source = readFileSync("src/app/api/v1/webhooks/route.ts", "utf8");
   assert.match(source, /secret:\s*encryptField\(signingSecret\)/);
+  assert.match(source, /validateResolvedWebhookDestination\(destination\.url\)/);
   assert.match(source, /MAX_WEBHOOKS_PER_USER\s*=\s*20/);
 });
