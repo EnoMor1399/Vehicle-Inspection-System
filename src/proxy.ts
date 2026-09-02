@@ -3,6 +3,11 @@ import type { NextRequest } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildContentSecurityPolicy } from "@/lib/csp";
 import { clientIpFromHeaders, normalizeRequestId } from "@/lib/request-context";
+import {
+  API_AI_JSON_BODY_LIMIT,
+  API_INSPECTION_JSON_BODY_LIMIT,
+  API_SMALL_JSON_BODY_LIMIT,
+} from "@/lib/request-body";
 
 async function apiRateIdentity(request: NextRequest, ip: string): Promise<string> {
   const authorization = request.headers.get("authorization") || "";
@@ -32,6 +37,12 @@ function allowedOrigins(request: NextRequest): Set<string> {
     .filter((value): value is string => Boolean(value));
   configured.push(request.nextUrl.origin);
   return new Set(configured);
+}
+
+function apiMutationBodyLimit(pathname: string): number {
+  if (pathname === "/api/v1/inspections") return API_INSPECTION_JSON_BODY_LIMIT;
+  if (pathname === "/api/v1/ai/detect-defects") return API_AI_JSON_BODY_LIMIT;
+  return API_SMALL_JSON_BODY_LIMIT;
 }
 
 function applyRateHeaders(response: NextResponse, result: Awaited<ReturnType<typeof rateLimit>>) {
@@ -93,8 +104,9 @@ export async function proxy(request: NextRequest) {
           return rejected("Invalid Content-Length header", 400, requestId);
         }
         const contentLength = Number(contentLengthHeader);
-        if (!Number.isSafeInteger(contentLength) || contentLength > 10 * 1024 * 1024) {
-          return rejected("Request body exceeds 10 MB limit", 413, requestId);
+        const maxBodyBytes = apiMutationBodyLimit(pathname);
+        if (!Number.isSafeInteger(contentLength) || contentLength > maxBodyBytes) {
+          return rejected(`Request body exceeds ${maxBodyBytes} byte limit`, 413, requestId);
         }
       }
     }
