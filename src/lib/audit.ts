@@ -1,6 +1,8 @@
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { newId } from "./utils";
+import { normalizeClientIp } from "./request-context";
+import { sanitizeAuditPayload, sanitizeAuditText } from "./audit-sanitizer";
 
 export type AuditInput = {
   userId?: string | null;
@@ -19,18 +21,19 @@ export async function logAudit(input: AuditInput) {
   try {
     await db.insert(auditLogs).values({
       id: newId(),
-      userId: input.userId || null,
-      userName: input.userName || null,
+      userId: sanitizeAuditText(input.userId, 36),
+      userName: sanitizeAuditText(input.userName, 200),
       action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId || null,
-      entityLabel: input.entityLabel || null,
-      summary: input.summary || null,
-      before: input.before ?? null,
-      after: input.after ?? null,
-      ipAddress: input.ipAddress || null,
+      entityType: sanitizeAuditText(input.entityType, 100) || "unknown",
+      entityId: sanitizeAuditText(input.entityId, 100),
+      entityLabel: sanitizeAuditText(input.entityLabel, 300),
+      summary: sanitizeAuditText(input.summary, 2_000),
+      before: sanitizeAuditPayload(input.before),
+      after: sanitizeAuditPayload(input.after),
+      ipAddress: input.ipAddress ? normalizeClientIp(input.ipAddress) : null,
     });
-  } catch (err) {
-    console.error("audit log failed", err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown error";
+    console.warn(`[audit] persistence failed: ${message}`);
   }
 }
