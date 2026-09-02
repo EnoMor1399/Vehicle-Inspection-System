@@ -1,9 +1,11 @@
 import { db } from "@/db";
-import { sessions, securityEvents, loginAttempts } from "@/db/schema";
+import { sessions, securityEvents, loginAttempts, users } from "@/db/schema";
 import { eq, and, gt, lt, desc, count, ne } from "drizzle-orm";
 import { randomBytes, createHash } from "crypto";
 import { generateSecret, generateURI, verify } from "otplib";
 import { normalizeClientIp, normalizeUserAgent } from "@/lib/request-context";
+
+export { validatePasswordStrength } from "./password";
 
 const MAX_SECURITY_DESCRIPTION_LENGTH = 2_000;
 const MAX_SECURITY_METADATA_BYTES = 16_000;
@@ -24,6 +26,11 @@ function boundedSecurityMetadata(data?: Record<string, unknown>): Record<string,
   } catch {
     return { dropped: true, reason: "non_serializable" };
   }
+}
+
+function warnTelemetryFailure(area: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : "unknown error";
+  console.warn(`[security] ${area} failed: ${message}`);
 }
 
 // ============ Two-Factor Authentication ============
@@ -83,12 +90,16 @@ export async function validateSession(token: string): Promise<{
   valid: boolean;
   userId?: string;
   sessionId?: string;
+  user?: typeof users.$inferSelect;
 }> {
   const hashedToken = hashToken(token);
 
-  const [session] = await db
-    .select()
+  // Resolve the session and its owner in one database round-trip. This also
+  // means a disabled account can no longer retain a technically valid session.
+  const [row] = await db
+    .select({ session: sessions, user: users })
     .from(sessions)
+    .innerJoin(users, eq(users.id, sessions.userId))
     .where(
       and(
         eq(sessions.token, hashedToken),
@@ -98,18 +109,39 @@ export async function validateSession(token: string): Promise<{
     )
     .limit(1);
 
-  if (!session) return { valid: false };
+  if (!row) return { valid: false };
+  const { session, user } = row;
+
+  if (!user.isActive) {
+    try {
+      await db.update(sessions).set({ isActive: false }).where(eq(sessions.id, session.id));
+    } catch (error) {
+      warnTelemetryFailure("inactive-session revocation", error);
+    }
+    await logSecurityEvent("session_revoked_inactive_user", "warning", {
+      userId: user.id,
+      ipAddress: session.ipAddress || undefined,
+      userAgent: session.userAgent || undefined,
+      description: "Session rejected because the owning account is inactive",
+      data: { sessionId: session.id },
+    });
+    return { valid: false };
+  }
 
   const configuredTimeout = Number(process.env.SESSION_TIMEOUT_MINUTES || 30);
-  const inactivityTimeout = Math.min(24 * 60, Math.max(5, configuredTimeout)) * 60 * 1000;
+  const inactivityTimeout = Math.min(24 * 60, Math.max(5, Number.isFinite(configuredTimeout) ? configuredTimeout : 30)) * 60 * 1000;
   const lastActivity = session.lastActivityAt ? new Date(session.lastActivityAt).getTime() : Date.now();
   const now = Date.now();
 
   if (now - lastActivity > inactivityTimeout) {
-    await db
-      .update(sessions)
-      .set({ isActive: false })
-      .where(eq(sessions.id, session.id));
+    try {
+      await db
+        .update(sessions)
+        .set({ isActive: false })
+        .where(eq(sessions.id, session.id));
+    } catch (error) {
+      warnTelemetryFailure("expired-session revocation", error);
+    }
 
     await logSecurityEvent("session_timeout", "info", {
       userId: session.userId,
@@ -124,13 +156,18 @@ export async function validateSession(token: string): Promise<{
 
   const activityWriteInterval = 2 * 60 * 1000;
   if (now - lastActivity >= activityWriteInterval) {
-    await db
-      .update(sessions)
-      .set({ lastActivityAt: new Date(now) })
-      .where(eq(sessions.id, session.id));
+    try {
+      await db
+        .update(sessions)
+        .set({ lastActivityAt: new Date(now) })
+        .where(eq(sessions.id, session.id));
+    } catch (error) {
+      // Activity telemetry should not invalidate an otherwise valid session.
+      warnTelemetryFailure("session activity refresh", error);
+    }
   }
 
-  return { valid: true, userId: session.userId, sessionId: session.id };
+  return { valid: true, userId: session.userId, sessionId: session.id, user };
 }
 
 export async function revokeSession(sessionId: string): Promise<void> {
@@ -179,18 +216,24 @@ export async function logSecurityEvent(
     data?: Record<string, unknown>;
   }
 ): Promise<void> {
-  const safeEventType = boundedText(eventType, 50) || "security_event";
-  await db.insert(securityEvents).values({
-    id: randomBytes(16).toString("hex"),
-    userId: boundedText(metadata.userId, 36),
-    eventType: safeEventType,
-    severity,
-    ipAddress: metadata.ipAddress ? normalizeClientIp(metadata.ipAddress) : null,
-    userAgent: metadata.userAgent ? normalizeUserAgent(metadata.userAgent) : null,
-    description: boundedText(metadata.description, MAX_SECURITY_DESCRIPTION_LENGTH),
-    metadata: boundedSecurityMetadata(metadata.data),
-    resolved: false,
-  });
+  try {
+    const safeEventType = boundedText(eventType, 50) || "security_event";
+    await db.insert(securityEvents).values({
+      id: randomBytes(16).toString("hex"),
+      userId: boundedText(metadata.userId, 36),
+      eventType: safeEventType,
+      severity,
+      ipAddress: metadata.ipAddress ? normalizeClientIp(metadata.ipAddress) : null,
+      userAgent: metadata.userAgent ? normalizeUserAgent(metadata.userAgent) : null,
+      description: boundedText(metadata.description, MAX_SECURITY_DESCRIPTION_LENGTH),
+      metadata: boundedSecurityMetadata(metadata.data),
+      resolved: false,
+    });
+  } catch (error) {
+    // Security telemetry is important, but a telemetry-table failure must not
+    // convert a valid authentication/session decision into an application outage.
+    warnTelemetryFailure("security-event persistence", error);
+  }
 }
 
 export async function getRecentSecurityEvents(limit: number = 50) {
@@ -214,15 +257,19 @@ export async function logLoginAttempt(
   failureReason?: string,
   twoFactorRequired: boolean = false
 ): Promise<void> {
-  await db.insert(loginAttempts).values({
-    id: randomBytes(16).toString("hex"),
-    email: (boundedText(email.toLowerCase(), 200) || "unknown").slice(0, 200),
-    ipAddress: normalizeClientIp(ipAddress),
-    userAgent: normalizeUserAgent(userAgent),
-    success,
-    twoFactorRequired,
-    failureReason: boundedText(failureReason, 100),
-  });
+  try {
+    await db.insert(loginAttempts).values({
+      id: randomBytes(16).toString("hex"),
+      email: (boundedText(email.toLowerCase(), 200) || "unknown").slice(0, 200),
+      ipAddress: normalizeClientIp(ipAddress),
+      userAgent: normalizeUserAgent(userAgent),
+      success,
+      twoFactorRequired,
+      failureReason: boundedText(failureReason, 100),
+    });
+  } catch (error) {
+    warnTelemetryFailure("login-attempt persistence", error);
+  }
 }
 
 export async function getRecentFailedLogins(
@@ -272,8 +319,14 @@ export async function detectSuspiciousActivity(
 ): Promise<{ suspicious: boolean; reasons: string[] }> {
   const reasons: string[] = [];
   const [failedAttempts, ipFailedAttempts] = await Promise.all([
-    getRecentFailedLogins(email, 900_000),
-    getFailedLoginsByIP(ipAddress, 3_600_000),
+    getRecentFailedLogins(email, 900_000).catch((error) => {
+      warnTelemetryFailure("failed-login email lookup", error);
+      return 0;
+    }),
+    getFailedLoginsByIP(ipAddress, 3_600_000).catch((error) => {
+      warnTelemetryFailure("failed-login IP lookup", error);
+      return 0;
+    }),
   ]);
 
   if (failedAttempts >= 3) {
@@ -316,16 +369,4 @@ function parseUserAgent(userAgent: string): { browser?: string; os?: string; dev
   else info.device = "Desktop";
 
   return info;
-}
-
-// ============ Password Security ============
-
-export function validatePasswordStrength(password: string): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  if (password.length < 12) errors.push("Password must be at least 12 characters long");
-  if (!/[A-Z]/.test(password)) errors.push("Password must contain at least one uppercase letter");
-  if (!/[a-z]/.test(password)) errors.push("Password must contain at least one lowercase letter");
-  if (!/[0-9]/.test(password)) errors.push("Password must contain at least one number");
-  if (!/[!@#$%^&*(),.?\":{}|<>]/.test(password)) errors.push("Password must contain at least one special character");
-  return { valid: errors.length === 0, errors };
 }
