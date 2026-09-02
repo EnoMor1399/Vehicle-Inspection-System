@@ -99,6 +99,21 @@ Completed in source:
 - Docker Compose is aligned to PostgreSQL 18 and the migration service runs both `db:upgrade` and `db:verify`;
 - regression coverage includes audit redaction, vehicle lifecycle policy, migration planning, webhook resolved-address rules and delegated role policy.
 
+## Phase 9 — Request, evidence, export and predictive-query hardening
+
+Completed in source:
+
+- mutating JSON APIs use a streaming bounded body reader, so oversized payloads are rejected before unbounded JSON parsing;
+- the API proxy applies endpoint-aware request limits that match route policy: a small default mutation envelope, a dedicated AI compatibility envelope and a larger but bounded inspection-evidence envelope;
+- malformed, forged and excessive `Content-Length` values are rejected consistently;
+- inspection evidence is restricted to base64 JPEG, PNG or WebP data URLs;
+- per-item, per-inspection photo counts and combined evidence size are bounded;
+- the AI compatibility endpoint no longer accepts multi-megabyte image blobs it cannot analyze and no longer exposes internal error text in its response;
+- CSV and XLSX exports neutralize spreadsheet formula prefixes, including whitespace/tab bypass forms;
+- export display-column widths are bounded to avoid pathological spreadsheet layouts;
+- predictive-maintenance fleet analysis no longer performs one history query per vehicle; a ranked batch query supplies bounded recent histories for risk calculation;
+- regression tests cover bounded JSON streaming, evidence format/count limits, proxy-limit alignment and spreadsheet formula neutralization.
+
 ## Release identity
 
 Enterprise V2.4 uses `package.json` as the source-controlled runtime release identity. The candidate reports version **2.4.0** through the existing release-version module and health endpoints.
