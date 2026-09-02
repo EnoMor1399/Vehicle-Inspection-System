@@ -114,9 +114,59 @@ Completed in source:
 - predictive-maintenance fleet analysis no longer performs one history query per vehicle; a ranked batch query supplies bounded recent histories for risk calculation;
 - regression tests cover bounded JSON streaming, evidence format/count limits, proxy-limit alignment and spreadsheet formula neutralization.
 
-## Final source acceptance result
+## Phase 10 — Public verification and horizontal-access protection
 
-GitHub quality gate run `33628174418` passed on final source head `f155b4afe76f22d2dc6f2320e524c290a8914708`:
+Completed in source:
+
+- unsigned, malformed, unknown and tampered public certificate-verification links return one generic failure state without disclosing record existence;
+- only a cryptographically valid signed verification link can reveal certificate facts;
+- public verification no longer exposes VIN, chassis numbers, owner/transporter details or stored handwritten signature images;
+- the public verification view is reduced to the minimum vehicle, inspection and validity facts required to confirm authenticity;
+- transporter-scoped certificate and inspection access remains enforced against the authenticated user's transporter assignment;
+- daily inspection direct-ID reads now require inspection permission for internal users while retaining transporter-scope enforcement for portal users.
+
+## Phase 11 — Browser submission, evidence and import hardening
+
+Completed in source:
+
+- comprehensive and daily inspection Server Actions now share bounded evidence and signature rules with the API path;
+- evidence photos are restricted by type, per-item count, per-inspection count and combined encoded size;
+- handwritten signatures are restricted to bounded PNG data URLs;
+- comprehensive inspection attachments are limited to bounded PDF/JPEG/PNG payloads with MIME and decoded-size consistency checks;
+- daily pre-trip inputs have bounded text, date, odometer, checklist, notes, evidence and signature validation;
+- import jobs validate runtime file, row and mapping envelopes rather than relying on TypeScript-only shapes;
+- integer import fields reject partial numeric strings instead of accepting prefixes such as `12abc`;
+- repeated vehicle/transporter reference lookups are batched for import processing;
+- the PWA service worker was verified to keep authenticated HTML and API responses network-only and out of persistent service-worker caches.
+
+## Phase 12 — Administrative mutation and configuration safety
+
+Completed in source:
+
+- system settings updates pass through a strict server-side whitelist before database writes;
+- password-policy minimum length cannot be lowered below the V2.4 security floor;
+- security timers, login-attempt limits, certificate periods and reminder windows are bounded server-side;
+- theme colors require valid hex values and organization URLs/contact fields are validated and bounded;
+- logo data is restricted to bounded raster image data rather than active SVG content;
+- web vehicle create/update now follows the same lifecycle policy as the API, including inspection-controlled states and terminal decommissioning;
+- vehicle transporter references are validated before persistence;
+- transporter and inspection-station Server Actions now use runtime schemas and bounded fields;
+- transporter direct-detail access no longer gives low-privilege internal accounts an alternate data-read path;
+- API-key generation uses strict runtime scope/expiry validation instead of silently dropping invalid scopes;
+- notification, API-key and session mutation identifiers are bounded before database use.
+
+## Phase 13 — 2FA enrollment protection
+
+Completed in source:
+
+- authenticator enrollment and verification use the dedicated two-factor rate-limit policy;
+- verification attempts are bounded to the existing five-attempt/five-minute policy;
+- accounts with 2FA already enabled cannot silently replace the enrolled secret by re-running setup;
+- enrollment failures continue to emit security telemetry without exposing secret material.
+
+## Latest code acceptance result
+
+GitHub quality gate run `33632021471` passed on source head `0c3cd786558238edaea29c4e37438946a8e5e59f`:
 
 - Secret and workflow policy scan: **PASS**
 - Dependency audit: **PASS**
@@ -126,6 +176,8 @@ GitHub quality gate run `33628174418` passed on final source head `f155b4afe76f2
 - Production build: **PASS**
 - Docker runtime and migrator image build: **PASS**
 - Local production-container liveness smoke: **PASS**
+
+This acceptance run validates the functional code through Phase 13. Documentation-only commits after that source head do not deploy or modify production data and remain subject to the same PR quality gate.
 
 ## Release identity
 
