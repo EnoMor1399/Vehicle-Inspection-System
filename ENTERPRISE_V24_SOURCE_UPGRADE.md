@@ -1,197 +1,242 @@
-# VIMS Enterprise V2.4 — Source Upgrade Candidate
+# VIMS Enterprise V2.4 — Source Upgrade Completion Record
 
-Status: **Source-complete candidate; not deployed and not applied to the production database.**
+Status: **SOURCE COMPLETE THROUGH PHASE 16 — NOT DEPLOYED AND NOT APPLIED TO THE PRODUCTION DATABASE.**
 
-This upgrade continues from the Enterprise V2.3 production baseline. The `source-only-hardening` branch remains a non-deployment branch. GitHub validation, container verification and database-upgrade preparation can run without changing the live application.
+This record covers the completed Enterprise V2.4 source-hardening program on the `source-only-hardening` branch. The branch is intentionally host-neutral and non-deploying. GitHub validation, container verification, migration preparation, release tooling, and security regression coverage may run without changing the live VIMS application or production database.
 
 ## Phase 1 — Production maintenance and release safety
 
-Completed on the V2.3 baseline and retained here:
+Completed:
 
-- preview-first production cutover and administrator repair workflows;
-- main-ref enforcement for production-secret workflows;
+- protected, deliberate production maintenance workflows;
+- main-ref enforcement for production-secret operations;
 - immutable commit-SHA pins for GitHub Actions;
-- explicit PostgreSQL `verify-full` TLS normalization;
-- protected production environment for database maintenance;
-- CI enforcement of maintenance-workflow safeguards.
+- explicit PostgreSQL TLS normalization;
+- protected production environment boundaries;
+- CI enforcement of maintenance-workflow safeguards;
+- removal of hard dependency on a Vercel production URL from release/database maintenance tooling.
 
 ## Phase 2 — Authentication and session resilience
 
-Completed in this source candidate:
+Completed:
 
-- canonical password policy with bounded environment parsing;
-- session validation joins the session and active account in one database round-trip;
+- canonical bounded password policy;
+- session validation joins session and active account state in one database round-trip;
 - disabled accounts invalidate active sessions immediately;
-- API-key authentication joins the key owner in one query;
+- API-key authentication validates the active key owner;
 - account lookup and suspicious-login checks execute concurrently;
-- security/login telemetry failures no longer turn otherwise valid authentication decisions into outages;
-- session activity refresh is treated as non-critical telemetry.
+- security/login telemetry failures cannot convert an otherwise valid authentication decision into an outage;
+- session activity refresh is non-critical telemetry.
 
 ## Phase 3 — Audit data protection
 
 Completed:
 
-- recursive redaction of passwords, secrets, tokens, API keys, authorization data, cookies and sensitive connection fields;
+- recursive redaction of passwords, secrets, tokens, API keys, authorization data, cookies, and sensitive connection fields;
 - cycle/depth/array/object-key protection for arbitrary audit payloads;
 - bounded audit strings and payload sizes;
 - normalized IP storage;
-- audit persistence failures log only bounded error messages, never the sensitive audit payload.
+- audit persistence failures log only bounded error information, not sensitive payloads.
 
 ## Phase 4 — Vehicle lifecycle and API integrity
 
 Completed:
 
-- new vehicles can start only in administrative states (`active` or `suspended`);
-- inspection-derived states (`under_inspection`, `passed`, `failed`) cannot be manufactured through generic vehicle updates;
-- inspection-derived states can leave the generic API only through decommissioning;
-- decommissioned vehicles are terminal through the generic vehicle API;
-- `transporter_id` PATCH requests are validated and persisted instead of being silently ignored;
-- vehicle PATCH rejects empty changes and returns the persisted state to audit logging;
-- repeated decommission requests are idempotent.
+- new vehicles may start only in administrative states;
+- inspection-derived states cannot be manufactured through generic vehicle updates;
+- inspection-derived states may leave the generic API only through approved decommissioning behavior;
+- decommissioned vehicles are terminal through generic vehicle mutation paths;
+- transporter changes are validated and persisted;
+- empty vehicle PATCH requests are rejected;
+- repeated decommission requests are idempotent;
+- persisted state is used for audit logging.
 
 ## Phase 5 — Security and operations query scaling
 
-Source preparation and verification tooling completed; production database execution remains intentionally pending:
+Source preparation completed; production execution intentionally pending:
 
-- partial indexes for failed-login detection by email and IP;
+- failed-login query indexes by email and IP;
 - active-session recency index;
 - audit entity/user recency indexes;
 - unread-notification recency index;
-- removal of redundant non-unique session-token and API-key-hash indexes already covered by UNIQUE constraints;
-- migration added to the guarded enterprise migration plan;
-- direct database post-migration verification through `npm run db:verify`;
-- the production database-upgrade workflow no longer depends on any application-host URL.
+- redundant indexes already covered by UNIQUE constraints removed from the migration plan;
+- guarded migration and direct post-migration verification tooling;
+- host-neutral production database-upgrade workflow.
 
 Migration: `migrations/20260902_security_query_indexes.sql`
 
-Do **not** mark this phase production-applied until the guarded database-upgrade workflow is deliberately run after promotion.
+Do not mark this phase production-applied until the guarded production database-upgrade workflow is deliberately executed after promotion.
 
 ## Phase 6 — Outbound integration and incident safety
 
 Completed:
 
-- webhook registration checks resolved DNS addresses as well as URL syntax;
-- private, loopback, link-local, metadata, documentation and other non-public resolved addresses are rejected;
-- frontend incident reports use normalized client IP, user-agent and request IDs;
+- webhook registration validates resolved DNS addresses as well as URL syntax;
+- private, loopback, link-local, metadata, documentation, and other non-public destinations are rejected;
+- frontend incident reports use normalized and bounded request metadata;
 - malformed or excessive Content-Length values are rejected;
-- the optional error-tracking webhook is DNS-checked before delivery.
+- optional error-tracking webhook destinations are DNS-checked before delivery.
 
 ## Phase 7 — Identity and RBAC transaction safety
 
 Completed:
 
-- role assignment has a privilege ceiling based on the actor's current role;
-- Super Administrator access remains exclusively controlled by a Super Administrator;
-- user-access mutations are serialized in one database transaction;
-- active Super Administrator rows are locked before last-admin checks, preventing concurrent demotions from orphaning the system;
-- role, active-state and transporter-scope changes revoke sessions in the same transaction as the access update;
-- audit records show whether sessions were revoked.
+- delegated role assignment has a privilege ceiling based on the actor’s current role;
+- Super Administrator control remains exclusive to Super Administrators;
+- user-access mutations are serialized transactionally;
+- active Super Administrator rows are locked before last-admin checks;
+- role, active-state, and transporter-scope changes revoke sessions in the same transaction;
+- audit records reflect sensitive access changes and session revocation.
 
 ## Phase 8 — Build, container and regression gate
 
-Completed in source:
+Completed:
 
-- GitHub quality gate includes secret/workflow policy enforcement, TypeScript, ESLint, regression tests, high-severity dependency audit and a production-mode Next.js build;
-- production dependency installation explicitly includes the build toolchain even when `NODE_ENV=production`;
-- the quality gate builds both the production runtime image and the database migrator image;
-- the runtime image is started locally inside GitHub Actions and `/api/health/live` must respond successfully;
-- Docker image validation publishes or deploys nothing;
-- Docker Compose is aligned to PostgreSQL 18 and the migration service runs both `db:upgrade` and `db:verify`;
-- regression coverage includes audit redaction, vehicle lifecycle policy, migration planning, webhook resolved-address rules and delegated role policy.
+- GitHub quality gate includes secret/workflow policy enforcement, TypeScript, ESLint, regression tests, high-severity dependency audit, and production Next.js build;
+- production build explicitly installs required build tooling;
+- CI builds both the runtime and database migrator images;
+- the production container must answer `/api/health/live` during the CI smoke test;
+- Docker verification publishes or deploys nothing;
+- Docker Compose is aligned to PostgreSQL 18 and the migration service runs both upgrade and verification;
+- CI concurrency prevents stale duplicate quality runs.
 
 ## Phase 9 — Request, evidence, export and predictive-query hardening
 
-Completed in source:
+Completed:
 
-- mutating JSON APIs use a streaming bounded body reader, so oversized payloads are rejected before unbounded JSON parsing;
-- the API proxy applies endpoint-aware request limits that match route policy: a small default mutation envelope, a dedicated AI compatibility envelope and a larger but bounded inspection-evidence envelope;
-- malformed, forged and excessive `Content-Length` values are rejected consistently;
-- inspection evidence is restricted to base64 JPEG, PNG or WebP data URLs;
-- per-item, per-inspection photo counts and combined evidence size are bounded;
-- the AI compatibility endpoint no longer accepts multi-megabyte image blobs it cannot analyze and no longer exposes internal error text in its response;
-- CSV and XLSX exports neutralize spreadsheet formula prefixes, including whitespace/tab bypass forms;
-- export display-column widths are bounded to avoid pathological spreadsheet layouts;
-- predictive-maintenance fleet analysis no longer performs one history query per vehicle; a ranked batch query supplies bounded recent histories for risk calculation;
-- regression tests cover bounded JSON streaming, evidence format/count limits, proxy-limit alignment and spreadsheet formula neutralization.
+- mutating JSON APIs use streaming bounded body reads;
+- endpoint-aware proxy limits match API payload policies;
+- malformed, forged, and excessive Content-Length values are rejected consistently;
+- inspection evidence is restricted to bounded base64 JPEG, PNG, or WebP data URLs;
+- per-item, per-inspection, and aggregate evidence limits are enforced;
+- AI compatibility input is bounded and internal error text is not disclosed;
+- CSV/XLSX exports neutralize spreadsheet formula prefixes, including whitespace/tab bypass forms;
+- spreadsheet display widths are bounded;
+- predictive-maintenance history queries are batched rather than executed N+1 per vehicle.
 
 ## Phase 10 — Public verification and horizontal-access protection
 
-Completed in source:
+Completed:
 
-- unsigned, malformed, unknown and tampered public certificate-verification links return one generic failure state without disclosing record existence;
-- only a cryptographically valid signed verification link can reveal certificate facts;
-- public verification no longer exposes VIN, chassis numbers, owner/transporter details or stored handwritten signature images;
-- the public verification view is reduced to the minimum vehicle, inspection and validity facts required to confirm authenticity;
-- transporter-scoped certificate and inspection access remains enforced against the authenticated user's transporter assignment;
-- daily inspection direct-ID reads now require inspection permission for internal users while retaining transporter-scope enforcement for portal users.
+- public certificate verification requires a valid cryptographic signature;
+- unsigned, malformed, unknown, and tampered links return one generic failure state;
+- public verification discloses only minimum authenticity and validity facts;
+- VIN, chassis details, owner/transporter details, and handwritten signature images are not exposed publicly;
+- transporter-scoped certificate and inspection access remains enforced;
+- daily-inspection direct-ID reads require permission for internal users and transporter scope for portal users.
 
 ## Phase 11 — Browser submission, evidence and import hardening
 
-Completed in source:
+Completed:
 
-- comprehensive and daily inspection Server Actions now share bounded evidence and signature rules with the API path;
-- evidence photos are restricted by type, per-item count, per-inspection count and combined encoded size;
+- comprehensive and daily inspection Server Actions share bounded evidence/signature policies with API paths;
 - handwritten signatures are restricted to bounded PNG data URLs;
-- comprehensive inspection attachments are limited to bounded PDF/JPEG/PNG payloads with MIME and decoded-size consistency checks;
-- daily pre-trip inputs have bounded text, date, odometer, checklist, notes, evidence and signature validation;
-- import jobs validate runtime file, row and mapping envelopes rather than relying on TypeScript-only shapes;
-- integer import fields reject partial numeric strings instead of accepting prefixes such as `12abc`;
-- repeated vehicle/transporter reference lookups are batched for import processing;
-- the PWA service worker was verified to keep authenticated HTML and API responses network-only and out of persistent service-worker caches.
+- comprehensive inspection attachments are limited to bounded PDF/JPEG/PNG payloads with MIME and decoded-size checks;
+- daily pre-trip text, dates, odometer, checklist, notes, evidence, and signatures are validated and bounded;
+- import files, rows, and mappings are runtime-validated;
+- integer imports reject partially numeric values;
+- repeated vehicle/transporter reference lookups are batched;
+- authenticated HTML/API responses remain excluded from persistent service-worker caches.
 
 ## Phase 12 — Administrative mutation and configuration safety
 
-Completed in source:
+Completed:
 
-- system settings updates pass through a strict server-side whitelist before database writes;
-- password-policy minimum length cannot be lowered below the V2.4 security floor;
-- security timers, login-attempt limits, certificate periods and reminder windows are bounded server-side;
-- theme colors require valid hex values and organization URLs/contact fields are validated and bounded;
-- logo data is restricted to bounded raster image data rather than active SVG content;
-- web vehicle create/update now follows the same lifecycle policy as the API, including inspection-controlled states and terminal decommissioning;
-- vehicle transporter references are validated before persistence;
-- transporter and inspection-station Server Actions now use runtime schemas and bounded fields;
-- transporter direct-detail access no longer gives low-privilege internal accounts an alternate data-read path;
-- API-key generation uses strict runtime scope/expiry validation instead of silently dropping invalid scopes;
-- notification, API-key and session mutation identifiers are bounded before database use.
+- system settings use a strict server-side whitelist;
+- password minimums cannot be lowered below the V2.4 security floor;
+- security timers, login limits, certificate periods, and reminder windows are bounded;
+- theme colours, organization URLs, and contact fields are validated;
+- logo payloads are restricted to bounded raster data rather than active SVG content;
+- web vehicle create/update follows the same lifecycle policy as API paths;
+- transporter references are validated before persistence;
+- transporter and station Server Actions use runtime schemas;
+- transporter direct-detail access closes low-privilege alternate read paths;
+- API-key generation validates scope and expiry strictly;
+- notification, API-key, and session mutation identifiers are bounded before database use.
 
 ## Phase 13 — 2FA enrollment protection
 
-Completed in source:
+Completed:
 
-- authenticator enrollment and verification use the dedicated two-factor rate-limit policy;
-- verification attempts are bounded to the existing five-attempt/five-minute policy;
+- authenticator enrollment and verification use dedicated two-factor rate limits;
+- verification attempts are bounded by the existing policy;
 - accounts with 2FA already enabled cannot silently replace the enrolled secret by re-running setup;
-- enrollment failures continue to emit security telemetry without exposing secret material.
+- enrollment failures emit security telemetry without exposing secret material.
 
-## Latest code acceptance result
+## Phase 14 — Reporting, export and Power BI authorization hardening
 
-GitHub quality gate run `33632021471` passed on source head `0c3cd786558238edaea29c4e37438946a8e5e59f`:
+Completed:
 
-- Secret and workflow policy scan: **PASS**
-- Dependency audit: **PASS**
-- TypeScript: **PASS**
-- ESLint: **PASS**
-- Regression tests: **PASS**
-- Production build: **PASS**
-- Docker runtime and migrator image build: **PASS**
-- Local production-container liveness smoke: **PASS**
+- reports are protected by reporting RBAC;
+- CSV/XLSX exports use centralized spreadsheet formula neutralization and bounded widths;
+- default Power BI datasets use explicit least-privilege field allow-lists;
+- VIN/chassis details and sensitive transporter tax/contact fields are not silently disclosed by default datasets;
+- OData/Power BI query behavior is validated and bounded;
+- expensive count queries run only when explicitly requested where applicable;
+- generated integration destinations do not trust spoofable forwarded request hosts;
+- unexpected reporting failures return generic server errors rather than raw internals;
+- regression coverage verifies reporting disclosure and export safety.
 
-This acceptance run validates the functional code through Phase 13. Documentation-only commits after that source head do not deploy or modify production data and remain subject to the same PR quality gate.
+## Phase 15 — Frontend telemetry and recovery hardening
+
+Completed:
+
+- frontend error telemetry is bounded server-side;
+- chunked or no-length requests cannot bypass the telemetry request limit;
+- ErrorBoundary payload shape is aligned with the strict server schema;
+- recovery navigation uses safe application destinations rather than attacker-controlled values;
+- regression coverage verifies error-telemetry bounds and schema alignment.
+
+## Phase 16 — Signed webhook delivery and event parity
+
+Completed:
+
+- vehicle and inspection webhook delivery uses HMAC-SHA256 signatures;
+- webhook secrets remain encrypted at rest;
+- destinations are revalidated and re-resolved immediately before every delivery;
+- outbound sockets connect to an already validated public address while preserving TLS SNI/Host identity;
+- automatic redirects are not followed;
+- network timeout and payload size are bounded;
+- webhook payloads use minimum-data disclosure;
+- success/failure bookkeeping updates delivery state safely;
+- REST and web-admin mutation paths emit the same documented vehicle/inspection events;
+- unsupported subscription contracts are removed rather than advertised;
+- regression coverage verifies registration policy, DNS/SSRF controls, signing, and event emission parity.
+
+## Source acceptance requirements
+
+Every current PR head must pass the `VIMS Quality Gate`, including:
+
+- secret and workflow policy scan;
+- high-severity dependency audit;
+- TypeScript validation;
+- ESLint;
+- regression tests;
+- production Next.js build;
+- Docker runtime image build;
+- Docker migrator image build;
+- running production-container liveness smoke.
+
+The authoritative latest run and source head are recorded on PR #14 so this document does not become stale after documentation-only commits.
 
 ## Release identity
 
-Enterprise V2.4 uses `package.json` as the source-controlled runtime release identity. The candidate reports version **2.4.0** through the existing release-version module and health endpoints.
+Enterprise V2.4 uses `package.json` as the source-controlled release identity and remains version **2.4.0**.
 
-## Host-neutral promotion requirements
+## Source-only completion boundary
 
-Before this candidate is considered a production V2.4 release:
+The planned source-hardening program is **complete through Phase 16**. No additional source phase is currently documented as outstanding in this V2.4 roadmap.
 
-1. The draft PR must pass every GitHub quality-gate job, including `Production build` and `Docker image and liveness smoke`.
-2. Review the final diff and promote intentionally only when a production rollout is authorized.
-3. Deploy the tested container/application to the selected non-Vercel production environment, or run it through an approved equivalent production runtime.
-4. Deliberately run the guarded production database-upgrade workflow to apply `20260902_security_query_indexes.sql`; the workflow must pass `db:verify` before it is considered successful.
-5. Perform live post-deployment verification for database readiness, authentication, inspection and vehicle workflows, user-access changes, tenant isolation, rate limiting, reports, audit logs, integrations and runtime errors.
-6. Verify backup and restore procedures against the chosen production platform before declaring the release operationally complete.
+The following are intentionally production-only and remain pending until a later explicit rollout request:
 
-Until the production promotion steps occur, the live VIMS production application remains unchanged and this document must continue to show **source-complete, not production-applied**.
+1. select and provision the approved non-Vercel production runtime;
+2. promote/merge the release intentionally without triggering an unauthorized deployment path;
+3. deploy the tested application/container to that runtime;
+4. capture a production backup and deliberately execute the guarded database upgrade;
+5. pass `npm run db:verify` against production;
+6. pass host-neutral post-deployment smoke verification;
+7. run live authentication, tenant/isolation, inspection, vehicle, reporting, audit, and integration checks;
+8. prove backup/restore readiness;
+9. activate production monitoring, logging, backup scheduling, alert ownership, and operational sign-off.
+
+Until those production-only steps are explicitly authorized and executed, VIMS Enterprise V2.4 must continue to be described as **source complete, not production applied**.
