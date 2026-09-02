@@ -24,11 +24,11 @@ export async function getCurrentUser() {
 
   const { validateSession } = await import("./security");
   const session = await validateSession(sessionToken);
-  if (!session.valid || !session.userId) throw new Error("Authentication required");
+  if (!session.valid || !session.userId || !session.user?.isActive) {
+    throw new Error("Authentication required");
+  }
 
-  const [user] = await db.select().from(users).where(eq(users.id, session.userId));
-  if (!user || !user.isActive) throw new Error("Authentication required");
-  return user;
+  return session.user;
 }
 
 export async function login(
@@ -54,7 +54,14 @@ export async function login(
     verifyTwoFactorToken,
   } = await import("./security");
 
-  const suspicious = await detectSuspiciousActivity(email, ipAddress, userAgent);
+  // Resolve the account and suspicious-login signals concurrently. The two
+  // checks are independent and this removes one sequential database wait from
+  // every sign-in attempt.
+  const [[user], suspicious] = await Promise.all([
+    db.select().from(users).where(eq(users.email, email)).limit(1),
+    detectSuspiciousActivity(email, ipAddress, userAgent),
+  ]);
+
   if (suspicious.suspicious) {
     await logSecurityEvent("suspicious_login_attempt", "warning", {
       ipAddress,
@@ -63,8 +70,6 @@ export async function login(
       data: { reasons: suspicious.reasons },
     });
   }
-
-  const [user] = await db.select().from(users).where(eq(users.email, email));
 
   if (!user) {
     await logLoginAttempt(email, ipAddress, userAgent, false, "user_not_found");
