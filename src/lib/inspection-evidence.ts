@@ -63,6 +63,38 @@ export function validateInspectionEvidence(
   return { totalPhotos, totalCharacters };
 }
 
+export function validateDailyInspectionEvidence(
+  categories: Array<{ items?: Array<{ photos?: string[] }> }>
+) {
+  let totalPhotos = 0;
+  let totalCharacters = 0;
+
+  for (const category of categories) {
+    for (const item of category.items || []) {
+      const photos = item.photos || [];
+      if (photos.length > MAX_EVIDENCE_PHOTOS_PER_ITEM) {
+        throw new Error(`Each checklist item is limited to ${MAX_EVIDENCE_PHOTOS_PER_ITEM} evidence photos`);
+      }
+      for (const photo of photos) {
+        if (!isSupportedEvidenceImageDataUrl(photo)) {
+          throw new Error("Evidence photos must be bounded base64 JPEG, PNG, or WebP images");
+        }
+        totalPhotos += 1;
+        totalCharacters += photo.length;
+      }
+    }
+  }
+
+  if (totalPhotos > MAX_EVIDENCE_PHOTOS_PER_INSPECTION) {
+    throw new Error(`Inspection evidence is limited to ${MAX_EVIDENCE_PHOTOS_PER_INSPECTION} photos`);
+  }
+  if (totalCharacters > MAX_COMBINED_EVIDENCE_PHOTO_CHARS) {
+    throw new Error("Combined inspection evidence is too large");
+  }
+
+  return { totalPhotos, totalCharacters };
+}
+
 export function validateInspectionDocuments(
   documents: Array<{ id?: string; name?: string; dataUrl?: string; type?: string; size?: number }>
 ) {
