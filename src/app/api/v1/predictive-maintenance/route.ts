@@ -1,7 +1,7 @@
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
-import { eq, desc, inArray, lte, sql } from "drizzle-orm";
+import { eq, desc, inArray, lte, sql, and } from "drizzle-orm";
 
 type VehicleRecord = typeof vehicles.$inferSelect;
 type HistoryRecord = Pick<
@@ -55,10 +55,10 @@ export async function GET(request: Request) {
         sectionData: rankedHistory.sectionData,
       })
       .from(rankedHistory)
-      .where(
-        inArray(rankedHistory.vehicleId, vehicleIds)
-      )
-      .where(lte(rankedHistory.rank, 12));
+      .where(and(
+        inArray(rankedHistory.vehicleId, vehicleIds),
+        lte(rankedHistory.rank, 12)
+      ));
 
     const historyByVehicle = new Map<string, HistoryRecord[]>();
     for (const row of historyRows) {
