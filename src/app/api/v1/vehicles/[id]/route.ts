@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { vehicles, transporters } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { vehiclePatchSchema, zodDetails } from "@/lib/api-schemas";
+import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { validateGenericVehicleStatusTransition } from "@/lib/vehicle-lifecycle";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +26,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   try {
-    const parsed = vehiclePatchSchema.safeParse(await req.json());
+    const bodyResult = await readJsonBody(req, API_SMALL_JSON_BODY_LIMIT);
+    if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+    const parsed = vehiclePatchSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid vehicle payload", zodDetails(parsed.error));
     const body = parsed.data;
     const changedFields = Object.keys(body);
