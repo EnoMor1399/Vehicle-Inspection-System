@@ -106,8 +106,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Install locked dependencies including build toolchain
+        run: npm ci --include=dev
 
       - name: Build production application
         run: npm run build
