@@ -1,17 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSettings, updateSettings, type SystemSettings } from "@/lib/settings";
+import {
+  getSettings,
+  updateSettings,
+  type EditableSystemSettings,
+} from "@/lib/settings";
+import { toEditableSystemSettings } from "@/lib/settings-view";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { settingsValidationMessage, systemSettingsUpdateSchema } from "@/lib/settings-policy";
 
-export async function getSettingsAction(): Promise<SystemSettings> {
-  return getSettings();
+export async function getSettingsAction(): Promise<EditableSystemSettings> {
+  return toEditableSystemSettings(await getSettings());
 }
 
 export async function updateSettingsAction(
-  data: Partial<Omit<SystemSettings, "id" | "updatedAt" | "updatedBy">>
+  data: Partial<EditableSystemSettings>
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser();
   if (!hasPermission(user, "settings")) {
