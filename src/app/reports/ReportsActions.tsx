@@ -5,10 +5,32 @@ import { Download, Printer, Mail, Loader2 } from "lucide-react";
 import * as XLSX from "@e965/xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { neutralizeSpreadsheetFormula } from "@/lib/export-security";
 
 interface ReportsActionsProps {
-  recentData: any[];
-  stats: any;
+  recentData: Record<string, unknown>[];
+  stats: {
+    totalVehicles: number;
+    totalTransporters: number;
+    totalInspections: number;
+    passRate: number;
+    failRate: number;
+    complianceRate: number;
+  };
+}
+
+function csvCell(value: unknown): string {
+  const stringValue = neutralizeSpreadsheetFormula(value);
+  if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes("\r") || stringValue.includes('"')) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function spreadsheetSafeRows(rows: Record<string, unknown>[]): Record<string, string>[] {
+  return rows.map((row) => Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key, neutralizeSpreadsheetFormula(value)])
+  ));
 }
 
 export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
@@ -21,17 +43,8 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       if (format === "csv") {
         const headers = Object.keys(recentData[0] || {});
         const csvContent = [
-          headers.join(","),
-          ...recentData.map((row: any) =>
-            headers.map((header) => {
-              const value = row[header];
-              const stringValue = value === null || value === undefined ? "" : String(value);
-              if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes('"')) {
-                return `"${stringValue.replace(/"/g, '""')}"`;
-              }
-              return stringValue;
-            }).join(",")
-          ),
+          headers.map(csvCell).join(","),
+          ...recentData.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
         ].join("\n");
 
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -39,7 +52,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       } else if (format === "excel") {
         const wb = XLSX.utils.book_new();
 
-        // Summary sheet
+        // Summary sheet contains only application-generated labels and numeric metrics.
         const summaryData = [
           ["Road Safety Limited - Executive Report"],
           [`Generated: ${new Date().toLocaleString()}`],
@@ -56,9 +69,9 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         summaryWs["!cols"] = [{ wch: 30 }, { wch: 20 }];
         XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
-        // Inspections sheet
+        // Database-backed text must be neutralized before it reaches a spreadsheet cell.
         if (recentData.length > 0) {
-          const inspWs = XLSX.utils.json_to_sheet(recentData);
+          const inspWs = XLSX.utils.json_to_sheet(spreadsheetSafeRows(recentData));
           XLSX.utils.book_append_sheet(wb, inspWs, "Recent Inspections");
         }
 
@@ -66,7 +79,6 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       } else if (format === "pdf") {
         const doc = new jsPDF();
 
-        // Title
         doc.setFontSize(20);
         doc.text("Road Safety Limited", 14, 20);
         doc.setFontSize(14);
@@ -74,7 +86,6 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         doc.setFontSize(10);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
 
-        // Summary stats
         doc.setFontSize(12);
         doc.text("Key Metrics", 14, 50);
 
@@ -93,7 +104,6 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
           styles: { fontSize: 10 },
         });
 
-        // Recent inspections
         if (recentData.length > 0) {
           doc.setFontSize(12);
           doc.text("Recent Inspections", 14, (doc as any).lastAutoTable.finalY + 15);
@@ -102,7 +112,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
           autoTable(doc, {
             startY: (doc as any).lastAutoTable.finalY + 20,
             head: [headers],
-            body: recentData.map((row: any) => headers.map((h) => row[h] || "")),
+            body: recentData.map((row) => headers.map((header) => String(row[header] ?? ""))),
             headStyles: { fillColor: [3, 151, 3] },
             styles: { fontSize: 8 },
           });
@@ -161,11 +171,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         disabled={!!action}
         className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
-        {action === "pdf" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Download className="h-4 w-4" />
-        )}
+        {action === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         PDF
       </button>
       <button
@@ -173,11 +179,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         disabled={!!action}
         className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
-        {action === "excel" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Download className="h-4 w-4" />
-        )}
+        {action === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         Excel
       </button>
       <button
@@ -185,11 +187,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         disabled={!!action}
         className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
-        {action === "csv" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Download className="h-4 w-4" />
-        )}
+        {action === "csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         CSV
       </button>
       <button
@@ -197,11 +195,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         disabled={!!action}
         className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
       >
-        {action === "print" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Printer className="h-4 w-4" />
-        )}
+        {action === "print" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
         Print
       </button>
       <button
@@ -209,11 +203,7 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         disabled={!!action}
         className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-50"
       >
-        {action === "email" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Mail className="h-4 w-4" />
-        )}
+        {action === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
         Email Report
       </button>
     </div>
