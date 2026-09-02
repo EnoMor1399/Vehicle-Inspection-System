@@ -5,6 +5,7 @@ const productionWorkflows = [
   ".github/workflows/production-db-upgrade.yml",
   ".github/workflows/repair-production-super-admin.yml",
   ".github/workflows/diagnose-super-admin-login.yml",
+  ".github/workflows/post-deploy-verification.yml",
 ];
 
 const allWorkflows = [
@@ -101,6 +102,14 @@ requireText(".github/workflows/production-db-upgrade.yml", dbUpgrade, "DATABASE_
 if (/vercel\.app/i.test(dbUpgrade)) {
   issues.push(".github/workflows/production-db-upgrade.yml: database upgrade must not depend on a Vercel runtime URL");
 }
+
+const postDeploy = read(".github/workflows/post-deploy-verification.yml");
+requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "node scripts/post-deploy-smoke.mjs", "post-deployment verification must use the source-controlled smoke verifier");
+requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "VIMS_BASE_URL: ${{ inputs.base_url }}", "post-deployment verification must receive an explicit target URL");
+
+const smokeVerifier = read("scripts/post-deploy-smoke.mjs");
+requireText("scripts/post-deploy-smoke.mjs", smokeVerifier, 'check("/api/health/live", "alive")', "release verifier must test application liveness");
+requireText("scripts/post-deploy-smoke.mjs", smokeVerifier, 'check("/api/health", "healthy")', "release verifier must test database readiness");
 
 const qualityGate = read(".github/workflows/quality-gate.yml");
 requireText(".github/workflows/quality-gate.yml", qualityGate, "node scripts/maintenance-workflow-guard.mjs", "quality gate must enforce maintenance workflow safeguards");
