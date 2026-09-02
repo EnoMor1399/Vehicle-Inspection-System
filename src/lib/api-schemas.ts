@@ -18,7 +18,6 @@ const webhookEvent = z.enum([
   "vehicle.updated",
   "inspection.completed",
   "inspection.failed",
-  "user.created",
 ]);
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().nullable();
@@ -114,7 +113,7 @@ export const inspectionCreateSchema = z.object({
 
 export const webhookCreateSchema = z.object({
   url: z.string().url().max(2048),
-  events: z.array(webhookEvent).min(1).max(5),
+  events: z.array(webhookEvent).min(1).max(4),
   secret: z.string().trim().min(24).max(500).optional().nullable(),
   description: optionalText(1000),
 }).strict();
