@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { createInspection, type InspectionFormData } from "./server";
 import { useRouter, useSearchParams } from "next/navigation";
 import { buildDefaultSectionData, summarizeSection } from "@/lib/sections";
+import { getInspectionDecisionGuidance } from "@/lib/inspection-decision";
 import { SignaturePad } from "@/components/SignaturePad";
 import { PhotoCapture, DocumentUpload, type Photo } from "@/components/PhotoCapture";
 import { GpsCapture } from "@/components/GpsCapture";
@@ -61,6 +62,38 @@ export function InspectionForm({
     return { pass, fail, na, critical, major, minor, total: pass + fail + na };
   }, [sections]);
 
+  const failedItems = useMemo(
+    () => sections.flatMap((section) =>
+      section.items.flatMap((item, itemIndex) => item.result === "fail"
+        ? [{
+            section: section.section,
+            sectionTitle: section.title,
+            itemIndex,
+            name: item.name,
+            severity: item.severity || "minor",
+          }]
+        : []),
+    ),
+    [sections],
+  );
+
+  const decisionGuidance = useMemo(
+    () => getInspectionDecisionGuidance({
+      failCount: totals.fail,
+      majorCount: totals.major,
+      criticalCount: totals.critical,
+      smokeTest,
+    }),
+    [smokeTest, totals.critical, totals.fail, totals.major],
+  );
+
+  const effectiveOverallResult: InspectionFormData["overallResult"] =
+    overallResult === "pass" && !decisionGuidance.passAllowed
+      ? decisionGuidance.recommendedResult
+      : overallResult === "conditional_pass" && !decisionGuidance.conditionalPassAllowed
+        ? decisionGuidance.recommendedResult
+        : overallResult;
+
   function setItem(sectionCode: string, itemIdx: number, patch: Partial<SectionForm["items"][number]>) {
     setSections((prev) =>
       prev.map((s) => {
@@ -115,16 +148,6 @@ export function InspectionForm({
       return setError("Inspection date and time cannot be in the future.");
     }
 
-    if (overallResult === "pass" && (totals.fail > 0 || smokeTest === "fail")) {
-      return showFinalDecisionError(
-        "PASS cannot be submitted while failed checklist or emissions items remain. Resolve the failed items or select Conditional Pass, Re-inspection Required, or Fail.",
-      );
-    }
-    if (overallResult === "conditional_pass" && totals.critical > 0) {
-      return showFinalDecisionError(
-        "Conditional Pass cannot be submitted while critical defects remain. Resolve the critical defects or select Re-inspection Required or Fail.",
-      );
-    }
     if (!inspectorSig) {
       return showFinalDecisionError("Inspector digital signature is required in Section P before submission.");
     }
@@ -141,7 +164,7 @@ export function InspectionForm({
       smokeTest,
       noiseLevel,
       opacityTest: opacity,
-      overallResult,
+      overallResult: effectiveOverallResult,
       inspectorRemarks,
       nextInspectionDate: nextDate,
       reinspectionDate: reinspectDate,
@@ -372,10 +395,87 @@ export function InspectionForm({
               <StatChip label="Critical" value={totals.critical} tone="red" />
             </div>
 
+            <div className={`mb-4 rounded-xl border px-4 py-3 ${decisionGuidance.passAllowed ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+              <div className="flex items-start gap-3">
+                {decisionGuidance.passAllowed ? (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+                ) : (
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">
+                    Recommended result: {formatOverallResult(decisionGuidance.recommendedResult)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">{decisionGuidance.message}</p>
+                  {!decisionGuidance.passAllowed && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      If the currently selected result becomes invalid, the form uses this recommendation automatically. An inspector may still choose a stricter valid result.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {(failedItems.length > 0 || smokeTest === "fail") && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50/60 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-900">Items requiring review</h3>
+                    <p className="text-xs text-red-700">Open the affected section to correct or document the defect before final submission.</p>
+                  </div>
+                  <Badge tone="red">{failedItems.length + (smokeTest === "fail" ? 1 : 0)}</Badge>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {failedItems.slice(0, 8).map((item) => (
+                    <button
+                      key={`${item.section}-${item.itemIndex}`}
+                      type="button"
+                      onClick={() => setActiveSection(item.section)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-left text-sm transition hover:border-red-300 hover:bg-red-50"
+                    >
+                      <span>
+                        <span className="font-semibold text-red-900">Section {item.section}</span>
+                        <span className="text-slate-500"> · {item.sectionTitle}</span>
+                        <span className="block text-slate-800">{item.name}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-red-100 px-2 py-1 text-xs font-medium capitalize text-red-800">{item.severity}</span>
+                    </button>
+                  ))}
+                  {failedItems.length > 8 && (
+                    <p className="text-xs text-red-700">+ {failedItems.length - 8} additional failed checklist item{failedItems.length - 8 === 1 ? "" : "s"}</p>
+                  )}
+                  {smokeTest === "fail" && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection("O")}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-left text-sm transition hover:border-red-300 hover:bg-red-50"
+                    >
+                      <span>
+                        <span className="font-semibold text-red-900">Section O</span>
+                        <span className="text-slate-500"> · Emissions Readings</span>
+                        <span className="block text-slate-800">Smoke Test failed</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">emissions</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <Field label="Overall Result" required>
-              <Select value={overallResult} onChange={(e) => setOverallResult(e.target.value as any)}>
-                <option value="pass">Pass</option>
-                <option value="conditional_pass">Conditional Pass</option>
+              <Select
+                value={effectiveOverallResult}
+                onChange={(e) => {
+                  setOverallResult(e.target.value as InspectionFormData["overallResult"]);
+                  setError(null);
+                }}
+              >
+                <option value="pass" disabled={!decisionGuidance.passAllowed}>
+                  Pass{decisionGuidance.passAllowed ? "" : " — unavailable while failures remain"}
+                </option>
+                <option value="conditional_pass" disabled={!decisionGuidance.conditionalPassAllowed}>
+                  Conditional Pass{decisionGuidance.conditionalPassAllowed ? "" : " — unavailable for critical defects"}
+                </option>
                 <option value="reinspection_required">Re-inspection Required</option>
                 <option value="fail">Fail</option>
               </Select>
@@ -415,10 +515,15 @@ export function InspectionForm({
         )}
 
         <div className="flex items-center justify-between gap-3 sticky bottom-4 bg-white rounded-2xl p-4 shadow-lg ring-1 ring-slate-200">
-          <div className="text-sm text-slate-600">
-            <span className="font-medium text-slate-900">{totals.pass}</span> pass ·{" "}
-            <span className="font-medium text-red-600">{totals.fail}</span> fail ·{" "}
-            <span className="font-medium">{totals.na}</span> n/a
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+            <span>
+              <span className="font-medium text-slate-900">{totals.pass}</span> pass ·{" "}
+              <span className="font-medium text-red-600">{totals.fail}</span> fail ·{" "}
+              <span className="font-medium">{totals.na}</span> n/a
+            </span>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${decisionGuidance.passAllowed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
+              Decision: {formatOverallResult(effectiveOverallResult)}
+            </span>
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => router.push("/inspections")}>Cancel</Button>
@@ -453,4 +558,17 @@ function StatChip({ label, value, tone }: { label: string; value: number; tone: 
       <p className={`text-xl font-semibold ${color}`}>{value}</p>
     </div>
   );
+}
+
+function formatOverallResult(result: InspectionFormData["overallResult"]): string {
+  switch (result) {
+    case "conditional_pass":
+      return "Conditional Pass";
+    case "reinspection_required":
+      return "Re-inspection Required";
+    case "fail":
+      return "Fail";
+    default:
+      return "Pass";
+  }
 }
