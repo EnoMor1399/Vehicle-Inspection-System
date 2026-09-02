@@ -87,7 +87,8 @@ export default async function VerifyPage({
   const validUntil = i.nextInspectionDate
     ? new Date(`${i.nextInspectionDate}T23:59:59`)
     : addMonths(new Date(i.inspectionDate), settings.certificateValidityMonths);
-  const expired = validUntil.getTime() < Date.now();
+  const currentTime = new Date();
+  const expired = validUntil.getTime() < currentTime.getTime();
   const archived = i.workflowStatus === "archived";
   const roadworthy = issued && !expired && !archived && i.overallResult === "pass";
   const resultTone = roadworthy ? "emerald" : i.overallResult === "fail" || archived ? "red" : "amber";
@@ -136,7 +137,7 @@ export default async function VerifyPage({
           </Section>
 
           <div className="mt-6 pt-4 border-t border-slate-200 text-center text-xs text-slate-500">
-            <p className="flex items-center justify-center gap-1.5"><Fingerprint className="h-3.5 w-3.5" /> Checked {formatDateTime(new Date())}</p>
+            <p className="flex items-center justify-center gap-1.5"><Fingerprint className="h-3.5 w-3.5" /> Checked {formatDateTime(currentTime)}</p>
             <p className="mt-1">Public verification intentionally displays only the minimum certificate facts required to confirm authenticity and validity.</p>
           </div>
         </Card>
