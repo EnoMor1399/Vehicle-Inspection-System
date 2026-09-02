@@ -6,6 +6,7 @@ import { vehicleCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { parseApiPagination } from "@/lib/api-pagination";
 import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { formatServerTiming, timeOperation } from "@/lib/performance";
+import { emitWebhookEvent } from "@/lib/webhook-delivery";
 
 const VEHICLE_STATUSES = new Set(["active", "under_inspection", "failed", "passed", "suspended", "decommissioned"]);
 
@@ -103,6 +104,13 @@ export async function POST(request: Request) {
       entityLabel: payload.registrationNumber,
       summary: `Created vehicle via API: ${payload.registrationNumber}`,
       after: payload,
+    });
+
+    await emitWebhookEvent("vehicle.created", {
+      id,
+      registrationNumber: payload.registrationNumber,
+      transporterId,
+      status: payload.status,
     });
 
     return json({ data: { id, registration_number: payload.registrationNumber } }, 201);
