@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 function normalizedHost(value: string): string {
@@ -98,6 +99,44 @@ function isInternalHostname(host: string): boolean {
     ".cluster.local",
   ];
   return blockedSuffixes.some((suffix) => host.endsWith(suffix));
+}
+
+export function isPublicNetworkAddress(address: string): boolean {
+  const normalized = normalizedHost(address);
+  const version = isIP(normalized);
+  if (version === 4) return !isNonPublicIPv4(normalized);
+  if (version === 6) return !isNonPublicIPv6(normalized);
+  return false;
+}
+
+export function validateResolvedAddresses(addresses: string[]): { ok: true } | { ok: false; reason: string } {
+  if (!addresses.length) return { ok: false, reason: "Webhook hostname did not resolve to an address" };
+  for (const address of addresses) {
+    if (!isPublicNetworkAddress(address)) {
+      return { ok: false, reason: "Webhook hostname resolves to a non-public network" };
+    }
+  }
+  return { ok: true };
+}
+
+export async function validateResolvedWebhookDestination(
+  url: URL
+): Promise<{ ok: true; addresses: string[] } | { ok: false; reason: string }> {
+  const host = normalizedHost(url.hostname);
+  const literalVersion = isIP(host);
+  if (literalVersion) {
+    const resolved = validateResolvedAddresses([host]);
+    return resolved.ok ? { ok: true, addresses: [host] } : resolved;
+  }
+
+  try {
+    const records = await lookup(host, { all: true, verbatim: true });
+    const addresses = [...new Set(records.map((record) => record.address))];
+    const resolved = validateResolvedAddresses(addresses);
+    return resolved.ok ? { ok: true, addresses } : resolved;
+  } catch {
+    return { ok: false, reason: "Webhook hostname could not be resolved" };
+  }
 }
 
 export function validateWebhookDestination(value: string): { ok: true; url: URL } | { ok: false; reason: string } {
