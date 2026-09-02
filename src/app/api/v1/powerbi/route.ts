@@ -1,19 +1,63 @@
 import { authenticateApiRequest, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { hasPermission } from "@/lib/auth";
 
 // Power BI-compatible OData v4 endpoint.
 // Supports: service document, $metadata, $filter, $select, $orderby, $top, $skip, $count, $format.
+
+const MAX_PATH_LENGTH = 4096;
+const MAX_FILTER_LENGTH = 2000;
+const MAX_SELECT_LENGTH = 1000;
+const MAX_ORDERBY_LENGTH = 500;
+const MAX_FILTER_CONDITIONS = 20;
+const MAX_SELECTED_FIELDS = 30;
+const MAX_ORDER_FIELDS = 4;
+
+type Row = Record<string, unknown>;
+type PageResult = { data: Row[]; total?: number; hasMore: boolean };
+
+class ODataQueryError extends Error {}
+
+function invalidQuery(message: string): never {
+  throw new ODataQueryError(message);
+}
+
+function configuredPublicBaseUrl(): string {
+  const configured = (process.env.NEXT_PUBLIC_APP_URL || "").trim();
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      const allowedProtocol = url.protocol === "https:" || (process.env.NODE_ENV !== "production" && url.protocol === "http:");
+      if (allowedProtocol && !url.username && !url.password) return url.origin;
+    } catch {
+      // Fall through to the safe environment-specific placeholder below.
+    }
+  }
+  return process.env.NODE_ENV === "production"
+    ? "https://your-vims-domain.example"
+    : "http://localhost:3000";
+}
+
+function normalizeFormat(value: string): "json" | "xml" | null {
+  const normalized = value.trim().toLowerCase();
+  if (["json", "application/json"].includes(normalized)) return "json";
+  if (["xml", "atom", "application/atom+xml"].includes(normalized)) return "xml";
+  return null;
+}
 
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   const url = new URL(request.url);
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || url.origin).replace(/\/$/, "");
+  const baseUrl = configuredPublicBaseUrl();
   const path = url.searchParams.get("path") || "";
-  const format = url.searchParams.get("$format") || url.searchParams.get("format") || "json";
+  if (path.length > MAX_PATH_LENGTH) return apiError(400, "Power BI path is too long");
+
+  const requestedFormat = url.searchParams.get("$format") || url.searchParams.get("format") || "json";
+  const format = normalizeFormat(requestedFormat);
+  if (!format) return apiError(400, "Unsupported Power BI response format");
 
   const allowedEntities = [
     "Inspections",
@@ -34,7 +78,13 @@ export async function GET(request: Request) {
     }, format);
   }
 
-  const [entityName, queryString] = path.split("?");
+  const queryStart = path.indexOf("?");
+  const entityName = (queryStart >= 0 ? path.slice(0, queryStart) : path).trim();
+  const queryString = queryStart >= 0 ? path.slice(queryStart + 1) : undefined;
+  if (!/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(entityName)) {
+    return apiError(400, "Invalid Power BI entity name");
+  }
+
   const entity = entityName.toLowerCase();
   if (!allowedEntities.some((name) => name.toLowerCase() === entity)) {
     return apiError(403, `Entity '${entityName}' is not available for this credential`);
@@ -42,7 +92,7 @@ export async function GET(request: Request) {
 
   try {
     const opts = parseQueryOptions(url.searchParams, queryString);
-    const loaders: Record<string, () => Promise<{ data: any[]; total: number }>> = {
+    const loaders: Record<string, () => Promise<PageResult>> = {
       inspections: () => loadInspections(opts),
       pretripinspections: () => loadPreTripInspections(opts),
       vehicles: () => loadVehicles(opts),
@@ -62,12 +112,12 @@ export async function GET(request: Request) {
       "@odata.context": `${baseUrl}/api/v1/powerbi/$metadata#${entityName}`,
       "@odata.count": opts.count ? result.total : undefined,
       value: result.data,
-      ...(result.data.length === opts.top && result.total > opts.top + opts.skip
-        ? { "@odata.nextLink": buildNextLink(baseUrl, entityName, opts) }
-        : {}),
+      ...(result.hasMore ? { "@odata.nextLink": buildNextLink(baseUrl, entityName, opts) } : {}),
     }, format);
   } catch (error) {
-    return apiError(400, error instanceof Error ? error.message : "Invalid OData query");
+    if (error instanceof ODataQueryError) return apiError(400, error.message);
+    console.error("[powerbi] query execution failed");
+    return apiError(500, "Unable to complete the Power BI query");
   }
 }
 
@@ -81,10 +131,25 @@ type QueryOptions = {
 };
 
 function boundedInteger(value: string | null, fallback: number, min: number, max: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) throw new Error("Invalid pagination value");
-  return Math.min(max, Math.max(min, parsed));
+  if (value === null || value === "") return fallback;
+  if (!/^\d+$/.test(value)) invalidQuery("Pagination values must be whole numbers");
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    invalidQuery(`Pagination value must be between ${min} and ${max}`);
+  }
+  return parsed;
+}
+
+function boundedOption(value: string | null, maxLength: number, label: string): string {
+  if (!value) return "";
+  if (value.length > maxLength) invalidQuery(`${label} is too long`);
+  return value;
+}
+
+function parseCount(value: string | null): boolean {
+  if (value === null || value === "" || value === "false") return false;
+  if (value === "true") return true;
+  invalidQuery("$count must be true or false");
 }
 
 function parseQueryOptions(params: URLSearchParams, queryString?: string): QueryOptions {
@@ -93,10 +158,10 @@ function parseQueryOptions(params: URLSearchParams, queryString?: string): Query
   return {
     top: boundedInteger(read("$top"), 100, 1, 500),
     skip: boundedInteger(read("$skip"), 0, 0, 100000),
-    filter: read("$filter") || "",
-    select: read("$select") || "",
-    orderby: read("$orderby") || "",
-    count: read("$count") === "true",
+    filter: boundedOption(read("$filter"), MAX_FILTER_LENGTH, "$filter"),
+    select: boundedOption(read("$select"), MAX_SELECT_LENGTH, "$select"),
+    orderby: boundedOption(read("$orderby"), MAX_ORDERBY_LENGTH, "$orderby"),
+    count: parseCount(read("$count")),
   };
 }
 
@@ -130,29 +195,32 @@ function safeSqlLiteral(raw: string): string {
     const inner = value.slice(1, -1).replace(/''/g, "'");
     return `'${inner.replace(/'/g, "''")}'`;
   }
-  throw new Error("Unsupported OData filter value");
+  invalidQuery("Unsupported OData filter value");
 }
 
 function buildWhereClause(filter: string, allowedFields: Record<string, string>, baseCondition?: string): string {
   const trimmed = filter.trim();
   if (!trimmed) return baseCondition ? `WHERE ${baseCondition}` : "";
-  if (/[;]|--|\/\*/.test(trimmed)) throw new Error("Unsupported OData filter syntax");
+  if (/[;]|--|\/\*/.test(trimmed)) invalidQuery("Unsupported OData filter syntax");
 
   const tokens = trimmed.split(/\s+(and|or)\s+/i);
+  const conditionCount = Math.ceil(tokens.length / 2);
+  if (conditionCount > MAX_FILTER_CONDITIONS) invalidQuery("Too many OData filter conditions");
+
   const expressions: string[] = [];
   for (let index = 0; index < tokens.length; index += 2) {
     const condition = tokens[index].trim();
     const match = condition.match(/^([A-Za-z][A-Za-z0-9_]*)\s+(eq|ne|gt|lt|ge|le)\s+(.+)$/i);
-    if (!match) throw new Error("Unsupported OData filter expression");
+    if (!match) invalidQuery("Unsupported OData filter expression");
     const [, fieldName, operatorName, rawValue] = match;
     const sqlField = allowedFields[fieldName];
-    if (!sqlField) throw new Error(`Filtering by '${fieldName}' is not allowed`);
+    if (!sqlField) invalidQuery(`Filtering by '${fieldName}' is not allowed`);
     const operator = ODATA_OPERATOR[operatorName.toLowerCase()];
     const literal = safeSqlLiteral(rawValue);
     expressions.push(`${sqlField} ${operator} ${literal}`);
     if (index + 1 < tokens.length) {
       const connector = tokens[index + 1].toUpperCase();
-      if (connector !== "AND" && connector !== "OR") throw new Error("Unsupported OData connector");
+      if (connector !== "AND" && connector !== "OR") invalidQuery("Unsupported OData connector");
       expressions.push(connector);
     }
   }
@@ -164,60 +232,59 @@ function buildWhereClause(filter: string, allowedFields: Record<string, string>,
 function buildOrderBy(orderby: string, allowedFields: Record<string, string>, fallbackField: string): string {
   const raw = orderby.trim() || fallbackField;
   const items = raw.split(",").map((item) => item.trim()).filter(Boolean);
-  if (items.length > 4) throw new Error("Too many order-by fields");
+  if (items.length > MAX_ORDER_FIELDS) invalidQuery("Too many order-by fields");
   const clauses = items.map((item) => {
     const match = item.match(/^([A-Za-z][A-Za-z0-9_]*)(?:\s+(asc|desc))?$/i);
-    if (!match) throw new Error("Unsupported OData order-by expression");
+    if (!match) invalidQuery("Unsupported OData order-by expression");
     const sqlField = allowedFields[match[1]];
-    if (!sqlField) throw new Error(`Ordering by '${match[1]}' is not allowed`);
+    if (!sqlField) invalidQuery(`Ordering by '${match[1]}' is not allowed`);
     return `${sqlField} ${(match[2] || "asc").toUpperCase()}`;
   });
   return `ORDER BY ${clauses.join(", ")}`;
 }
 
 function buildSelectClause(select: string, fields: Record<string, string>): string {
-  const cols = select.split(",").map((s) => s.trim()).filter(Boolean);
-  if (!cols.length) throw new Error("At least one select field is required");
-  if (cols.length > 30) throw new Error("Too many selected fields");
+  const cols = select.split(",").map((item) => item.trim()).filter(Boolean);
+  if (!cols.length) invalidQuery("At least one select field is required");
+  if (cols.length > MAX_SELECTED_FIELDS) invalidQuery("Too many selected fields");
   return cols.map((field) => {
     const sqlCol = fields[field];
-    if (!sqlCol) throw new Error(`Selecting '${field}' is not allowed`);
+    if (!sqlCol) invalidQuery(`Selecting '${field}' is not allowed`);
     return `${sqlCol} as "${field}"`;
   }).join(", ");
 }
 
-async function loadInspections(opts: QueryOptions) {
+function selectedColumns(opts: QueryOptions, fields: Record<string, string>, defaults: string[]): string {
+  return buildSelectClause(opts.select || defaults.join(","), fields);
+}
+
+async function finishPage(rows: Row[], opts: QueryOptions, countQuery: SQL): Promise<PageResult> {
+  const hasMore = rows.length > opts.top;
+  const data = hasMore ? rows.slice(0, opts.top) : rows;
+  if (!opts.count) return { data, hasMore };
+
+  const countRow = await queryOne(countQuery);
+  const rawCount = countRow?.c;
+  const total = typeof rawCount === "number" ? rawCount : Number(rawCount || 0);
+  return { data, total: Number.isFinite(total) ? total : 0, hasMore };
+}
+
+async function loadInspections(opts: QueryOptions): Promise<PageResult> {
   const fields: Record<string, string> = {
+    id: "i.id",
     InspectionNumber: "i.inspection_number",
     InspectionDate: "i.inspection_date",
     OverallResult: "i.overall_result",
     WorkflowStatus: "i.workflow_status",
     InspectorName: "i.inspector_name",
     VehicleRegistration: "v.registration_number",
-    VehicleMake: "v.make",
-    VehicleModel: "v.model",
     TransporterName: "t.company_name",
-    TransporterRegion: "t.region",
     StationName: "l.name",
-    StationRegion: "l.region",
   };
+  const defaults = ["id", "InspectionNumber", "InspectionDate", "OverallResult", "WorkflowStatus", "VehicleRegistration", "InspectorName", "TransporterName", "StationName"];
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      i.id, i.inspection_number as "InspectionNumber", i.inspection_date as "InspectionDate",
-      i.overall_result as "OverallResult", i.workflow_status as "WorkflowStatus",
-      i.inspector_name as "InspectorName", i.station as "Station",
-      i.service_brake_efficiency as "ServiceBrakeEfficiency",
-      i.parking_brake_efficiency as "ParkingBrakeEfficiency",
-      i.smoke_test as "SmokeTest", i.opacity_test as "OpacityTest",
-      i.total_photos as "TotalPhotos", i.template_type as "TemplateType",
-      i.next_inspection_date as "NextInspectionDate", i.reinspection_date as "ReinspectionDate",
-      v.registration_number as "VehicleRegistration", v.make as "VehicleMake",
-      v.model as "VehicleModel", v.body_type as "VehicleBodyType",
-      v.category as "VehicleCategory", v.manufacturing_year as "VehicleYear",
-      v.fuel_type as "VehicleFuelType", t.company_name as "TransporterName",
-      t.region as "TransporterRegion", l.name as "StationName", l.region as "StationRegion"
-  `;
+  const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`
     SELECT ${select}
     FROM inspections i
@@ -226,41 +293,31 @@ async function loadInspections(opts: QueryOptions) {
     LEFT JOIN locations l ON l.id = i.location_id
     ${where}
     ${orderBy}
-    LIMIT ${opts.top} OFFSET ${opts.skip}
+    LIMIT ${opts.top + 1} OFFSET ${opts.skip}
   `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM inspections i INNER JOIN vehicles v ON v.id = i.vehicle_id LEFT JOIN transporters t ON t.id = v.transporter_id LEFT JOIN locations l ON l.id = i.location_id ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  return finishPage(
+    rows,
+    opts,
+    sql.raw(`SELECT count(*)::int as c FROM inspections i INNER JOIN vehicles v ON v.id = i.vehicle_id LEFT JOIN transporters t ON t.id = v.transporter_id LEFT JOIN locations l ON l.id = i.location_id ${where}`)
+  );
 }
 
-async function loadPreTripInspections(opts: QueryOptions) {
+async function loadPreTripInspections(opts: QueryOptions): Promise<PageResult> {
   const fields: Record<string, string> = {
+    id: "d.id",
     InspectionDate: "d.inspection_date",
     Status: "d.status",
     ClearedForTrip: "d.cleared_for_trip",
     DriverName: "d.driver_name",
     PassedItems: "d.passed_items",
     FailedItems: "d.failed_items",
-    TotalItems: "d.total_items",
     VehicleRegistration: "v.registration_number",
-    VehicleMake: "v.make",
-    VehicleModel: "v.model",
     TransporterName: "t.company_name",
-    TransporterRegion: "t.region",
   };
+  const defaults = ["id", "InspectionDate", "Status", "ClearedForTrip", "VehicleRegistration", "DriverName", "PassedItems", "FailedItems", "TransporterName"];
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      d.id, d.inspection_date as "InspectionDate", d.start_time as "StartTime",
-      d.completed_at as "CompletedAt", d.driver_name as "DriverName",
-      d.odometer as "Odometer", d.trip_purpose as "TripPurpose",
-      d.route_description as "RouteDescription", d.status as "Status",
-      d.total_items as "TotalItems", d.passed_items as "PassedItems",
-      d.failed_items as "FailedItems", d.cleared_for_trip as "ClearedForTrip",
-      d.supervisor_review as "SupervisorReview", d.notes as "Notes",
-      v.registration_number as "VehicleRegistration", v.make as "VehicleMake",
-      v.model as "VehicleModel", t.company_name as "TransporterName",
-      t.region as "TransporterRegion"
-  `;
+  const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`
     SELECT ${select}
     FROM daily_inspections d
@@ -268,181 +325,170 @@ async function loadPreTripInspections(opts: QueryOptions) {
     LEFT JOIN transporters t ON t.id = v.transporter_id
     ${where}
     ${orderBy}
-    LIMIT ${opts.top} OFFSET ${opts.skip}
+    LIMIT ${opts.top + 1} OFFSET ${opts.skip}
   `));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM daily_inspections d INNER JOIN vehicles v ON v.id = d.vehicle_id LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  return finishPage(
+    rows,
+    opts,
+    sql.raw(`SELECT count(*)::int as c FROM daily_inspections d INNER JOIN vehicles v ON v.id = d.vehicle_id LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`)
+  );
 }
 
-async function loadVehicles(opts: QueryOptions) {
+async function loadVehicles(opts: QueryOptions): Promise<PageResult> {
   const totalInspections = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id)";
-  const passCount = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id AND i.overall_result = 'pass')";
-  const failCount = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id AND i.overall_result = 'fail')";
   const fields: Record<string, string> = {
-    RegistrationNumber: "v.registration_number", Make: "v.make", Model: "v.model",
-    Status: "v.status", Category: "v.category", VehicleClass: "v.vehicle_class",
-    FuelType: "v.fuel_type", ManufacturingYear: "v.manufacturing_year",
-    InsuranceExpiry: "v.insurance_expiry", RoadworthyExpiry: "v.roadworthy_expiry",
-    TransporterName: "t.company_name", TransporterRegion: "t.region",
-    TotalInspections: totalInspections, PassCount: passCount, FailCount: failCount,
+    id: "v.id",
+    RegistrationNumber: "v.registration_number",
+    Make: "v.make",
+    Model: "v.model",
+    Status: "v.status",
+    Category: "v.category",
+    InsuranceExpiry: "v.insurance_expiry",
+    RoadworthyExpiry: "v.roadworthy_expiry",
+    TransporterName: "t.company_name",
+    TotalInspections: totalInspections,
   };
+  const defaults = ["id", "RegistrationNumber", "Make", "Model", "Status", "Category", "TransporterName", "InsuranceExpiry", "RoadworthyExpiry", "TotalInspections"];
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "RegistrationNumber asc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      v.id, v.registration_number as "RegistrationNumber", v.make as "Make", v.model as "Model",
-      v.body_type as "BodyType", v.category as "Category", v.vehicle_class as "VehicleClass",
-      v.colour as "Colour", v.manufacturing_year as "ManufacturingYear", v.fuel_type as "FuelType",
-      v.transmission as "Transmission", v.seating_capacity as "SeatingCapacity",
-      v.gross_weight as "GrossWeight", v.number_of_axles as "NumberOfAxles",
-      v.odometer_reading as "OdometerReading", v.status as "Status",
-      v.insurance_expiry as "InsuranceExpiry", v.roadworthy_expiry as "RoadworthyExpiry",
-      v.road_fund_expiry as "RoadFundExpiry", v.vin as "VIN", v.chassis_number as "ChassisNumber",
-      t.company_name as "TransporterName", t.region as "TransporterRegion",
-      ${totalInspections} as "TotalInspections", ${passCount} as "PassCount", ${failCount} as "FailCount"
-  `;
-  const rows = await query(sql.raw(`SELECT ${select} FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  const select = selectedColumns(opts, fields, defaults);
+  const rows = await query(sql.raw(`SELECT ${select} FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
 }
 
-async function loadTransporters(opts: QueryOptions) {
+async function loadTransporters(opts: QueryOptions): Promise<PageResult> {
   const fleetSize = "(SELECT count(*) FROM vehicles v WHERE v.transporter_id = t.id)";
   const passCount = "(SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'pass')";
   const failCount = "(SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'fail')";
   const fields: Record<string, string> = {
-    CompanyName: "t.company_name", RegistrationNumber: "t.registration_number",
-    Region: "t.region", District: "t.district", FleetSize: fleetSize,
-    PassCount: passCount, FailCount: failCount,
+    id: "t.id",
+    CompanyName: "t.company_name",
+    Region: "t.region",
+    District: "t.district",
+    FleetSize: fleetSize,
+    PassCount: passCount,
+    FailCount: failCount,
   };
+  const defaults = ["id", "CompanyName", "Region", "District", "FleetSize", "PassCount", "FailCount"];
   const where = buildWhereClause(opts.filter, fields, "t.deleted_at IS NULL");
   const orderBy = buildOrderBy(opts.orderby, fields, "CompanyName asc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      t.id, t.company_name as "CompanyName", t.registration_number as "RegistrationNumber",
-      t.tin_number as "TIN", t.region as "Region", t.district as "District",
-      t.contact_person as "ContactPerson", t.mobile as "Mobile", t.email as "Email",
-      t.insurance_company as "InsuranceCompany", t.insurance_expiry as "InsuranceExpiry",
-      ${fleetSize} as "FleetSize", ${passCount} as "PassCount", ${failCount} as "FailCount"
-  `;
-  const rows = await query(sql.raw(`SELECT ${select} FROM transporters t ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM transporters t ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  const select = selectedColumns(opts, fields, defaults);
+  const rows = await query(sql.raw(`SELECT ${select} FROM transporters t ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM transporters t ${where}`));
 }
 
-async function loadStations(opts: QueryOptions) {
-  const inspectorCount = "(SELECT count(*) FROM users u WHERE u.location_id = l.id)";
+async function loadStations(opts: QueryOptions): Promise<PageResult> {
   const inspectionCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id)";
   const passCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'pass')";
   const failCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'fail')";
   const fields: Record<string, string> = {
-    Name: "l.name", Code: "l.code", Region: "l.region", District: "l.district",
-    Capacity: "l.capacity", Status: "l.status", InspectorCount: inspectorCount,
-    InspectionCount: inspectionCount, PassCount: passCount, FailCount: failCount,
+    id: "l.id",
+    Name: "l.name",
+    Code: "l.code",
+    Region: "l.region",
+    Capacity: "l.capacity",
+    InspectionCount: inspectionCount,
+    PassCount: passCount,
+    FailCount: failCount,
   };
+  const defaults = ["id", "Name", "Code", "Region", "Capacity", "InspectionCount", "PassCount", "FailCount"];
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      l.id, l.name as "Name", l.code as "Code", l.region as "Region", l.district as "District",
-      l.address as "Address", l.phone as "Phone", l.email as "Email", l.capacity as "Capacity",
-      l.status as "Status", ${inspectorCount} as "InspectorCount", ${inspectionCount} as "InspectionCount",
-      ${passCount} as "PassCount", ${failCount} as "FailCount"
-  `;
-  const rows = await query(sql.raw(`SELECT ${select} FROM locations l ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM locations l ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  const select = selectedColumns(opts, fields, defaults);
+  const rows = await query(sql.raw(`SELECT ${select} FROM locations l ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM locations l ${where}`));
 }
 
-async function loadDefects(opts: QueryOptions) {
+async function loadDefects(opts: QueryOptions): Promise<PageResult> {
   const photoCount = "jsonb_array_length(coalesce(item->'photos', '[]'::jsonb))";
   const fields: Record<string, string> = {
-    InspectionNumber: "i.inspection_number", InspectionDate: "i.inspection_date",
-    InspectionResult: "i.overall_result", VehicleRegistration: "v.registration_number",
-    VehicleMake: "v.make", VehicleModel: "v.model", SectionCode: "sec->>'section'",
-    SectionTitle: "sec->>'title'", ItemName: "item->>'name'", Result: "item->>'result'",
-    Severity: "item->>'severity'", Remarks: "item->>'remarks'", PhotoCount: photoCount,
+    InspectionNumber: "i.inspection_number",
+    InspectionDate: "i.inspection_date",
+    VehicleRegistration: "v.registration_number",
+    SectionCode: "sec->>'section'",
+    ItemName: "item->>'name'",
+    Severity: "item->>'severity'",
+    PhotoCount: photoCount,
   };
+  const defaults = ["InspectionNumber", "InspectionDate", "VehicleRegistration", "SectionCode", "ItemName", "Severity", "PhotoCount"];
   const where = buildWhereClause(opts.filter, fields, "item->>'result' = 'fail'");
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      i.inspection_number as "InspectionNumber", i.inspection_date as "InspectionDate",
-      i.overall_result as "InspectionResult", v.registration_number as "VehicleRegistration",
-      v.make as "VehicleMake", v.model as "VehicleModel", sec->>'section' as "SectionCode",
-      sec->>'title' as "SectionTitle", item->>'name' as "ItemName", item->>'result' as "Result",
-      item->>'severity' as "Severity", item->>'remarks' as "Remarks", ${photoCount} as "PhotoCount"
-  `;
+  const select = selectedColumns(opts, fields, defaults);
   const from = `FROM inspections i INNER JOIN vehicles v ON v.id = i.vehicle_id, jsonb_array_elements(i.section_data) as sec, jsonb_array_elements(sec->'items') as item`;
-  const rows = await query(sql.raw(`SELECT ${select} ${from} ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c ${from} ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  const rows = await query(sql.raw(`SELECT ${select} ${from} ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c ${from} ${where}`));
 }
 
-async function loadDocuments(opts: QueryOptions) {
+async function loadDocuments(opts: QueryOptions): Promise<PageResult> {
   const fields: Record<string, string> = {
-    Name: "d.name", Type: "d.type", OwnerType: "d.owner_type", OwnerId: "d.owner_id",
-    Version: "d.version", ExpiryDate: "d.expiry_date", CreatedAt: "d.created_at", UploadedBy: "u.name",
+    id: "d.id",
+    Name: "d.name",
+    Type: "d.type",
+    OwnerType: "d.owner_type",
+    Version: "d.version",
+    ExpiryDate: "d.expiry_date",
+    UploadedBy: "u.name",
   };
-  const where = buildWhereClause(opts.filter, fields);
-  const orderBy = buildOrderBy(opts.orderby, fields, "CreatedAt desc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      d.id, d.name as "Name", d.type as "Type", d.owner_type as "OwnerType",
-      d.owner_id as "OwnerId", d.mime_type as "MimeType", d.size_bytes as "SizeBytes",
-      d.version as "Version", d.expiry_date as "ExpiryDate", d.created_at as "CreatedAt",
-      u.name as "UploadedBy"
-  `;
-  const rows = await query(sql.raw(`SELECT ${select} FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
-}
-
-async function loadAuditLogs(opts: QueryOptions) {
-  const fields: Record<string, string> = {
-    Action: "a.action", EntityType: "a.entity_type", EntityId: "a.entity_id",
-    EntityLabel: "a.entity_label", Summary: "a.summary", UserName: "a.user_name",
-    IPAddress: "a.ip_address", CreatedAt: "a.created_at",
-  };
-  const where = buildWhereClause(opts.filter, fields);
-  const orderBy = buildOrderBy(opts.orderby, fields, "CreatedAt desc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      a.id, a.action as "Action", a.entity_type as "EntityType", a.entity_id as "EntityId",
-      a.entity_label as "EntityLabel", a.summary as "Summary", a.user_name as "UserName",
-      a.ip_address as "IPAddress", a.created_at as "CreatedAt"
-  `;
-  const rows = await query(sql.raw(`SELECT ${select} FROM audit_logs a ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM audit_logs a ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
-}
-
-async function loadUsers(opts: QueryOptions) {
-  const fields: Record<string, string> = {
-    Name: "u.name", Email: "u.email", Role: "u.role", IsActive: "u.is_active",
-    LastLoginAt: "u.last_login_at", CreatedAt: "u.created_at", StationName: "l.name",
-  };
+  const defaults = ["id", "Name", "Type", "OwnerType", "ExpiryDate", "Version", "UploadedBy"];
   const where = buildWhereClause(opts.filter, fields);
   const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
-  const select = opts.select ? buildSelectClause(opts.select, fields) : `
-      u.id, u.name as "Name", u.email as "Email", u.role as "Role",
-      u.is_active as "IsActive", u.last_login_at as "LastLoginAt",
-      u.created_at as "CreatedAt", l.name as "StationName"
-  `;
-  const rows = await query(sql.raw(`SELECT ${select} FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where} ${orderBy} LIMIT ${opts.top} OFFSET ${opts.skip}`));
-  const countRow = await queryOne(sql.raw(`SELECT count(*)::int as c FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where}`));
-  return { data: rows, total: countRow?.c || 0 };
+  const select = selectedColumns(opts, fields, defaults);
+  const rows = await query(sql.raw(`SELECT ${select} FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where}`));
 }
 
-async function query(sqlText: any): Promise<any[]> {
+async function loadAuditLogs(opts: QueryOptions): Promise<PageResult> {
+  const fields: Record<string, string> = {
+    id: "a.id",
+    Action: "a.action",
+    EntityType: "a.entity_type",
+    Summary: "a.summary",
+    UserName: "a.user_name",
+    IPAddress: "a.ip_address",
+    CreatedAt: "a.created_at",
+  };
+  const defaults = ["id", "Action", "EntityType", "UserName", "Summary", "IPAddress", "CreatedAt"];
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "CreatedAt desc");
+  const select = selectedColumns(opts, fields, defaults);
+  const rows = await query(sql.raw(`SELECT ${select} FROM audit_logs a ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM audit_logs a ${where}`));
+}
+
+async function loadUsers(opts: QueryOptions): Promise<PageResult> {
+  const fields: Record<string, string> = {
+    id: "u.id",
+    Name: "u.name",
+    Email: "u.email",
+    Role: "u.role",
+    IsActive: "u.is_active",
+    LastLoginAt: "u.last_login_at",
+    StationName: "l.name",
+  };
+  const defaults = ["id", "Name", "Email", "Role", "IsActive", "LastLoginAt", "StationName"];
+  const where = buildWhereClause(opts.filter, fields);
+  const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
+  const select = selectedColumns(opts, fields, defaults);
+  const rows = await query(sql.raw(`SELECT ${select} FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
+  return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where}`));
+}
+
+async function query(sqlText: SQL): Promise<Row[]> {
   const result = await db.execute(sqlText);
-  return (result as any).rows || [];
+  return ((result as { rows?: Row[] }).rows || []);
 }
 
-async function queryOne(sqlText: any): Promise<any> {
+async function queryOne(sqlText: SQL): Promise<Row | null> {
   const rows = await query(sqlText);
   return rows[0] || null;
 }
 
-function jsonResponse(data: any, format: string) {
+function jsonResponse(data: Record<string, unknown>, format: "json" | "xml") {
   if (format === "xml") {
     return new Response(odataToAtomXml(data), {
       headers: {
         "Content-Type": "application/atom+xml;type=feed;charset=utf-8",
+        "OData-Version": "4.0",
         "Cache-Control": "private, no-store",
       },
     });
@@ -456,9 +502,11 @@ function jsonResponse(data: any, format: string) {
   });
 }
 
-function odataToAtomXml(data: any): string {
-  const items = (data.value || []).map((item: any) => {
-    const props = Object.entries(item).map(([k, v]) => `<d:${k}>${escapeXml(String(v ?? ""))}</d:${k}>`).join("");
+function odataToAtomXml(data: Record<string, unknown>): string {
+  const values = Array.isArray(data.value) ? data.value : [];
+  const items = values.map((item) => {
+    if (!item || typeof item !== "object") return "";
+    const props = Object.entries(item).map(([key, value]) => `<d:${key}>${escapeXml(String(value ?? ""))}</d:${key}>`).join("");
     return `<entry><content type="application/xml"><m:properties>${props}</m:properties></content></entry>`;
   }).join("");
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -467,6 +515,6 @@ ${items}
 </feed>`;
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function escapeXml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
