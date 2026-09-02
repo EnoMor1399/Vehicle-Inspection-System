@@ -1,0 +1,54 @@
+name: VIMS V2.4 one-time database upgrade
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/v2-4-db-upgrade-once.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-db-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    name: Apply and verify VIMS V2.4 production migrations
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Validate one-time authorization commit
+        shell: bash
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "$COMMIT_MESSAGE" != *"[APPLY_VIMS_DB_UPGRADE]"* ]]; then
+            echo "One-time production database authorization marker is missing."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply idempotent production database upgrades
+        run: npm run db:upgrade
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Verify upgraded production database directly
+        run: npm run db:verify
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
