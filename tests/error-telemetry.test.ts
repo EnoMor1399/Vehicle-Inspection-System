@@ -18,8 +18,10 @@ test("ErrorBoundary payload matches the strict telemetry schema", () => {
   assert.doesNotMatch(source, /userAgent:\s*navigator/);
 });
 
-test("ErrorBoundary internal recovery navigation uses a link instead of location assignment", () => {
+test("ErrorBoundary internal recovery navigation uses Next Link instead of location assignment", () => {
   const source = readFileSync("src/components/ErrorBoundary.tsx", "utf8");
-  assert.match(source, /<a\s+[\s\S]*href="\/"/);
+  assert.match(source, /import Link from "next\/link"/);
+  assert.match(source, /<Link\s+[\s\S]*href="\/"/);
   assert.doesNotMatch(source, /window\.location\.href\s*=\s*["']\/["']/);
+  assert.doesNotMatch(source, /<a\s+[\s\S]*href="\/"/);
 });
