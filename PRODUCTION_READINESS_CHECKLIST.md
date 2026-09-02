@@ -5,7 +5,7 @@
 **Source candidate: READY**  
 **Production rollout: NOT EXECUTED**
 
-The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. Production deployment, production database migration and live-environment verification remain intentionally separate and have not been executed as part of the source-only upgrade.
+The Enterprise V2.4 source candidate has completed its extended GitHub acceptance gate through Phase 13. Production deployment, production database migration and live-environment verification remain intentionally separate and have not been executed as part of the source-only upgrade.
 
 ## 1. Security and identity
 
@@ -18,6 +18,10 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] Super Administrator last-admin transaction protection
 - [x] Session revocation on sensitive access changes
 - [x] API-key authentication with active-owner validation
+- [x] Strict API-key generation scope/expiry validation
+- [x] API-key and session mutation ownership enforcement
+- [x] 2FA enrollment and verification rate limiting
+- [x] Prevention of silent 2FA secret overwrite on already-enabled accounts
 - [x] CSRF and request-security controls
 - [x] API/request rate limiting
 - [x] Endpoint-aware mutation body limits
@@ -30,18 +34,35 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 ## 2. Vehicle and inspection integrity
 
 - [x] Vehicle administrative-state creation rules
-- [x] Inspection-derived vehicle states protected from generic updates
+- [x] Inspection-derived vehicle states protected from generic API updates
+- [x] Inspection-derived vehicle states protected from web Server Action updates
 - [x] Decommissioned vehicle terminal-state enforcement
 - [x] Idempotent vehicle decommission operation
+- [x] Transporter references validated before vehicle persistence
 - [x] Transporter changes validated and persisted
 - [x] Empty vehicle PATCH rejection
 - [x] Persisted-state audit logging
 - [x] Inspection evidence restricted to JPEG/PNG/WebP base64 data URLs
 - [x] Per-item and aggregate evidence-count/size limits
-- [x] Regression tests for lifecycle and evidence policy
+- [x] Browser comprehensive-inspection evidence/signature validation
+- [x] Browser daily pre-trip evidence/signature/input validation
+- [x] Comprehensive inspection attachment MIME and decoded-size verification
+- [x] Regression tests for lifecycle, evidence and direct-access policy
 - [ ] Live production CRUD and inspection-flow verification after deployment
 
-## 3. Database and migrations
+## 3. Public verification and data isolation
+
+- [x] Signed certificate verification links required before public record disclosure
+- [x] Unsigned, malformed, unknown and tampered verification requests return one generic failure state
+- [x] Public certificate verification exposes only minimum authenticity/validity facts
+- [x] Public verification does not expose VIN/chassis details or handwritten signature images
+- [x] Transporter-scoped vehicle, inspection and certificate access controls
+- [x] Daily-inspection direct-ID permission check for internal users
+- [x] Transporter direct-detail authorization for internal and portal users
+- [x] Authenticated/API responses excluded from service-worker persistence
+- [ ] Live tenant/isolation verification after deployment
+
+## 4. Database and migrations
 
 - [x] PostgreSQL 18 source/runtime baseline
 - [x] Connection pooling
@@ -58,7 +79,22 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [ ] Isolated restore drill completed and documented
 - [ ] Production slow-query/latency baseline captured after rollout
 
-## 4. Integrations, exports and incident safety
+## 5. Imports, settings and administrative mutations
+
+- [x] Import file/row/mapping envelopes validated server-side
+- [x] Import row counts bounded by entity type
+- [x] Strict integer parsing rejects partially numeric values
+- [x] Import vehicle/transporter reference lookups batched
+- [x] System-settings updates use a strict server-side whitelist
+- [x] Password minimum cannot be lowered below V2.4 security floor
+- [x] Security timers, login limits and operational periods bounded server-side
+- [x] Theme colors, URLs and contact fields validated and bounded
+- [x] Logo payload restricted to bounded raster images; active SVG content rejected
+- [x] Transporter and station Server Actions use runtime schemas
+- [x] Notification, API-key and session identifiers bounded before database use
+- [ ] Live administrative workflow verification after deployment
+
+## 6. Integrations, exports and incident safety
 
 - [x] Webhook URL validation
 - [x] DNS-aware public-address enforcement for outbound integrations
@@ -71,11 +107,11 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] Regression tests for integration and export-security policy
 - [ ] Live production integration/webhook verification after deployment
 
-## 5. Build, testing and CI
+## 7. Build, testing and CI
 
 - [x] TypeScript validation
 - [x] ESLint
-- [x] Regression test suite
+- [x] Expanded regression test suite
 - [x] High-severity dependency audit
 - [x] Secret/workflow policy enforcement
 - [x] Production-mode Next.js build
@@ -84,10 +120,11 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] Database migrator Docker image build
 - [x] Running production-container liveness smoke test
 - [x] GitHub concurrency prevents stale duplicate quality runs
+- [x] Extended Phase 10-13 functional code acceptance run `33632021471`
 - [ ] Full browser end-to-end test suite against deployed environment
 - [ ] Production load/performance test against an approved non-production target
 
-## 6. Runtime health and verification
+## 8. Runtime health and verification
 
 - [x] Database-independent `/api/health/live` endpoint
 - [x] Database-aware `/api/health` readiness endpoint
@@ -101,7 +138,7 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [ ] Verify authentication, tenant isolation, inspection flows, reports and audit logs live
 - [ ] Confirm runtime error logs are clean after rollout
 
-## 7. Container and infrastructure readiness
+## 9. Container and infrastructure readiness
 
 - [x] Multi-stage production Dockerfile
 - [x] Non-root application runtime
@@ -115,7 +152,7 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [ ] Production secrets installed in platform secret storage
 - [ ] Scaling/resource limits configured for actual runtime
 
-## 8. Monitoring, backup and operations
+## 10. Monitoring, backup and operations
 
 - [x] Liveness/readiness endpoints suitable for external monitoring
 - [x] Monitoring signals and alert categories documented
@@ -129,9 +166,9 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [ ] Restore drill completed successfully
 - [ ] Operational alert ownership/escalation configured
 
-## 9. Documentation
+## 11. Documentation
 
-- [x] V2.4 source-upgrade record
+- [x] V2.4 source-upgrade record through Phase 13
 - [x] Host-neutral deployment guide
 - [x] Database migration and verification procedure
 - [x] Post-deployment verification procedure
@@ -146,7 +183,9 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 
 ### Current source phase — Enterprise V2.4 hardening
 
-**COMPLETE.** GitHub source acceptance includes the production build and running Docker-container smoke gate. The extended source pass also covers bounded API parsing, evidence limits, export injection safety and predictive-query batching.
+**COMPLETE THROUGH PHASE 13.** GitHub code acceptance run `33632021471` passed secret/workflow policy, dependency audit, TypeScript, ESLint, regression tests, production build, runtime/migrator Docker builds and a running production-container liveness smoke on source head `0c3cd786558238edaea29c4e37438946a8e5e59f`.
+
+The extended source pass covers bounded API and Server Action inputs, certificate privacy, transporter/direct-ID isolation, evidence/signature/document safety, import hardening, predictive-query batching, administrative lifecycle parity, strict settings validation, API-key boundaries and 2FA enrollment protection.
 
 ### Next phase — Production preparation without deployment
 
