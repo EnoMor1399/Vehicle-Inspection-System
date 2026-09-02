@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { canApprove } from "@/lib/auth";
 import { inspectionCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { parseApiPagination } from "@/lib/api-pagination";
+import { API_INSPECTION_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 import { assessInspectionOutcome, deriveVehicleStatusAfterInspection } from "@/lib/inspection-policy";
 import { getSettings } from "@/lib/settings";
 import { formatServerTiming, timeOperation } from "@/lib/performance";
@@ -19,7 +20,10 @@ export async function POST(request: Request) {
   if (!auth.ok) return apiError(auth.status, auth.message);
 
   try {
-    const parsed = inspectionCreateSchema.safeParse(await request.json());
+    const bodyResult = await readJsonBody(request, API_INSPECTION_JSON_BODY_LIMIT);
+    if (!bodyResult.ok) return apiError(bodyResult.status, bodyResult.message);
+
+    const parsed = inspectionCreateSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid inspection payload", zodDetails(parsed.error));
     const body = parsed.data;
 
