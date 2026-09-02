@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { createInspection, type InspectionFormData } from "./server";
 import { useRouter, useSearchParams } from "next/navigation";
 import { buildDefaultSectionData, summarizeSection } from "@/lib/sections";
@@ -87,20 +87,12 @@ export function InspectionForm({
     [smokeTest, totals.critical, totals.fail, totals.major],
   );
 
-  useEffect(() => {
-    if (overallResult === "pass" && !decisionGuidance.passAllowed) {
-      setOverallResult(decisionGuidance.recommendedResult);
-      return;
-    }
-    if (overallResult === "conditional_pass" && !decisionGuidance.conditionalPassAllowed) {
-      setOverallResult(decisionGuidance.recommendedResult);
-    }
-  }, [
-    decisionGuidance.conditionalPassAllowed,
-    decisionGuidance.passAllowed,
-    decisionGuidance.recommendedResult,
-    overallResult,
-  ]);
+  const effectiveOverallResult: InspectionFormData["overallResult"] =
+    overallResult === "pass" && !decisionGuidance.passAllowed
+      ? decisionGuidance.recommendedResult
+      : overallResult === "conditional_pass" && !decisionGuidance.conditionalPassAllowed
+        ? decisionGuidance.recommendedResult
+        : overallResult;
 
   function setItem(sectionCode: string, itemIdx: number, patch: Partial<SectionForm["items"][number]>) {
     setSections((prev) =>
@@ -156,16 +148,6 @@ export function InspectionForm({
       return setError("Inspection date and time cannot be in the future.");
     }
 
-    if (overallResult === "pass" && !decisionGuidance.passAllowed) {
-      return showFinalDecisionError(
-        "PASS is unavailable while failed checklist or emissions items remain. Review the failed items below or choose a valid final result.",
-      );
-    }
-    if (overallResult === "conditional_pass" && !decisionGuidance.conditionalPassAllowed) {
-      return showFinalDecisionError(
-        "Conditional Pass is unavailable while critical defects remain. Resolve the critical defects or select Re-inspection Required or Fail.",
-      );
-    }
     if (!inspectorSig) {
       return showFinalDecisionError("Inspector digital signature is required in Section P before submission.");
     }
@@ -182,7 +164,7 @@ export function InspectionForm({
       smokeTest,
       noiseLevel,
       opacityTest: opacity,
-      overallResult,
+      overallResult: effectiveOverallResult,
       inspectorRemarks,
       nextInspectionDate: nextDate,
       reinspectionDate: reinspectDate,
@@ -427,7 +409,7 @@ export function InspectionForm({
                   <p className="mt-1 text-sm text-slate-700">{decisionGuidance.message}</p>
                   {!decisionGuidance.passAllowed && (
                     <p className="mt-1 text-xs text-slate-600">
-                      The system automatically moves an incompatible PASS decision to this recommendation. An inspector may still choose a stricter valid result.
+                      If the currently selected result becomes invalid, the form uses this recommendation automatically. An inspector may still choose a stricter valid result.
                     </p>
                   )}
                 </div>
@@ -482,7 +464,7 @@ export function InspectionForm({
 
             <Field label="Overall Result" required>
               <Select
-                value={overallResult}
+                value={effectiveOverallResult}
                 onChange={(e) => {
                   setOverallResult(e.target.value as InspectionFormData["overallResult"]);
                   setError(null);
@@ -540,7 +522,7 @@ export function InspectionForm({
               <span className="font-medium">{totals.na}</span> n/a
             </span>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${decisionGuidance.passAllowed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
-              Decision: {formatOverallResult(overallResult)}
+              Decision: {formatOverallResult(effectiveOverallResult)}
             </span>
           </div>
           <div className="flex gap-2">
