@@ -2,10 +2,10 @@
 
 ## Status
 
-**Source candidate: READY**  
+**Source candidate: READY — COMPLETE THROUGH PHASE 16**  
 **Production rollout: NOT EXECUTED**
 
-The Enterprise V2.4 source candidate has completed its extended GitHub acceptance gate through Phase 13. Production deployment, production database migration and live-environment verification remain intentionally separate and have not been executed as part of the source-only upgrade.
+The Enterprise V2.4 source candidate has completed the planned source-hardening phases. Production deployment, production database migration and live-environment verification remain intentionally separate and have not been executed as part of this source-only upgrade. The exact latest GitHub quality-gate run and source head are recorded on draft PR #14.
 
 ## 1. Security and identity
 
@@ -26,6 +26,8 @@ The Enterprise V2.4 source candidate has completed its extended GitHub acceptanc
 - [x] API/request rate limiting
 - [x] Endpoint-aware mutation body limits
 - [x] Streaming JSON size enforcement before parsing
+- [x] Frontend error telemetry uses the same streaming body bound for chunked/no-length requests
+- [x] ErrorBoundary telemetry payload matches the strict server schema
 - [x] Sensitive audit payload redaction and bounds
 - [x] Workflow committed-secret scan
 - [x] GitHub Actions pinned to immutable commit SHAs
@@ -94,20 +96,42 @@ The Enterprise V2.4 source candidate has completed its extended GitHub acceptanc
 - [x] Notification, API-key and session identifiers bounded before database use
 - [ ] Live administrative workflow verification after deployment
 
-## 6. Integrations, exports and incident safety
+## 6. Reporting, exports and information disclosure
 
-- [x] Webhook URL validation
+- [x] Reports page protected by reporting RBAC
+- [x] Reports CSV/XLSX exports use centralized spreadsheet formula neutralization
+- [x] Spreadsheet column-width bounds
+- [x] Power BI default datasets use explicit least-privilege field allow-lists
+- [x] VIN/chassis and transporter TIN/contact/mobile/email data are not silently exposed by default reporting datasets
+- [x] Power BI query behavior is bounded and validated
+- [x] Count queries run only when explicitly requested where applicable
+- [x] Power BI generated integration destinations do not trust spoofable forwarded request hosts
+- [x] Unexpected Power BI failures return generic server errors instead of raw internals
+- [x] Regression tests cover reporting disclosure and export formula safety
+- [ ] Live production reporting/export verification after deployment
+
+## 7. Integrations, webhook delivery and incident safety
+
+- [x] Webhook URL validation during registration
 - [x] DNS-aware public-address enforcement for outbound integrations
 - [x] Private/loopback/link-local/metadata destinations rejected
+- [x] Webhook signing secrets encrypted at rest
+- [x] Signed HMAC-SHA256 webhook delivery implemented for vehicle and inspection events
+- [x] REST and web-admin mutation paths emit the same documented webhook events
+- [x] Webhook destination is revalidated and re-resolved immediately before every delivery
+- [x] Outbound webhook socket connects to the already validated public address while preserving TLS SNI/Host identity
+- [x] Automatic redirect following is avoided for webhook delivery
+- [x] Webhook network timeout and payload size are bounded
+- [x] Webhook payload is minimum-data by design
+- [x] Webhook delivery success/failure bookkeeping updates `lastTriggeredAt` and `failureCount`
+- [x] Unsupported `user.created` subscription removed from the public contract
 - [x] Error-tracking webhook destination validation
 - [x] Incident request metadata normalized and bounded
 - [x] Excessive/malformed Content-Length protection
-- [x] CSV/XLSX spreadsheet formula-injection neutralization
-- [x] Spreadsheet column-width bounds
-- [x] Regression tests for integration and export-security policy
+- [x] Regression tests for registration, DNS/SSRF, signing and event emission policy
 - [ ] Live production integration/webhook verification after deployment
 
-## 7. Build, testing and CI
+## 8. Build, testing and CI
 
 - [x] TypeScript validation
 - [x] ESLint
@@ -120,11 +144,13 @@ The Enterprise V2.4 source candidate has completed its extended GitHub acceptanc
 - [x] Database migrator Docker image build
 - [x] Running production-container liveness smoke test
 - [x] GitHub concurrency prevents stale duplicate quality runs
-- [x] Extended Phase 10-13 functional code acceptance run `33632021471`
+- [x] Phase 14 reporting/export security accepted by full quality gate
+- [x] Phase 15 error telemetry/recovery hardening accepted by full quality gate (`33637758671`)
+- [x] Phase 16 webhook delivery covered by the final full quality gate recorded on draft PR #14
 - [ ] Full browser end-to-end test suite against deployed environment
 - [ ] Production load/performance test against an approved non-production target
 
-## 8. Runtime health and verification
+## 9. Runtime health and verification
 
 - [x] Database-independent `/api/health/live` endpoint
 - [x] Database-aware `/api/health` readiness endpoint
@@ -138,7 +164,7 @@ The Enterprise V2.4 source candidate has completed its extended GitHub acceptanc
 - [ ] Verify authentication, tenant isolation, inspection flows, reports and audit logs live
 - [ ] Confirm runtime error logs are clean after rollout
 
-## 9. Container and infrastructure readiness
+## 10. Container and infrastructure readiness
 
 - [x] Multi-stage production Dockerfile
 - [x] Non-root application runtime
@@ -152,7 +178,7 @@ The Enterprise V2.4 source candidate has completed its extended GitHub acceptanc
 - [ ] Production secrets installed in platform secret storage
 - [ ] Scaling/resource limits configured for actual runtime
 
-## 10. Monitoring, backup and operations
+## 11. Monitoring, backup and operations
 
 - [x] Liveness/readiness endpoints suitable for external monitoring
 - [x] Monitoring signals and alert categories documented
@@ -166,28 +192,27 @@ The Enterprise V2.4 source candidate has completed its extended GitHub acceptanc
 - [ ] Restore drill completed successfully
 - [ ] Operational alert ownership/escalation configured
 
-## 11. Documentation
+## 12. Documentation
 
-- [x] V2.4 source-upgrade record through Phase 13
+- [x] V2.4 source-upgrade record
+- [x] Production readiness checklist aligned through Phase 16
 - [x] Host-neutral deployment guide
 - [x] Database migration and verification procedure
 - [x] Post-deployment verification procedure
 - [x] Rollback procedure
 - [x] Monitoring and backup/restore requirements
-- [x] API documentation baseline
+- [x] API documentation aligned with implemented V2.4 endpoints and signed webhook contract
 - [x] Existing UI/mobile documentation retained
 - [ ] Final production environment inventory recorded after host selection
 - [ ] Production incident/escalation contacts recorded by the operating organization
 
 ## Phase status
 
-### Current source phase — Enterprise V2.4 hardening
+### Enterprise V2.4 source hardening
 
-**COMPLETE THROUGH PHASE 13.** GitHub code acceptance run `33632021471` passed secret/workflow policy, dependency audit, TypeScript, ESLint, regression tests, production build, runtime/migrator Docker builds and a running production-container liveness smoke on source head `0c3cd786558238edaea29c4e37438946a8e5e59f`.
+**COMPLETE THROUGH PHASE 16.** The source pass covers bounded API and Server Action inputs, certificate privacy, transporter/direct-ID isolation, evidence/signature/document safety, import hardening, predictive-query batching, administrative lifecycle parity, strict settings validation, API-key boundaries, 2FA enrollment protection, reporting/export information-disclosure controls, frontend error-telemetry/recovery hardening, and signed delivery-time SSRF-protected webhooks.
 
-The extended source pass covers bounded API and Server Action inputs, certificate privacy, transporter/direct-ID isolation, evidence/signature/document safety, import hardening, predictive-query batching, administrative lifecycle parity, strict settings validation, API-key boundaries and 2FA enrollment protection.
-
-### Next phase — Production preparation without deployment
+### Production preparation without deployment
 
 **SOURCE PREPARATION COMPLETE.** The database migration/verifier, PostgreSQL 18 container path, deployment guide and release verification tooling are ready. The production database has not been changed.
 
