@@ -45,6 +45,13 @@ export const vehiclePatchSchema = vehicleCreateSchema
   .partial()
   .strict();
 
+const evidenceImageDataUrl = z.string()
+  .max(3_000_000)
+  .regex(
+    /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+    "Evidence photo must be a base64 JPEG, PNG, or WebP data URL"
+  );
+
 const inspectionItemSchema = z.object({
   name: z.string().trim().min(1).max(200),
   result: z.enum(["pass", "fail", "na"]),
@@ -52,26 +59,54 @@ const inspectionItemSchema = z.object({
   remarks: optionalText(2000),
   photos: z.array(z.object({
     id: z.string().max(100),
-    dataUrl: z.string().max(8_000_000),
+    dataUrl: evidenceImageDataUrl,
     caption: optionalText(500),
     takenAt: z.string().max(100),
-  })).max(20).optional(),
+  })).max(5).optional(),
 });
 
 const inspectionSectionSchema = z.object({
   section: z.string().trim().min(1).max(100),
   title: z.string().trim().min(1).max(200),
-  items: z.array(inspectionItemSchema).max(250),
+  items: z.array(inspectionItemSchema).max(100),
 });
 
 export const inspectionCreateSchema = z.object({
   vehicleId: z.string().uuid(),
-  sectionData: z.array(inspectionSectionSchema).min(1).max(50),
+  sectionData: z.array(inspectionSectionSchema).min(1).max(20),
   overallResult: inspectionResult,
   inspectorName: optionalText(200),
   station: optionalText(200),
   workflowStatus: workflowStatus.optional().default("completed"),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  let photoCount = 0;
+  let photoDataCharacters = 0;
+
+  for (const section of value.sectionData) {
+    for (const item of section.items) {
+      for (const photo of item.photos || []) {
+        photoCount += 1;
+        photoDataCharacters += photo.dataUrl.length;
+      }
+    }
+  }
+
+  if (photoCount > 50) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["sectionData"],
+      message: "Inspection evidence is limited to 50 photos per inspection",
+    });
+  }
+
+  if (photoDataCharacters > 12_000_000) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["sectionData"],
+      message: "Combined inspection evidence is too large",
+    });
+  }
+});
 
 export const webhookCreateSchema = z.object({
   url: z.string().url().max(2048),
