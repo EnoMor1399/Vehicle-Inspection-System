@@ -14,6 +14,7 @@ import {
   validateSignatureDataUrl,
 } from "@/lib/inspection-evidence";
 import type { InspectionDocument, InspectionSectionData } from "@/db/schema";
+import { emitWebhookEvent } from "@/lib/webhook-delivery";
 
 async function requireEditor() {
   const user = await getCurrentUser();
@@ -215,6 +216,18 @@ export async function createInspection(data: InspectionFormData) {
     entityLabel: number,
     summary: `Completed inspection ${number} for ${vehicle.registrationNumber} — ${data.overallResult.toUpperCase()}`,
     after: { result: data.overallResult, workflowStatus, vehicle: vehicle.registrationNumber, failedItems: totals.fail },
+  });
+
+  const event = data.overallResult === "fail" ? "inspection.failed" : "inspection.completed";
+  await emitWebhookEvent(event, {
+    id,
+    inspectionNumber: number,
+    vehicleId: data.vehicleId,
+    vehicleRegistration: vehicle.registrationNumber,
+    overallResult: data.overallResult,
+    workflowStatus,
+    failedItemCount: totals.fail,
+    criticalFailedItemCount: totals.critical,
   });
 
   revalidatePath("/inspections");
