@@ -79,3 +79,35 @@ jobs:
 
       - name: Block high-severity dependencies
         run: npm audit --audit-level=high
+
+  production-build:
+    name: Production build
+    needs: [security-policy, validate, dependency-audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://vims_ci:vims_ci@127.0.0.1:5432/vims_ci?sslmode=disable
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      JWT_SECRET: ci-only-jwt-secret-value-000000000000000000000000
+      SESSION_SECRET: ci-only-session-secret-value-000000000000000000000
+      CSRF_SECRET: ci-only-csrf-secret-value-000000000000000000000000
+      API_KEY_SALT: ci-only-api-key-salt-value-00000000000000000000000
+      FIELD_ENCRYPTION_KEY: ci-only-field-encryption-key-0000000000000000000000
+      CERTIFICATE_SIGNING_SECRET: ci-only-certificate-signing-secret-000000000000000000
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build production application
+        run: npm run build
