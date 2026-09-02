@@ -16,6 +16,7 @@ const maintenanceScripts = [
   "scripts/reset-production-data.mjs",
   "scripts/repair-production-super-admin.mjs",
   "scripts/diagnose-super-admin-login.mjs",
+  "scripts/verify-enterprise-upgrade.mjs",
 ];
 
 const issues = [];
@@ -95,8 +96,11 @@ requireText(".github/workflows/repair-production-super-admin.yml", repair, "REPA
 requireText(".github/workflows/repair-production-super-admin.yml", repair, "security_acknowledgement", "administrator repair must require a second security-state acknowledgement");
 
 const dbUpgrade = read(".github/workflows/production-db-upgrade.yml");
-requireText(".github/workflows/production-db-upgrade.yml", dbUpgrade, "/api/health/live", "database upgrade must verify application liveness");
-requireText(".github/workflows/production-db-upgrade.yml", dbUpgrade, 'body?.status === "healthy"', "database upgrade must require explicit healthy readiness after migrations");
+requireText(".github/workflows/production-db-upgrade.yml", dbUpgrade, "npm run db:verify", "database upgrade must verify the upgraded database directly");
+requireText(".github/workflows/production-db-upgrade.yml", dbUpgrade, "DATABASE_URL: ${{ secrets.DATABASE_URL }}", "database verification must use the protected production database secret");
+if (/vercel\.app/i.test(dbUpgrade)) {
+  issues.push(".github/workflows/production-db-upgrade.yml: database upgrade must not depend on a Vercel runtime URL");
+}
 
 const qualityGate = read(".github/workflows/quality-gate.yml");
 requireText(".github/workflows/quality-gate.yml", qualityGate, "node scripts/maintenance-workflow-guard.mjs", "quality gate must enforce maintenance workflow safeguards");
