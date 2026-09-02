@@ -20,6 +20,8 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] API-key authentication with active-owner validation
 - [x] CSRF and request-security controls
 - [x] API/request rate limiting
+- [x] Endpoint-aware mutation body limits
+- [x] Streaming JSON size enforcement before parsing
 - [x] Sensitive audit payload redaction and bounds
 - [x] Workflow committed-secret scan
 - [x] GitHub Actions pinned to immutable commit SHAs
@@ -34,7 +36,9 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] Transporter changes validated and persisted
 - [x] Empty vehicle PATCH rejection
 - [x] Persisted-state audit logging
-- [x] Regression tests for lifecycle policy
+- [x] Inspection evidence restricted to JPEG/PNG/WebP base64 data URLs
+- [x] Per-item and aggregate evidence-count/size limits
+- [x] Regression tests for lifecycle and evidence policy
 - [ ] Live production CRUD and inspection-flow verification after deployment
 
 ## 3. Database and migrations
@@ -47,13 +51,14 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] Direct post-migration verifier (`npm run db:verify`)
 - [x] Guarded manual production database-upgrade workflow
 - [x] Database workflow is host-neutral and does not call a deployment URL
+- [x] Predictive-maintenance fleet analysis removes per-vehicle N+1 history queries
 - [ ] Production V2.4 migration executed
 - [ ] Production `db:verify` result recorded
 - [ ] Pre-upgrade production backup captured
 - [ ] Isolated restore drill completed and documented
 - [ ] Production slow-query/latency baseline captured after rollout
 
-## 4. Integrations and incident safety
+## 4. Integrations, exports and incident safety
 
 - [x] Webhook URL validation
 - [x] DNS-aware public-address enforcement for outbound integrations
@@ -61,7 +66,9 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 - [x] Error-tracking webhook destination validation
 - [x] Incident request metadata normalized and bounded
 - [x] Excessive/malformed Content-Length protection
-- [x] Regression tests for integration-security policy
+- [x] CSV/XLSX spreadsheet formula-injection neutralization
+- [x] Spreadsheet column-width bounds
+- [x] Regression tests for integration and export-security policy
 - [ ] Live production integration/webhook verification after deployment
 
 ## 5. Build, testing and CI
@@ -139,7 +146,7 @@ The Enterprise V2.4 source candidate has completed its GitHub acceptance gate. P
 
 ### Current source phase — Enterprise V2.4 hardening
 
-**COMPLETE.** All GitHub source acceptance jobs pass, including the production build and running Docker-container smoke gate.
+**COMPLETE.** GitHub source acceptance includes the production build and running Docker-container smoke gate. The extended source pass also covers bounded API parsing, evidence limits, export injection safety and predictive-query batching.
 
 ### Next phase — Production preparation without deployment
 
