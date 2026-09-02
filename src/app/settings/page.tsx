@@ -1,5 +1,6 @@
 import { requirePermission } from "@/lib/require-auth";
 import { getSettings } from "@/lib/settings";
+import { toEditableSystemSettings } from "@/lib/settings-view";
 import { SettingsForm } from "./SettingsForm";
 import { PageHeader, Badge } from "@/components/ui";
 import { ShieldAlert } from "lucide-react";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   await requirePermission("settings");
   const canEdit = true;
-  const settings = await getSettings();
+  const settings = toEditableSystemSettings(await getSettings());
 
   return (
     <div className="p-6 lg:p-10">
