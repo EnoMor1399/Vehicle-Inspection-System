@@ -114,6 +114,19 @@ Completed in source:
 - predictive-maintenance fleet analysis no longer performs one history query per vehicle; a ranked batch query supplies bounded recent histories for risk calculation;
 - regression tests cover bounded JSON streaming, evidence format/count limits, proxy-limit alignment and spreadsheet formula neutralization.
 
+## Final source acceptance result
+
+GitHub quality gate run `33627752634` passed on source head `7171d17d84b229f7ad6e890b034fcf22717e3216`:
+
+- Secret and workflow policy scan: **PASS**
+- Dependency audit: **PASS**
+- TypeScript: **PASS**
+- ESLint: **PASS**
+- Regression tests: **PASS**
+- Production build: **PASS**
+- Docker runtime and migrator image build: **PASS**
+- Local production-container liveness smoke: **PASS**
+
 ## Release identity
 
 Enterprise V2.4 uses `package.json` as the source-controlled runtime release identity. The candidate reports version **2.4.0** through the existing release-version module and health endpoints.
