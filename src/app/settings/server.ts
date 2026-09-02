@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSettings, updateSettings, type SystemSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { settingsValidationMessage, systemSettingsUpdateSchema } from "@/lib/settings-policy";
 
 export async function getSettingsAction(): Promise<SystemSettings> {
   return getSettings();
@@ -17,9 +18,17 @@ export async function updateSettingsAction(
     return { ok: false, error: "You do not have permission to update system settings" };
   }
 
+  const parsed = systemSettingsUpdateSchema.safeParse(data);
+  if (!parsed.success) {
+    return { ok: false, error: settingsValidationMessage(parsed.error) };
+  }
+  if (Object.keys(parsed.data).length === 0) {
+    return { ok: false, error: "No system setting changes were provided" };
+  }
+
   try {
     const before = await getSettings();
-    await updateSettings(data, user.id);
+    const updated = await updateSettings(parsed.data, user.id);
     await logAudit({
       userId: user.id,
       userName: user.name,
@@ -29,13 +38,14 @@ export async function updateSettingsAction(
       entityLabel: "System Settings",
       summary: "Updated system settings",
       before,
-      after: data,
+      after: updated,
     });
     revalidatePath("/", "layout");
     revalidatePath("/settings");
     revalidatePath("/login");
     return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err.message || "Failed to update settings" };
+  } catch (error) {
+    console.error("System settings update failed:", error instanceof Error ? error.message : "unknown error");
+    return { ok: false, error: "Failed to update system settings" };
   }
 }
