@@ -12,6 +12,7 @@ import { API_INSPECTION_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body
 import { assessInspectionOutcome, deriveVehicleStatusAfterInspection } from "@/lib/inspection-policy";
 import { getSettings } from "@/lib/settings";
 import { formatServerTiming, timeOperation } from "@/lib/performance";
+import { emitWebhookEvent } from "@/lib/webhook-delivery";
 
 const RESULTS = new Set(["pass", "conditional_pass", "reinspection_required", "fail"]);
 
@@ -110,6 +111,18 @@ export async function POST(request: Request) {
         criticalFailedItemCount: assessment.criticalFailedCount,
         vehicleStatus: nextVehicleStatus,
       },
+    });
+
+    const event = body.overallResult === "fail" ? "inspection.failed" : "inspection.completed";
+    await emitWebhookEvent(event, {
+      id,
+      inspectionNumber,
+      vehicleId: body.vehicleId,
+      vehicleRegistration: vehicle.registrationNumber,
+      overallResult: body.overallResult,
+      workflowStatus: body.workflowStatus,
+      failedItemCount: assessment.failedCount,
+      criticalFailedItemCount: assessment.criticalFailedCount,
     });
 
     return json({ data: { id, inspectionNumber } }, 201);
