@@ -10,6 +10,7 @@ COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 COPY migrations ./migrations
 COPY scripts/apply-enterprise-upgrade.mjs ./scripts/apply-enterprise-upgrade.mjs
+COPY scripts/verify-enterprise-upgrade.mjs ./scripts/verify-enterprise-upgrade.mjs
 CMD ["npm", "run", "db:upgrade"]
 
 # Application build stage
@@ -18,9 +19,17 @@ RUN apk add --no-cache libc6-compat python3 make g++
 COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci --include=dev; else npm install --include=dev; fi
 COPY . .
-# Server-rendered pages are force-dynamic. A build-only URL prevents module initialization
-# from failing before runtime DATABASE_URL is injected by the deployment platform.
-RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build npx next build
+# Server-rendered pages are force-dynamic. Build-only values satisfy production
+# configuration validation without embedding production credentials in the image.
+RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
+    NEXT_PUBLIC_APP_URL=http://localhost:3000 \
+    JWT_SECRET=build-only-jwt-secret-value-000000000000000000000000 \
+    SESSION_SECRET=build-only-session-secret-value-000000000000000000000 \
+    CSRF_SECRET=build-only-csrf-secret-value-000000000000000000000000 \
+    API_KEY_SALT=build-only-api-key-salt-value-00000000000000000000000 \
+    FIELD_ENCRYPTION_KEY=build-only-field-encryption-key-0000000000000000000000 \
+    CERTIFICATE_SIGNING_SECRET=build-only-certificate-signing-secret-000000000000000000 \
+    npx next build
 
 # Minimal non-root runtime image. Next standalone already includes required runtime modules.
 FROM base AS runner
