@@ -6,6 +6,11 @@ import { Download, FileSpreadsheet, FileText, Table, ChevronDown, Loader2, File 
 import * as XLSX from "@e965/xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  exportCellText,
+  neutralizeSpreadsheetFormula,
+  spreadsheetColumnWidth,
+} from "@/lib/export-security";
 
 interface ExportMenuProps {
   data: any[];
@@ -33,10 +38,9 @@ export function ExportMenu({ data, filename, title, label = "Export" }: ExportMe
         ...data.map((row) =>
           headers
             .map((header) => {
-              const value = row[header];
-              const stringValue = value === null || value === undefined ? "" : String(value);
-              // Escape quotes and wrap in quotes if contains comma or newline
-              if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes('"')) {
+              const stringValue = neutralizeSpreadsheetFormula(row[header]);
+              // Escape quotes and wrap in quotes if contains a delimiter or newline.
+              if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes("\r") || stringValue.includes('"')) {
                 return `"${stringValue.replace(/"/g, '""')}"`;
               }
               return stringValue;
@@ -65,17 +69,19 @@ export function ExportMenu({ data, filename, title, label = "Export" }: ExportMe
         return;
       }
 
+      const headers = Object.keys(data[0]);
+      const safeRows = data.map((row) => Object.fromEntries(
+        headers.map((header) => [header, neutralizeSpreadsheetFormula(row[header])])
+      ));
+
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(data);
-      
-      // Auto-size columns
-      const colWidths = Object.keys(data[0]).map((key) => ({
-        wch: Math.max(
-          key.length,
-          ...data.map((row) => String(row[key] || "").length)
-        ),
+      const ws = XLSX.utils.json_to_sheet(safeRows);
+
+      // Bound display widths so unusually long imported text cannot create
+      // impractical spreadsheet columns.
+      ws["!cols"] = headers.map((key) => ({
+        wch: spreadsheetColumnWidth(data.map((row) => row[key]), key),
       }));
-      ws["!cols"] = colWidths;
 
       XLSX.utils.book_append_sheet(wb, ws, title || "Data");
       XLSX.writeFile(wb, `${filename}.xlsx`);
@@ -120,19 +126,19 @@ export function ExportMenu({ data, filename, title, label = "Export" }: ExportMe
 
       const doc = new jsPDF();
       const headers = Object.keys(data[0]);
-      
+
       // Add title
       doc.setFontSize(18);
       doc.text(title || filename, 14, 20);
-      
+
       // Add date
       doc.setFontSize(10);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
-      
+
       // Add table
       autoTable(doc, {
         head: [headers],
-        body: data.map((row) => headers.map((h) => row[h] || "")),
+        body: data.map((row) => headers.map((header) => exportCellText(row[header]))),
         startY: 35,
         headStyles: { fillColor: [3, 151, 3] },
         styles: { fontSize: 8 },
