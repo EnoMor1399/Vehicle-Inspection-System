@@ -70,4 +70,30 @@ CREATE UNIQUE INDEX IF NOT EXISTS training_quotation_one_accepted_request_uidx O
 CREATE INDEX IF NOT EXISTS training_quotation_item_quotation_idx ON training_quotation_items(quotation_id);
 CREATE INDEX IF NOT EXISTS training_quotation_item_type_idx ON training_quotation_items(item_type);
 
+CREATE OR REPLACE FUNCTION enforce_training_request_commercial_authorization()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.request_type = 'client' AND NEW.status = 'scheduled' THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM training_quotations q
+      WHERE q.request_id = NEW.id
+        AND q.status = 'accepted'
+        AND q.valid_until >= CURRENT_DATE
+    ) THEN
+      RAISE EXCEPTION 'Client training request requires an accepted, valid quotation before scheduling';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS training_request_commercial_authorization_trg ON training_requests;
+CREATE TRIGGER training_request_commercial_authorization_trg
+BEFORE INSERT OR UPDATE OF status, scheduled_session_id ON training_requests
+FOR EACH ROW
+EXECUTE FUNCTION enforce_training_request_commercial_authorization();
+
 COMMIT;
