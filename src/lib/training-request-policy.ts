@@ -17,6 +17,10 @@ const SERVICE_IDS = new Set(DRIVER_TRAINING_SERVICES.map((service) => service.id
 const optionalText = (max: number) => z.string().trim().max(max).optional().transform((value) => value || undefined);
 const optionalUuid = z.string().uuid().optional().or(z.literal("")).transform((value) => value || undefined);
 const optionalDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date").optional().or(z.literal("")).transform((value) => value || undefined);
+const dateTime = (label: string) => z.string().trim().min(1).max(40).transform((value) => new Date(value)).refine(
+  (value) => !Number.isNaN(value.getTime()),
+  `Invalid ${label} date/time`,
+);
 
 export const trainingRequestCreateSchema = z.object({
   requestType: z.enum(TRAINING_REQUEST_TYPES).default("client"),
@@ -52,8 +56,8 @@ export const trainingRequestTransitionSchema = z.object({
 
 export const trainingRequestScheduleSchema = z.object({
   requestId: z.string().uuid(),
-  startAt: z.string().datetime({ offset: true }),
-  endAt: z.string().datetime({ offset: true }),
+  startAt: dateTime("start"),
+  endAt: dateTime("end"),
   instructorId: optionalUuid,
   instructorName: optionalText(200),
   capacity: z.coerce.number().int().min(1).max(5000),
@@ -61,7 +65,7 @@ export const trainingRequestScheduleSchema = z.object({
   locationId: optionalUuid,
   notes: optionalText(4000),
 }).superRefine((value, ctx) => {
-  if (new Date(value.endAt).getTime() <= new Date(value.startAt).getTime()) {
+  if (value.endAt.getTime() <= value.startAt.getTime()) {
     ctx.addIssue({ code: "custom", path: ["endAt"], message: "Session end time must be after start time" });
   }
 });
