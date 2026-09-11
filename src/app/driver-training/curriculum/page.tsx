@@ -1,4 +1,5 @@
-import { asc, desc, eq, ne } from "drizzle-orm";
+import type { ReactNode } from "react";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { BookOpenCheck, CalendarClock, Layers3, Link2, ListChecks, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -9,7 +10,7 @@ import {
   trainingMatrixRequirements,
   trainingSessionCurricula,
 } from "@/db/training-curriculum-schema";
-import { Badge, Button, Card, EmptyState, Input, PageHeader, StatCard, TextArea } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, PageHeader, StatCard, TextArea, TextInput as Input } from "@/components/ui";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
 import { canManageTraining, canViewTraining } from "@/lib/training-access";
@@ -48,7 +49,7 @@ export default async function TrainingCurriculumPage() {
     db
       .select({ id: users.id, name: users.name, role: users.role })
       .from(users)
-      .where(ne(users.role, "transporter_user"))
+      .where(and(eq(users.isActive, true), ne(users.role, "transporter_user")))
       .orderBy(asc(users.name))
       .limit(300),
   ]);
@@ -199,7 +200,7 @@ export default async function TrainingCurriculumPage() {
   );
 }
 
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`block ${className}`}><span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">{label}</span>{children}</label>;
 }
 
