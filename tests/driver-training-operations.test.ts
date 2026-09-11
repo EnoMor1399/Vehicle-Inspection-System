@@ -150,7 +150,7 @@ test("department UI exposes operational workspaces without removing the service 
   const sessions = readFileSync("src/app/driver-training/sessions/page.tsx", "utf8");
   const participants = readFileSync("src/app/driver-training/participants/page.tsx", "utf8");
   const certificates = readFileSync("src/app/driver-training/certificates/page.tsx", "utf8");
-  assert.match(dashboard, /Training command center/);
+  assert.match(dashboard, /Operational overview/);
   assert.match(dashboard, /DRIVER_TRAINING_SERVICES\.map/);
   assert.match(sessions, /Schedule a training session/);
   assert.match(participants, /Participants & Assessments/);
