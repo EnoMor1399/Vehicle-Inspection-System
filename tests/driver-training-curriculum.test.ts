@@ -118,7 +118,7 @@ test("enterprise migration runner and verifier include curriculum governance pha
 });
 
 test("Driver Training navigation exposes curriculum governance workspace", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/curriculum/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/curriculum/);
   assert.match(page, /Curriculum & Training Matrix/);
