@@ -40,6 +40,9 @@ const requiredTables = [
   "training_request_events",
   "training_development_plans",
   "training_development_actions",
+  "training_risk_assessments",
+  "training_safety_hazards",
+  "training_safety_incidents",
 ];
 
 const requiredIndexes = [
@@ -124,6 +127,18 @@ const requiredIndexes = [
   "training_development_action_plan_status_idx",
   "training_development_action_due_idx",
   "training_development_action_type_idx",
+  "training_risk_assessment_session_uidx",
+  "training_risk_assessment_status_idx",
+  "training_risk_assessment_overall_risk_idx",
+  "training_risk_assessment_assessed_at_idx",
+  "training_safety_hazard_assessment_status_idx",
+  "training_safety_hazard_residual_risk_idx",
+  "training_safety_hazard_owner_idx",
+  "training_safety_incident_number_uidx",
+  "training_safety_incident_session_status_idx",
+  "training_safety_incident_severity_idx",
+  "training_safety_incident_occurred_idx",
+  "training_safety_incident_owner_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
