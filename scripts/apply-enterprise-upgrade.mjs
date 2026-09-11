@@ -31,6 +31,7 @@ const migrationPaths = [
   "migrations/20260911_driver_training_operations.sql",
   "migrations/20260911_driver_training_compliance.sql",
   "migrations/20260911_driver_training_readiness.sql",
+  "migrations/20260911_driver_training_evidence.sql",
 ];
 
 const client = new pg.Client({
