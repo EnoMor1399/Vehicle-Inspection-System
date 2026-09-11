@@ -93,7 +93,7 @@ test("enterprise migration runner and verifier include logistics objects", () =>
 });
 
 test("Driver Training navigation exposes logistics workspace and risk controls", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/logistics/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/logistics/);
   assert.match(page, /Training Logistics & Resources/);

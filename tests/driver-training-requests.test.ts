@@ -102,7 +102,7 @@ test("enterprise migration runner and verifier include request workflow objects"
 });
 
 test("Driver Training navigation exposes requests workspace and controlled scheduling language", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/requests/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/requests/);
   assert.match(page, /Training Requests & Delivery Planning/);

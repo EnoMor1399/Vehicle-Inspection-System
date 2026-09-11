@@ -82,7 +82,7 @@ test("enterprise migration runner and verifier include the evidence phase", () =
 });
 
 test("Driver Training navigation exposes the evidence workspace", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/evidence/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/evidence/);
   assert.match(page, /Attendance & Evidence/);

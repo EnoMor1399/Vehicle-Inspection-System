@@ -126,12 +126,12 @@ test("compliance workspace exposes renewal, licence and high-risk queues with dr
 
 test("participant dossier and department navigation expose compliance history without global-sidebar noise", () => {
   const dossier = readFileSync("src/app/driver-training/participants/[id]/page.tsx", "utf8");
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   assert.match(dossier, /Assessment history/);
   assert.match(dossier, /Certificate history/);
   assert.match(dossier, /Compliance case history/);
   assert.match(dossier, /canViewTraining/);
   assert.match(layout, /\/driver-training\/compliance/);
   assert.match(layout, /\/driver-training\/analytics/);
-  assert.match(layout, /Driver Training workspaces/);
+  assert.match(layout, /Driver Training & Assessment/);
 });

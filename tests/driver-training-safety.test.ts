@@ -89,7 +89,7 @@ test("enterprise migration runner and verifier include safety governance phase",
 });
 
 test("Driver Training navigation exposes safety workspace and explicit readiness boundary", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/safety/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/safety/);
   assert.match(page, /Training Safety, Risk & Incidents/);
