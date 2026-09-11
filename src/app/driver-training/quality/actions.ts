@@ -96,6 +96,9 @@ export async function submitTrainingFeedback(formData: FormData) {
   if (!parsed.success) throw new Error(trainingQualityValidationMessage(parsed.error));
   const data = parsed.data;
   const context = await validateSessionParticipant(data.sessionId, data.participantId);
+  if (!["in_progress", "completed"].includes(context.session.status)) {
+    throw new Error("Training feedback can only be recorded for in-progress or completed sessions");
+  }
   const signal = feedbackQualitySignal(data.overallRating, data.safetyRating);
   const createdAt = new Date();
 
