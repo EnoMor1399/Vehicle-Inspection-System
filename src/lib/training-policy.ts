@@ -79,6 +79,13 @@ export const trainingCertificateSchema = z.object({
   validityMonths: z.coerce.number().int().min(0).max(60).default(12),
 });
 
+export const trainingCertificateRevocationSchema = z.object({
+  certificateId: z.string().uuid(),
+  reason: z.string().trim().min(5, "Provide a revocation reason").max(2000),
+});
+
+export const trainingVerificationCodeSchema = z.string().trim().regex(/^[a-f0-9]{32}$/i, "Invalid verification code");
+
 export const trainingSessionStatusSchema = z.object({
   sessionId: z.string().uuid(),
   status: z.enum(TRAINING_SESSION_STATUSES),
@@ -101,6 +108,19 @@ export function calculateOverallScore(theoryScore?: number, practicalScore?: num
 
 export function isPassingTrainingResult(result: string) {
   return result === "pass" || result === "competent";
+}
+
+export function effectiveTrainingCertificateStatus(
+  status: string,
+  expiryDate?: string | Date | null,
+  now = new Date(),
+) {
+  if (status === "revoked") return "revoked" as const;
+  if (expiryDate) {
+    const expiry = expiryDate instanceof Date ? expiryDate : new Date(`${expiryDate}T23:59:59.999Z`);
+    if (!Number.isNaN(expiry.getTime()) && expiry.getTime() < now.getTime()) return "expired" as const;
+  }
+  return "active" as const;
 }
 
 export function canTransitionTrainingSession(current: string, next: string) {
