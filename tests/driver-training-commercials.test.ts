@@ -77,7 +77,7 @@ test("enterprise migration runner and verifier include commercial objects", () =
 });
 
 test("Driver Training navigation exposes commercial workspace and delivery authorization language", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/commercials/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/commercials/);
   assert.match(page, /Training Commercials & Quotations/);
