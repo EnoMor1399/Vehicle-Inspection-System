@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS training_requests (
   CONSTRAINT training_request_type_chk CHECK (request_type IN ('client', 'internal')),
   CONSTRAINT training_request_priority_chk CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   CONSTRAINT training_request_status_chk CHECK (status IN ('draft', 'submitted', 'under_review', 'approved', 'rejected', 'scheduled', 'cancelled')),
-  CONSTRAINT training_request_delivery_mode_chk CHECK (delivery_mode IN ('onsite', 'classroom', 'practical', 'hybrid', 'virtual')),
+  CONSTRAINT training_request_delivery_mode_chk CHECK (delivery_mode IN ('onsite', 'classroom', 'practical', 'hybrid')),
   CONSTRAINT training_request_participant_count_chk CHECK (requested_participants BETWEEN 1 AND 5000),
   CONSTRAINT training_request_client_name_chk CHECK (request_type <> 'client' OR client_name IS NOT NULL),
   CONSTRAINT training_request_preferred_dates_chk CHECK (preferred_start_date IS NULL OR preferred_end_date IS NULL OR preferred_end_date >= preferred_start_date),
