@@ -137,7 +137,7 @@ export async function updateTrainingQuotationPricing(formData: FormData) {
     const [quote] = await tx.select().from(trainingQuotations).where(eq(trainingQuotations.id, data.quotationId)).limit(1);
     if (!quote) return { ok: false as const, error: "Training quotation not found" };
     if (quote.status !== "draft") return { ok: false as const, error: "Quotation pricing can only be changed while the quotation is draft" };
-    const recalculated = await recalculateQuotation(tx as typeof db, quote.id, data.discountAmount, data.taxRate);
+    const recalculated = await recalculateQuotation(tx as unknown as typeof db, quote.id, data.discountAmount, data.taxRate);
     await tx.update(trainingQuotations).set({ validUntil: data.validUntil, updatedAt: new Date() }).where(eq(trainingQuotations.id, quote.id));
     return { ok: true as const, quote, totals: recalculated.totals };
   });
@@ -185,7 +185,7 @@ export async function addTrainingQuotationItem(formData: FormData) {
       unitPrice: data.unitPrice.toFixed(2),
       lineTotal: lineTotal.toFixed(2),
     });
-    const recalculated = await recalculateQuotation(tx as typeof db, quote.id, Number(quote.discountAmount), Number(quote.taxRate));
+    const recalculated = await recalculateQuotation(tx as unknown as typeof db, quote.id, Number(quote.discountAmount), Number(quote.taxRate));
     return { ok: true as const, quote, lineTotal, totals: recalculated.totals };
   });
   if (!result.ok) throw new Error(result.error);
@@ -216,7 +216,7 @@ export async function removeTrainingQuotationItem(formData: FormData) {
     if (!quote) return { ok: false as const, error: "Training quotation not found" };
     if (quote.status !== "draft") return { ok: false as const, error: "Quotation line items can only be edited while the quotation is draft" };
     await tx.delete(trainingQuotationItems).where(eq(trainingQuotationItems.id, item.id));
-    await recalculateQuotation(tx as typeof db, quote.id, Number(quote.discountAmount), Number(quote.taxRate));
+    await recalculateQuotation(tx as unknown as typeof db, quote.id, Number(quote.discountAmount), Number(quote.taxRate));
     return { ok: true as const, quote, item };
   });
   if (!result.ok) throw new Error(result.error);
