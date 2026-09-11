@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
-      "source-only-hardening": false
+      "source-only-hardening": false,
+      "source-only-driver-training-robustness": false
     }
   }
 }
