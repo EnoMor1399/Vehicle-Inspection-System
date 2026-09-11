@@ -16,6 +16,7 @@ import {
   quotationLineTotal,
   trainingQuotationCreateSchema,
   trainingQuotationItemSchema,
+  trainingQuotationPricingSchema,
   trainingQuotationTransitionSchema,
   trainingQuotationValidationMessage,
 } from "@/lib/training-commercial-policy";
@@ -62,8 +63,6 @@ export async function createTrainingQuotation(formData: FormData) {
     requestId: field(formData, "requestId"),
     currency: field(formData, "currency") || "GHS",
     validUntil: field(formData, "validUntil"),
-    discountAmount: field(formData, "discountAmount") || "0",
-    taxRate: field(formData, "taxRate") || "0",
     terms: field(formData, "terms"),
     notes: field(formData, "notes"),
   });
@@ -95,8 +94,8 @@ export async function createTrainingQuotation(formData: FormData) {
       status: "draft",
       validUntil: data.validUntil,
       subtotal: "0.00",
-      discountAmount: data.discountAmount.toFixed(2),
-      taxRate: data.taxRate.toFixed(3),
+      discountAmount: "0.00",
+      taxRate: "0.000",
       taxAmount: "0.00",
       totalAmount: "0.00",
       terms: data.terms || null,
@@ -118,6 +117,42 @@ export async function createTrainingQuotation(formData: FormData) {
     entityLabel: result.values.quotationNumber,
     summary: `Created quotation ${result.values.quotationNumber} for ${result.request.requestNumber}`,
     after: result.values,
+  });
+  refreshCommercialPaths();
+}
+
+export async function updateTrainingQuotationPricing(formData: FormData) {
+  const user = await requireTrainingManager();
+  const parsed = trainingQuotationPricingSchema.safeParse({
+    quotationId: field(formData, "quotationId"),
+    validUntil: field(formData, "validUntil"),
+    discountAmount: field(formData, "discountAmount") || "0",
+    taxRate: field(formData, "taxRate") || "0",
+  });
+  if (!parsed.success) throw new Error(trainingQuotationValidationMessage(parsed.error));
+  const data = parsed.data;
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.quotationId}))`);
+    const [quote] = await tx.select().from(trainingQuotations).where(eq(trainingQuotations.id, data.quotationId)).limit(1);
+    if (!quote) return { ok: false as const, error: "Training quotation not found" };
+    if (quote.status !== "draft") return { ok: false as const, error: "Quotation pricing can only be changed while the quotation is draft" };
+    const recalculated = await recalculateQuotation(tx as typeof db, quote.id, data.discountAmount, data.taxRate);
+    await tx.update(trainingQuotations).set({ validUntil: data.validUntil, updatedAt: new Date() }).where(eq(trainingQuotations.id, quote.id));
+    return { ok: true as const, quote, totals: recalculated.totals };
+  });
+  if (!result.ok) throw new Error(result.error);
+
+  await logAudit({
+    userId: user.id,
+    userName: user.name,
+    action: "update",
+    entityType: "training_quotation",
+    entityId: result.quote.id,
+    entityLabel: result.quote.quotationNumber,
+    summary: `Updated pricing controls for ${result.quote.quotationNumber}`,
+    before: { validUntil: result.quote.validUntil, discountAmount: result.quote.discountAmount, taxRate: result.quote.taxRate },
+    after: { validUntil: data.validUntil, discountAmount: result.totals.discountAmount, taxRate: result.totals.taxRate },
   });
   refreshCommercialPaths();
 }
