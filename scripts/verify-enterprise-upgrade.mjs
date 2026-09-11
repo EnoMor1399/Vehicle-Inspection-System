@@ -21,6 +21,8 @@ const requiredTables = [
   "training_participants",
   "training_assessments",
   "training_certificates",
+  "training_compliance_cases",
+  "training_compliance_events",
 ];
 
 const requiredIndexes = [
@@ -36,6 +38,12 @@ const requiredIndexes = [
   "training_assessment_participant_idx",
   "training_certificate_number_uidx",
   "training_certificate_verification_uidx",
+  "training_compliance_participant_idx",
+  "training_compliance_certificate_idx",
+  "training_compliance_status_due_idx",
+  "training_compliance_assigned_idx",
+  "training_compliance_event_case_created_idx",
+  "training_compliance_active_case_uidx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
