@@ -28,6 +28,19 @@ const migrationPaths = [
   "migrations/20260830_user_theme_preferences.sql",
   "migrations/20260831_performance_indexes.sql",
   "migrations/20260902_security_query_indexes.sql",
+  "migrations/20260911_driver_training_operations.sql",
+  "migrations/20260911_driver_training_compliance.sql",
+  "migrations/20260911_driver_training_readiness.sql",
+  "migrations/20260911_driver_training_evidence.sql",
+  "migrations/20260911_driver_training_quality.sql",
+  "migrations/20260911_driver_training_curriculum.sql",
+  "migrations/20260911_driver_training_logistics.sql",
+  "migrations/20260911_driver_training_requests.sql",
+  "migrations/20260911_driver_training_development.sql",
+  "migrations/20260911_driver_training_safety.sql",
+  "migrations/20260911_driver_training_commercials.sql",
+  "migrations/20260911_driver_training_accreditation.sql",
+  "migrations/20260911_driver_training_communications.sql",
 ];
 
 const client = new pg.Client({
