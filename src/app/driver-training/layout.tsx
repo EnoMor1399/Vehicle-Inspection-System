@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Award, BadgeCheck, BarChart3, BookOpenCheck, CalendarDays, ClipboardCheck, ClipboardList, FileCheck2, GraduationCap, ShieldCheck, UsersRound } from "lucide-react";
+import { Award, BadgeCheck, BarChart3, BookOpenCheck, Boxes, CalendarDays, ClipboardCheck, ClipboardList, FileCheck2, GraduationCap, ShieldCheck, UsersRound } from "lucide-react";
 
 const WORKSPACES = [
   { href: "/driver-training", label: "Overview", icon: GraduationCap },
   { href: "/driver-training/sessions", label: "Sessions", icon: CalendarDays },
   { href: "/driver-training/participants", label: "Participants", icon: UsersRound },
   { href: "/driver-training/curriculum", label: "Curriculum", icon: BookOpenCheck },
+  { href: "/driver-training/logistics", label: "Logistics", icon: Boxes },
   { href: "/driver-training/instructors", label: "Instructors", icon: BadgeCheck },
   { href: "/driver-training/readiness", label: "Readiness", icon: ClipboardCheck },
   { href: "/driver-training/evidence", label: "Evidence", icon: FileCheck2 },
