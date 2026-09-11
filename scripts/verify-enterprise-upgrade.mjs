@@ -30,6 +30,10 @@ const requiredTables = [
   "training_session_feedback",
   "training_quality_findings",
   "training_quality_events",
+  "training_curricula",
+  "training_curriculum_versions",
+  "training_session_curricula",
+  "training_matrix_requirements",
 ];
 
 const requiredIndexes = [
@@ -76,6 +80,20 @@ const requiredIndexes = [
   "training_quality_severity_idx",
   "training_quality_owner_idx",
   "training_quality_event_finding_created_idx",
+  "training_curriculum_code_uidx",
+  "training_curriculum_service_idx",
+  "training_curriculum_status_idx",
+  "training_curriculum_owner_idx",
+  "training_curriculum_version_uidx",
+  "training_curriculum_version_status_idx",
+  "training_curriculum_review_due_idx",
+  "training_curriculum_effective_idx",
+  "training_curriculum_one_approved_uidx",
+  "training_session_curriculum_session_uidx",
+  "training_session_curriculum_version_idx",
+  "training_matrix_requirement_key_uidx",
+  "training_matrix_service_idx",
+  "training_matrix_scope_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
