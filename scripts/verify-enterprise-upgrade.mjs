@@ -34,6 +34,8 @@ const requiredTables = [
   "training_curriculum_versions",
   "training_session_curricula",
   "training_matrix_requirements",
+  "training_resources",
+  "training_resource_allocations",
 ];
 
 const requiredIndexes = [
@@ -94,6 +96,15 @@ const requiredIndexes = [
   "training_matrix_requirement_key_uidx",
   "training_matrix_service_idx",
   "training_matrix_scope_idx",
+  "training_resource_code_uidx",
+  "training_resource_type_status_idx",
+  "training_resource_location_idx",
+  "training_resource_service_due_idx",
+  "training_resource_inspection_due_idx",
+  "training_resource_allocation_resource_session_idx",
+  "training_resource_active_session_uidx",
+  "training_resource_allocation_resource_status_idx",
+  "training_resource_allocation_session_status_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
@@ -147,15 +158,9 @@ try {
   );
 
   if (missingTables.length > 0 || missing.length > 0 || redundantStillPresent.length > 0) {
-    if (missingTables.length > 0) {
-      console.error(`Missing required tables: ${missingTables.join(", ")}`);
-    }
-    if (missing.length > 0) {
-      console.error(`Missing required indexes: ${missing.join(", ")}`);
-    }
-    if (redundantStillPresent.length > 0) {
-      console.error(`Redundant indexes still present: ${redundantStillPresent.join(", ")}`);
-    }
+    if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
+    if (missing.length > 0) console.error(`Missing required indexes: ${missing.join(", ")}`);
+    if (redundantStillPresent.length > 0) console.error(`Redundant indexes still present: ${redundantStillPresent.join(", ")}`);
     process.exitCode = 1;
   } else {
     console.log("Enterprise database upgrade verification passed.");
