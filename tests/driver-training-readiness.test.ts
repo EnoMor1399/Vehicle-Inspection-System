@@ -124,7 +124,7 @@ test("readiness workspace exposes all eight controls and does not silently chang
 
 test("instructor register surfaces credential expiry and department navigation exposes both workspaces", () => {
   const instructorPage = readFileSync("src/app/driver-training/instructors/page.tsx", "utf8");
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   assert.match(instructorPage, /Instructor Qualifications/);
   assert.match(instructorPage, /trainerCertificationExpiry/);
   assert.match(instructorPage, /medicalFitnessExpiry/);
