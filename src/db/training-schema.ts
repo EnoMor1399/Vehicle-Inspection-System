@@ -136,3 +136,51 @@ export const trainingCertificates = pgTable(
     statusIdx: index("training_certificate_status_idx").on(t.status),
   })
 );
+
+export const trainingComplianceCases = pgTable(
+  "training_compliance_cases",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    participantId: varchar("participant_id", { length: 36 })
+      .notNull()
+      .references(() => trainingParticipants.id, { onDelete: "cascade" }),
+    certificateId: varchar("certificate_id", { length: 36 }).references(() => trainingCertificates.id, { onDelete: "set null" }),
+    caseType: varchar("case_type", { length: 30 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("open"),
+    priority: varchar("priority", { length: 20 }).notNull().default("medium"),
+    dueDate: date("due_date"),
+    assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    preferredChannel: varchar("preferred_channel", { length: 20 }),
+    contactCount: integer("contact_count").notNull().default(0),
+    lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+    nextFollowUpDate: date("next_follow_up_date"),
+    notes: text("notes"),
+    createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    participantIdx: index("training_compliance_participant_idx").on(t.participantId),
+    certificateIdx: index("training_compliance_certificate_idx").on(t.certificateId),
+    statusDueIdx: index("training_compliance_status_due_idx").on(t.status, t.dueDate),
+    assignedIdx: index("training_compliance_assigned_idx").on(t.assignedTo),
+  })
+);
+
+export const trainingComplianceEvents = pgTable(
+  "training_compliance_events",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    caseId: varchar("case_id", { length: 36 })
+      .notNull()
+      .references(() => trainingComplianceCases.id, { onDelete: "cascade" }),
+    eventType: varchar("event_type", { length: 30 }).notNull(),
+    channel: varchar("channel", { length: 20 }),
+    summary: text("summary").notNull(),
+    createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    caseCreatedIdx: index("training_compliance_event_case_created_idx").on(t.caseId, t.createdAt),
+  })
+);
