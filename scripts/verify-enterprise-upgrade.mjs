@@ -36,6 +36,8 @@ const requiredTables = [
   "training_matrix_requirements",
   "training_resources",
   "training_resource_allocations",
+  "training_requests",
+  "training_request_events",
 ];
 
 const requiredIndexes = [
@@ -105,6 +107,13 @@ const requiredIndexes = [
   "training_resource_active_session_uidx",
   "training_resource_allocation_resource_status_idx",
   "training_resource_allocation_session_status_idx",
+  "training_request_number_uidx",
+  "training_request_status_created_idx",
+  "training_request_service_idx",
+  "training_request_client_idx",
+  "training_request_reviewer_idx",
+  "training_request_scheduled_session_uidx",
+  "training_request_event_request_created_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
