@@ -45,6 +45,9 @@ const requiredTables = [
   "training_safety_incidents",
   "training_quotations",
   "training_quotation_items",
+  "training_regulatory_requirements",
+  "training_accreditation_records",
+  "training_session_compliance_reviews",
 ];
 
 const requiredIndexes = [
@@ -148,6 +151,16 @@ const requiredIndexes = [
   "training_quotation_one_accepted_request_uidx",
   "training_quotation_item_quotation_idx",
   "training_quotation_item_type_idx",
+  "training_regulatory_requirement_code_uidx",
+  "training_regulatory_requirement_service_status_idx",
+  "training_regulatory_requirement_review_idx",
+  "training_accreditation_requirement_idx",
+  "training_accreditation_status_validity_idx",
+  "training_accreditation_credential_idx",
+  "training_accreditation_one_verified_uidx",
+  "training_session_compliance_session_uidx",
+  "training_session_compliance_status_idx",
+  "training_session_compliance_reviewed_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
