@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   FileBarChart,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -68,6 +69,12 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/inspections", label: "Inspections", icon: ClipboardCheck, resource: "inspections" },
       { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck, resource: "inspections" },
       { href: "/locations", label: "Stations", icon: MapPin, resource: "locations" },
+    ],
+  },
+  {
+    label: "Departments",
+    items: [
+      { href: "/driver-training", label: "Driver Training & Assessment", icon: GraduationCap },
     ],
   },
   {
