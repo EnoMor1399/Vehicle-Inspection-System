@@ -43,6 +43,8 @@ const requiredTables = [
   "training_risk_assessments",
   "training_safety_hazards",
   "training_safety_incidents",
+  "training_quotations",
+  "training_quotation_items",
 ];
 
 const requiredIndexes = [
@@ -139,6 +141,13 @@ const requiredIndexes = [
   "training_safety_incident_severity_idx",
   "training_safety_incident_occurred_idx",
   "training_safety_incident_owner_idx",
+  "training_quotation_number_uidx",
+  "training_quotation_request_version_uidx",
+  "training_quotation_request_status_idx",
+  "training_quotation_valid_until_idx",
+  "training_quotation_one_accepted_request_uidx",
+  "training_quotation_item_quotation_idx",
+  "training_quotation_item_type_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
