@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS training_sessions (
   id varchar(36) PRIMARY KEY,
-  reference_number varchar(40) NOT NULL UNIQUE,
+  reference_number varchar(40) NOT NULL,
   service_id varchar(80) NOT NULL,
   title varchar(220) NOT NULL,
   client_name varchar(220),
@@ -78,8 +78,8 @@ CREATE TABLE IF NOT EXISTS training_assessments (
 
 CREATE TABLE IF NOT EXISTS training_certificates (
   id varchar(36) PRIMARY KEY,
-  certificate_number varchar(50) NOT NULL UNIQUE,
-  verification_code varchar(64) NOT NULL UNIQUE,
+  certificate_number varchar(50) NOT NULL,
+  verification_code varchar(64) NOT NULL,
   participant_id varchar(36) NOT NULL REFERENCES training_participants(id) ON DELETE RESTRICT,
   session_id varchar(36) NOT NULL REFERENCES training_sessions(id) ON DELETE RESTRICT,
   service_id varchar(80) NOT NULL,
@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS training_certificates (
   CONSTRAINT training_certificate_status_chk CHECK (status IN ('active', 'expired', 'revoked'))
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS training_session_reference_uidx ON training_sessions(reference_number);
 CREATE INDEX IF NOT EXISTS training_session_service_idx ON training_sessions(service_id);
 CREATE INDEX IF NOT EXISTS training_session_status_start_idx ON training_sessions(status, start_at);
 CREATE INDEX IF NOT EXISTS training_session_transporter_idx ON training_sessions(transporter_id);
@@ -104,6 +105,8 @@ CREATE INDEX IF NOT EXISTS training_participant_assessment_idx ON training_parti
 CREATE INDEX IF NOT EXISTS training_assessment_participant_idx ON training_assessments(participant_id, assessed_at);
 CREATE INDEX IF NOT EXISTS training_assessment_session_idx ON training_assessments(session_id);
 CREATE INDEX IF NOT EXISTS training_assessment_result_idx ON training_assessments(result);
+CREATE UNIQUE INDEX IF NOT EXISTS training_certificate_number_uidx ON training_certificates(certificate_number);
+CREATE UNIQUE INDEX IF NOT EXISTS training_certificate_verification_uidx ON training_certificates(verification_code);
 CREATE INDEX IF NOT EXISTS training_certificate_participant_idx ON training_certificates(participant_id);
 CREATE INDEX IF NOT EXISTS training_certificate_session_idx ON training_certificates(session_id);
 CREATE INDEX IF NOT EXISTS training_certificate_status_idx ON training_certificates(status);
