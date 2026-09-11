@@ -100,7 +100,7 @@ test("enterprise migration runner and verifier include communication objects", (
 });
 
 test("Driver Training navigation exposes Communications and workspace states no automatic external dispatch", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/communications/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/communications/);
   assert.match(page, /Training Communications & Reminders/);
