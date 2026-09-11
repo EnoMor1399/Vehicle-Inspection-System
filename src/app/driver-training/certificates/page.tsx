@@ -9,8 +9,7 @@ import { requireInternalUser } from "@/lib/require-auth";
 import { canManageTraining, canViewTraining } from "@/lib/training-access";
 import { effectiveTrainingCertificateStatus } from "@/lib/training-policy";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import { issueTrainingCertificate } from "../actions";
-import { revokeTrainingCertificate } from "./actions";
+import { issueAssuredTrainingCertificate, revokeTrainingCertificate } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,10 +74,10 @@ export default async function TrainingCertificatesPage() {
           <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><Award className="h-5 w-5" /></div>
-              <div><h2 className="font-semibold text-[var(--vims-ink)]">Issue certificate</h2><p className="text-sm text-[var(--vims-ink-muted)]">The server rechecks assessment eligibility and blocks duplicate active certificates.</p></div>
+              <div><h2 className="font-semibold text-[var(--vims-ink)]">Issue certificate</h2><p className="text-sm text-[var(--vims-ink-muted)]">Requires a completed session and current passing assessment; renewals normalize expired records and revoked certificates require reassessment.</p></div>
             </div>
           </div>
-          <form action={issueTrainingCertificate} className="grid gap-4 p-5 sm:grid-cols-[1fr_220px_auto] sm:items-end sm:p-6">
+          <form action={issueAssuredTrainingCertificate} className="grid gap-4 p-5 sm:grid-cols-[1fr_220px_auto] sm:items-end sm:p-6">
             <Field label="Eligible participant" required>
               <Select name="participantId" required defaultValue="">
                 <option value="" disabled>Select participant</option>
