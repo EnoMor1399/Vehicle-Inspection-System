@@ -189,6 +189,6 @@ export async function reviewTrainingSessionRegulatoryCompliance(formData: FormDa
   if (existing) await db.update(trainingSessionComplianceReviews).set(values).where(eq(trainingSessionComplianceReviews.id, existing.id));
   else await db.insert(trainingSessionComplianceReviews).values({ id: newId(), sessionId: session.id, ...values });
 
-  await logAudit({ userId: user.id, userName: user.name, action: "review", entityType: "training_session_compliance", entityId: session.id, entityLabel: session.referenceNumber, summary: `Reviewed regulatory compliance: ${evaluation.ready ? "ready" : "blocked"}`, after: { ...values, applicableRequirements: evaluation.applicableCount } });
+  await logAudit({ userId: user.id, userName: user.name, action: "inspect", entityType: "training_session_compliance", entityId: session.id, entityLabel: session.referenceNumber, summary: `Reviewed regulatory compliance: ${evaluation.ready ? "ready" : "blocked"}`, after: { ...values, applicableRequirements: evaluation.applicableCount } });
   refreshAccreditationPaths();
 }
