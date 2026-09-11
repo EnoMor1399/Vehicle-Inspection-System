@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   trainingAccreditationRecords,
@@ -139,6 +139,7 @@ export async function decideTrainingAccreditationRecord(formData: FormData) {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.accreditationId}))`);
     const [record] = await tx.select().from(trainingAccreditationRecords).where(eq(trainingAccreditationRecords.id, data.accreditationId)).limit(1);
     if (!record) return { ok: false as const, error: "Accreditation record not found" };
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-accreditation:${record.requirementId}`}))`);
     const allowed = record.status === "pending"
       ? ["verified", "rejected"].includes(data.status)
       : record.status === "verified"
@@ -148,7 +149,10 @@ export async function decideTrainingAccreditationRecord(formData: FormData) {
 
     const now = new Date();
     if (data.status === "verified") {
-      await tx.update(trainingAccreditationRecords).set({ status: "superseded", updatedAt: now }).where(eq(trainingAccreditationRecords.requirementId, record.requirementId));
+      await tx.update(trainingAccreditationRecords).set({ status: "superseded", updatedAt: now }).where(and(
+        eq(trainingAccreditationRecords.requirementId, record.requirementId),
+        eq(trainingAccreditationRecords.status, "verified"),
+      ));
     }
     const patch = {
       status: data.status,
@@ -173,7 +177,7 @@ export async function reviewTrainingSessionRegulatoryCompliance(formData: FormDa
 
   const [session] = await db.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
   if (!session) throw new Error("Training session not found");
-  if (!['scheduled', 'in_progress'].includes(session.status)) throw new Error("Regulatory compliance review is only available for scheduled or in-progress sessions");
+  if (!["scheduled", "in_progress"].includes(session.status)) throw new Error("Regulatory compliance review is only available for scheduled or in-progress sessions");
   const [requirements, accreditations] = await Promise.all([
     db.select().from(trainingRegulatoryRequirements),
     db.select().from(trainingAccreditationRecords),
