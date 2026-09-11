@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { Award, BadgeCheck, ShieldCheck } from "lucide-react";
+import { Award, BadgeCheck, ExternalLink, ShieldCheck, ShieldX } from "lucide-react";
 import { db } from "@/db";
 import { trainingCertificates, trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, TextInput } from "@/components/ui";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
 import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { effectiveTrainingCertificateStatus } from "@/lib/training-policy";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { issueTrainingCertificate } from "../actions";
+import { revokeTrainingCertificate } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function TrainingCertificatesPage() {
   const user = await requireInternalUser();
   if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
   const canManage = canManageTraining(user);
+  const now = new Date();
 
   const [eligibleParticipants, certificates] = await Promise.all([
     db
@@ -42,6 +45,8 @@ export default async function TrainingCertificatesPage() {
         expiryDate: trainingCertificates.expiryDate,
         status: trainingCertificates.status,
         issuedAt: trainingCertificates.issuedAt,
+        revokedAt: trainingCertificates.revokedAt,
+        revocationReason: trainingCertificates.revocationReason,
         fullName: trainingParticipants.fullName,
         referenceNumber: trainingSessions.referenceNumber,
       })
@@ -53,11 +58,16 @@ export default async function TrainingCertificatesPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Training Certificates"
-        description="Issue controlled competence certificates only after a passing assessment and maintain an auditable certificate register."
-        action={<Link href="/driver-training/participants" className="text-sm font-semibold text-[var(--brand-accent)] hover:opacity-75">Participants & assessments →</Link>}
+        description="Issue, verify, monitor, and revoke controlled competence certificates after successful Driver Training & Assessment outcomes."
+        action={
+          <div className="flex flex-wrap gap-3 text-sm font-semibold">
+            <Link href="/driver-training/participants" className="text-[var(--brand-accent)] hover:opacity-75">Participants & assessments →</Link>
+            <Link href="/driver-training/analytics" className="text-[var(--brand-accent)] hover:opacity-75">Analytics →</Link>
+          </div>
+        }
       />
 
       {canManage && (
@@ -86,7 +96,7 @@ export default async function TrainingCertificatesPage() {
       <Card className="overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
           <div className="flex items-center justify-between gap-4">
-            <div><h2 className="font-semibold text-[var(--vims-ink)]">Certificate register</h2><p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 300 Driver Training & Assessment certificates.</p></div>
+            <div><h2 className="font-semibold text-[var(--vims-ink)]">Certificate register</h2><p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 300 certificates with effective validity, public verification, and controlled revocation.</p></div>
             <ShieldCheck className="h-5 w-5 text-emerald-600" />
           </div>
         </div>
@@ -94,22 +104,44 @@ export default async function TrainingCertificatesPage() {
           <div className="p-5 sm:p-6"><EmptyState icon={<Award className="h-5 w-5" />} title="No training certificates issued" description="Complete an assessment with a passing or competent result before issuing a certificate." /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[950px] text-left text-sm">
+            <table className="w-full min-w-[1250px] text-left text-sm">
               <thead className="bg-[var(--vims-panel-soft)] text-xs uppercase tracking-wide text-[var(--vims-ink-muted)]">
-                <tr><th className="px-5 py-3 font-semibold">Certificate</th><th className="px-5 py-3 font-semibold">Participant</th><th className="px-5 py-3 font-semibold">Service / session</th><th className="px-5 py-3 font-semibold">Issued</th><th className="px-5 py-3 font-semibold">Expiry</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3 font-semibold">Verification code</th></tr>
+                <tr><th className="px-5 py-3 font-semibold">Certificate</th><th className="px-5 py-3 font-semibold">Participant</th><th className="px-5 py-3 font-semibold">Service / session</th><th className="px-5 py-3 font-semibold">Issued</th><th className="px-5 py-3 font-semibold">Expiry</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3 font-semibold">Verification</th>{canManage && <th className="px-5 py-3 font-semibold">Control</th>}</tr>
               </thead>
               <tbody className="divide-y divide-[var(--vims-line)]">
-                {certificates.map((item) => (
-                  <tr key={item.id} className="hover:bg-[var(--vims-panel-soft)]/70">
-                    <td className="px-5 py-4 font-semibold text-[var(--vims-ink)]">{item.certificateNumber}</td>
-                    <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{item.fullName}</td>
-                    <td className="px-5 py-4"><p className="font-medium text-[var(--vims-ink)]">{serviceNames.get(item.serviceId) || item.serviceId}</p><p className="mt-1 text-xs text-[var(--vims-ink-muted)]">{item.referenceNumber}</p></td>
-                    <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{formatDate(item.issueDate)}<span className="mt-1 block text-xs text-[var(--vims-ink-muted)]">{formatDateTime(item.issuedAt)}</span></td>
-                    <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{item.expiryDate ? formatDate(item.expiryDate) : "No expiry"}</td>
-                    <td className="px-5 py-4"><Badge tone={item.status === "active" ? "emerald" : item.status === "revoked" ? "red" : "slate"}>{item.status}</Badge></td>
-                    <td className="px-5 py-4 font-mono text-xs text-[var(--vims-ink-muted)]">{item.verificationCode}</td>
-                  </tr>
-                ))}
+                {certificates.map((item) => {
+                  const effectiveStatus = effectiveTrainingCertificateStatus(item.status, item.expiryDate, now);
+                  return (
+                    <tr key={item.id} className="align-top hover:bg-[var(--vims-panel-soft)]/70">
+                      <td className="px-5 py-4 font-semibold text-[var(--vims-ink)]">{item.certificateNumber}</td>
+                      <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{item.fullName}</td>
+                      <td className="px-5 py-4"><p className="font-medium text-[var(--vims-ink)]">{serviceNames.get(item.serviceId) || item.serviceId}</p><p className="mt-1 text-xs text-[var(--vims-ink-muted)]">{item.referenceNumber}</p></td>
+                      <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{formatDate(item.issueDate)}<span className="mt-1 block text-xs text-[var(--vims-ink-muted)]">{formatDateTime(item.issuedAt)}</span></td>
+                      <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{item.expiryDate ? formatDate(item.expiryDate) : "No expiry"}</td>
+                      <td className="px-5 py-4">
+                        <Badge tone={effectiveStatus === "active" ? "emerald" : "red"}>{effectiveStatus}</Badge>
+                        {item.revokedAt && <p className="mt-1 text-xs text-red-600">{formatDateTime(item.revokedAt)}</p>}
+                      </td>
+                      <td className="px-5 py-4">
+                        <Link href={`/verify/training/${item.verificationCode}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand-accent)] hover:opacity-75"><ExternalLink className="h-3.5 w-3.5" /> Verify</Link>
+                        <p className="mt-1 max-w-40 truncate font-mono text-[10px] text-[var(--vims-ink-muted)]" title={item.verificationCode}>{item.verificationCode}</p>
+                      </td>
+                      {canManage && (
+                        <td className="px-5 py-4">
+                          {item.status !== "revoked" ? (
+                            <form action={revokeTrainingCertificate} className="flex min-w-[280px] items-center gap-2">
+                              <input type="hidden" name="certificateId" value={item.id} />
+                              <TextInput name="reason" required minLength={5} maxLength={2000} placeholder="Revocation reason" className="py-1.5 text-xs" />
+                              <Button type="submit" size="sm" variant="danger"><ShieldX className="h-3.5 w-3.5" /> Revoke</Button>
+                            </form>
+                          ) : (
+                            <p className="max-w-xs text-xs leading-5 text-[var(--vims-ink-muted)]">{item.revocationReason || "Revoked"}</p>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
