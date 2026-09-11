@@ -34,10 +34,15 @@ export const trainingQuotationCreateSchema = z.object({
   requestId: z.string().uuid(),
   currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Use a 3-letter currency code").default("GHS"),
   validUntil: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid quotation expiry date"),
-  discountAmount: z.coerce.number().min(0).max(100000000).default(0),
-  taxRate: z.coerce.number().min(0).max(100).default(0),
   terms: optionalText(8000),
   notes: optionalText(4000),
+});
+
+export const trainingQuotationPricingSchema = z.object({
+  quotationId: z.string().uuid(),
+  validUntil: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid quotation expiry date"),
+  discountAmount: z.coerce.number().min(0).max(100000000).default(0),
+  taxRate: z.coerce.number().min(0).max(100).default(0),
 });
 
 export const trainingQuotationItemSchema = z.object({
