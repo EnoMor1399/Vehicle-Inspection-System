@@ -119,8 +119,8 @@ export function canApproveTrainingCurriculumVersion(input: {
 export function curriculumReviewState(reviewDueDate: string | Date, now = new Date()) {
   const review = reviewDueDate instanceof Date ? reviewDueDate : new Date(`${reviewDueDate}T23:59:59.999Z`);
   if (Number.isNaN(review.getTime())) return "unknown" as const;
+  if (review.getTime() < now.getTime()) return "overdue" as const;
   const days = Math.ceil((review.getTime() - now.getTime()) / 86_400_000);
-  if (days < 0) return "overdue" as const;
   if (days <= 30) return "due_soon" as const;
   return "current" as const;
 }
