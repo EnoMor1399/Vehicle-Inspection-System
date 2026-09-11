@@ -27,6 +27,9 @@ const requiredTables = [
   "training_session_readiness",
   "training_attendance_signoffs",
   "training_evidence_records",
+  "training_session_feedback",
+  "training_quality_findings",
+  "training_quality_events",
 ];
 
 const requiredIndexes = [
@@ -65,6 +68,14 @@ const requiredIndexes = [
   "training_evidence_participant_idx",
   "training_evidence_status_idx",
   "training_evidence_type_idx",
+  "training_feedback_session_idx",
+  "training_feedback_participant_idx",
+  "training_feedback_rating_idx",
+  "training_quality_session_idx",
+  "training_quality_status_due_idx",
+  "training_quality_severity_idx",
+  "training_quality_owner_idx",
+  "training_quality_event_finding_created_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
