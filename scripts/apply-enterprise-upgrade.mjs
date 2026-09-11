@@ -28,6 +28,7 @@ const migrationPaths = [
   "migrations/20260830_user_theme_preferences.sql",
   "migrations/20260831_performance_indexes.sql",
   "migrations/20260902_security_query_indexes.sql",
+  "migrations/20260911_driver_training_operations.sql",
 ];
 
 const client = new pg.Client({
