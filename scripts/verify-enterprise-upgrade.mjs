@@ -38,6 +38,8 @@ const requiredTables = [
   "training_resource_allocations",
   "training_requests",
   "training_request_events",
+  "training_development_plans",
+  "training_development_actions",
 ];
 
 const requiredIndexes = [
@@ -114,6 +116,14 @@ const requiredIndexes = [
   "training_request_reviewer_idx",
   "training_request_scheduled_session_uidx",
   "training_request_event_request_created_idx",
+  "training_development_participant_idx",
+  "training_development_status_target_idx",
+  "training_development_priority_idx",
+  "training_development_owner_idx",
+  "training_development_assessment_idx",
+  "training_development_action_plan_status_idx",
+  "training_development_action_due_idx",
+  "training_development_action_type_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
