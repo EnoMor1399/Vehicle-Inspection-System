@@ -12,7 +12,7 @@ import {
 test("training requests validate known services, client identity and preferred dates", () => {
   const base = {
     requestType: "client",
-    serviceId: "defensive-driving-training",
+    serviceId: "defensive-driving",
     title: "Fleet defensive driving programme",
     clientName: "Acme Logistics",
     requestedParticipants: 25,
@@ -31,7 +31,7 @@ test("training requests validate known services, client identity and preferred d
 test("internal requests do not require client identity", () => {
   const parsed = trainingRequestCreateSchema.safeParse({
     requestType: "internal",
-    serviceId: "defensive-driving-training",
+    serviceId: "defensive-driving",
     title: "Internal refresher programme",
     requestedParticipants: 12,
     deliveryMode: "classroom",
