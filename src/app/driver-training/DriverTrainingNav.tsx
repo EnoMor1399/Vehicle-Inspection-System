@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { useEffect, useRef, type ComponentType, type KeyboardEvent } from "react";
 import {
   Award,
   BadgeCheck,
@@ -78,35 +78,54 @@ function isActivePath(pathname: string, href: string) {
 
 export default function DriverTrainingNav() {
   const pathname = usePathname();
+  const moreRef = useRef<HTMLDetailsElement>(null);
   const secondaryActive = SECONDARY_GROUPS.some((group) =>
     group.items.some((item) => isActivePath(pathname, item.href))
   );
 
+  useEffect(() => {
+    moreRef.current?.removeAttribute("open");
+  }, [pathname]);
+
+  const closeMore = () => {
+    moreRef.current?.removeAttribute("open");
+  };
+
+  const handleMoreKeyDown = (event: KeyboardEvent<HTMLDetailsElement>) => {
+    if (event.key !== "Escape" || !moreRef.current?.open) return;
+    event.preventDefault();
+    closeMore();
+    moreRef.current.querySelector<HTMLElement>("summary")?.focus();
+  };
+
   return (
     <div className="border-b border-[var(--vims-line)] bg-[var(--vims-panel-solid)] px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px] py-2.5">
-        <nav aria-label="Driver Training & Assessment" className="flex flex-wrap items-center gap-1.5">
-          {PRIMARY_WORKSPACES.map(({ href, label, icon: Icon }) => {
-            const active = isActivePath(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 ${
-                  active
-                    ? "bg-[var(--brand-color)] text-white shadow-sm"
-                    : "text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-soft)] hover:text-[var(--vims-ink)]"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
+        <nav aria-label="Driver Training & Assessment" className="flex items-start gap-1.5">
+          <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+            {PRIMARY_WORKSPACES.map(({ href, label, icon: Icon }) => {
+              const active = isActivePath(pathname, href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 ${
+                    active
+                      ? "bg-[var(--brand-color)] text-white shadow-sm"
+                      : "text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-soft)] hover:text-[var(--vims-ink)]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </div>
 
-          <details className="group relative">
+          <details ref={moreRef} onKeyDown={handleMoreKeyDown} className="group relative shrink-0">
             <summary
+              aria-label="More Driver Training workspaces"
               className={`inline-flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden ${
                 secondaryActive
                   ? "bg-[var(--vims-panel-soft)] text-[var(--brand-color)] ring-1 ring-inset ring-[var(--vims-line-strong)]"
@@ -117,7 +136,7 @@ export default function DriverTrainingNav() {
               <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
 
-            <div className="absolute right-0 z-40 mt-2 w-[min(92vw,44rem)] overflow-hidden rounded-2xl border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] p-2 shadow-2xl">
+            <div className="absolute right-0 z-40 mt-2 max-h-[min(72vh,38rem)] w-[min(92vw,44rem)] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] p-2 shadow-2xl">
               <div className="grid gap-2 md:grid-cols-2">
                 {SECONDARY_GROUPS.map((group) => (
                   <div key={group.label} className="rounded-xl bg-[var(--vims-panel-soft)] p-2">
@@ -131,8 +150,9 @@ export default function DriverTrainingNav() {
                           <Link
                             key={href}
                             href={href}
+                            onClick={closeMore}
                             aria-current={active ? "page" : undefined}
-                            className={`flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors ${
+                            className={`flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-inset ${
                               active
                                 ? "bg-[var(--vims-panel-solid)] text-[var(--brand-color)] shadow-sm ring-1 ring-inset ring-[var(--vims-line)]"
                                 : "text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-solid)] hover:text-[var(--vims-ink)]"
