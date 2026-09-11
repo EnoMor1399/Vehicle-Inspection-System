@@ -68,7 +68,9 @@ CREATE TABLE IF NOT EXISTS training_safety_incidents (
   CONSTRAINT training_safety_incident_type_chk CHECK (incident_type IN ('near_miss', 'unsafe_condition', 'first_aid', 'injury', 'property_damage', 'environmental', 'equipment_failure', 'other')),
   CONSTRAINT training_safety_incident_severity_chk CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   CONSTRAINT training_safety_incident_status_chk CHECK (status IN ('open', 'investigating', 'corrective_action', 'verification', 'closed')),
-  CONSTRAINT training_safety_incident_stop_work_chk CHECK (severity NOT IN ('high', 'critical') OR stop_work = true),
+  CONSTRAINT training_safety_incident_stop_work_chk CHECK (
+    (severity NOT IN ('high', 'critical') AND incident_type NOT IN ('injury', 'equipment_failure')) OR stop_work = true
+  ),
   CONSTRAINT training_safety_incident_closure_chk CHECK (
     status <> 'closed' OR (
       root_cause IS NOT NULL
