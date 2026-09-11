@@ -44,7 +44,10 @@ CREATE INDEX IF NOT EXISTS training_resource_type_status_idx ON training_resourc
 CREATE INDEX IF NOT EXISTS training_resource_location_idx ON training_resources(location_id);
 CREATE INDEX IF NOT EXISTS training_resource_service_due_idx ON training_resources(service_due_date);
 CREATE INDEX IF NOT EXISTS training_resource_inspection_due_idx ON training_resources(inspection_due_date);
-CREATE UNIQUE INDEX IF NOT EXISTS training_resource_allocation_resource_session_uidx ON training_resource_allocations(resource_id, session_id);
+CREATE INDEX IF NOT EXISTS training_resource_allocation_resource_session_idx ON training_resource_allocations(resource_id, session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS training_resource_active_session_uidx
+  ON training_resource_allocations(resource_id, session_id)
+  WHERE status IN ('reserved', 'confirmed');
 CREATE INDEX IF NOT EXISTS training_resource_allocation_resource_status_idx ON training_resource_allocations(resource_id, status);
 CREATE INDEX IF NOT EXISTS training_resource_allocation_session_status_idx ON training_resource_allocations(session_id, status);
 
