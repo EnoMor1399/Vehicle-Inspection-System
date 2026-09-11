@@ -59,7 +59,7 @@ export const trainingResourceAllocations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    resourceSessionIdx: uniqueIndex("training_resource_allocation_resource_session_uidx").on(t.resourceId, t.sessionId),
+    resourceSessionIdx: index("training_resource_allocation_resource_session_idx").on(t.resourceId, t.sessionId),
     resourceStatusIdx: index("training_resource_allocation_resource_status_idx").on(t.resourceId, t.status),
     sessionStatusIdx: index("training_resource_allocation_session_status_idx").on(t.sessionId, t.status),
   })
