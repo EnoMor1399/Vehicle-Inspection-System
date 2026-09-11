@@ -15,6 +15,7 @@ import { logAudit } from "@/lib/audit";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { canManageTraining } from "@/lib/training-access";
 import {
+  addUtcMonthsClamped,
   calculateOverallScore,
   canTransitionTrainingSession,
   isPassingTrainingResult,
@@ -40,6 +41,8 @@ function refreshTrainingPaths() {
   revalidatePath("/driver-training/sessions");
   revalidatePath("/driver-training/participants");
   revalidatePath("/driver-training/certificates");
+  revalidatePath("/driver-training/analytics");
+  revalidatePath("/driver-training/compliance");
 }
 
 async function requireTrainingManager() {
@@ -141,22 +144,31 @@ export async function updateTrainingSessionStatus(formData: FormData) {
   if (!parsed.success) throw new Error(trainingValidationMessage(parsed.error));
   const data = parsed.data;
 
-  const [before] = await db.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
-  if (!before) throw new Error("Training session not found");
-  if (!canTransitionTrainingSession(before.status, data.status)) {
-    throw new Error(`Training session cannot move from ${before.status} to ${data.status}`);
-  }
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.sessionId}))`);
+    const [before] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    if (!before) return { ok: false as const, error: "Training session not found" };
+    if (!canTransitionTrainingSession(before.status, data.status)) {
+      return { ok: false as const, error: `Training session cannot move from ${before.status} to ${data.status}` };
+    }
 
-  await db.update(trainingSessions).set({ status: data.status, updatedAt: new Date() }).where(eq(trainingSessions.id, data.sessionId));
+    await tx
+      .update(trainingSessions)
+      .set({ status: data.status, updatedAt: new Date() })
+      .where(eq(trainingSessions.id, data.sessionId));
+    return { ok: true as const, before };
+  });
+
+  if (!result.ok) throw new Error(result.error);
   await logAudit({
     userId: user.id,
     userName: user.name,
     action: "update",
     entityType: "training_session",
-    entityId: before.id,
-    entityLabel: before.referenceNumber,
+    entityId: result.before.id,
+    entityLabel: result.before.referenceNumber,
     summary: `Changed training session status to ${data.status}`,
-    before: { status: before.status },
+    before: { status: result.before.status },
     after: { status: data.status },
   });
 
@@ -258,22 +270,28 @@ export async function updateTrainingAttendance(formData: FormData) {
   if (!parsed.success) throw new Error(trainingValidationMessage(parsed.error));
   const data = parsed.data;
 
-  const [before] = await db.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
-  if (!before) throw new Error("Training participant not found");
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.participantId}))`);
+    const [before] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+    if (!before) return { ok: false as const, error: "Training participant not found" };
 
-  await db
-    .update(trainingParticipants)
-    .set({ attendanceStatus: data.status, updatedAt: new Date() })
-    .where(eq(trainingParticipants.id, data.participantId));
+    await tx
+      .update(trainingParticipants)
+      .set({ attendanceStatus: data.status, updatedAt: new Date() })
+      .where(eq(trainingParticipants.id, data.participantId));
+    return { ok: true as const, before };
+  });
+
+  if (!result.ok) throw new Error(result.error);
   await logAudit({
     userId: user.id,
     userName: user.name,
     action: "update",
     entityType: "training_participant",
-    entityId: before.id,
-    entityLabel: before.fullName,
+    entityId: result.before.id,
+    entityLabel: result.before.fullName,
     summary: `Updated training attendance to ${data.status}`,
-    before: { attendanceStatus: before.attendanceStatus },
+    before: { attendanceStatus: result.before.attendanceStatus },
     after: { attendanceStatus: data.status },
   });
 
@@ -300,6 +318,7 @@ export async function recordTrainingAssessment(formData: FormData) {
   const id = newId();
 
   const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.participantId}))`);
     const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
     const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, participant.sessionId)).limit(1);
@@ -367,12 +386,9 @@ export async function issueTrainingCertificate(formData: FormData) {
   const verificationCode = newId().replace(/-/g, "");
   const issueDate = new Date();
   const issueDateText = issueDate.toISOString().slice(0, 10);
-  let expiryDate: string | null = null;
-  if (data.validityMonths > 0) {
-    const expiry = new Date(issueDate);
-    expiry.setUTCMonth(expiry.getUTCMonth() + data.validityMonths);
-    expiryDate = expiry.toISOString().slice(0, 10);
-  }
+  const expiryDate = data.validityMonths > 0
+    ? addUtcMonthsClamped(issueDate, data.validityMonths).toISOString().slice(0, 10)
+    : null;
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.participantId}))`);
