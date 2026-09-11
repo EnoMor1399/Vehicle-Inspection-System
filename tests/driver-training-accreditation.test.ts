@@ -95,7 +95,7 @@ test("enterprise migration runner and verifier include accreditation objects", (
 });
 
 test("Driver Training navigation exposes accreditation workspace and live delivery-gate language", () => {
-  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
+  const layout = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const page = readFileSync("src/app/driver-training/accreditation/page.tsx", "utf8");
   assert.match(layout, /\/driver-training\/accreditation/);
   assert.match(page, /Training Accreditation & Regulatory Compliance/);
