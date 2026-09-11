@@ -35,7 +35,7 @@ export const trainingRequestCreateSchema = z.object({
   preferredEndDate: optionalDate,
   locationId: optionalUuid,
   venue: optionalText(300),
-  deliveryMode: z.enum(["onsite", "classroom", "practical", "hybrid", "virtual"]),
+  deliveryMode: z.enum(["onsite", "classroom", "practical", "hybrid"]),
   priority: z.enum(TRAINING_REQUEST_PRIORITIES).default("normal"),
   businessNeed: optionalText(4000),
   notes: optionalText(4000),
