@@ -48,6 +48,9 @@ const requiredTables = [
   "training_regulatory_requirements",
   "training_accreditation_records",
   "training_session_compliance_reviews",
+  "training_communication_preferences",
+  "training_outbound_messages",
+  "training_communication_events",
 ];
 
 const requiredIndexes = [
@@ -161,6 +164,15 @@ const requiredIndexes = [
   "training_session_compliance_session_uidx",
   "training_session_compliance_status_idx",
   "training_session_compliance_reviewed_idx",
+  "training_comm_pref_participant_uidx",
+  "training_comm_pref_channel_idx",
+  "training_comm_pref_dnc_idx",
+  "training_outbound_participant_idx",
+  "training_outbound_session_idx",
+  "training_outbound_certificate_idx",
+  "training_outbound_status_idx",
+  "training_outbound_queue_idx",
+  "training_comm_event_message_created_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
