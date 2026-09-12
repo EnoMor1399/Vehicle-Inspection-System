@@ -5,7 +5,11 @@ import { db } from "@/db";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canReviewTrainingAssessments, canViewTraining } from "@/lib/training-access";
+import {
+  canAdministrativelySelfReviewTrainingAssessment,
+  canReviewTrainingAssessments,
+  canViewTraining,
+} from "@/lib/training-access";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +20,7 @@ export default async function DriverAssessmentReviewQueuePage() {
     return <div className="p-8 text-sm text-slate-600">You do not have access to this module.</div>;
   }
   const canReview = canReviewTrainingAssessments(user);
+  const canSelfReviewAdministratively = canAdministrativelySelfReviewTrainingAssessment(user);
 
   const records = await db
     .select({
@@ -40,16 +45,35 @@ export default async function DriverAssessmentReviewQueuePage() {
   const pending = records.filter((record) => record.reviewStatus === "pending_review");
   const approved = records.filter((record) => record.reviewStatus === "approved").length;
   const returned = records.filter((record) => record.reviewStatus === "returned").length;
-  const selfReviewBlocked = pending.filter((record) => record.assessorId === user.id).length;
-  const actionablePending = canReview ? pending.filter((record) => record.assessorId !== user.id) : [];
+  const selfReviewBlocked = pending.filter(
+    (record) => record.assessorId === user.id && !canSelfReviewAdministratively,
+  ).length;
+  const actionablePending = canReview
+    ? pending.filter((record) => record.assessorId !== user.id || canSelfReviewAdministratively)
+    : [];
   const currentReview = actionablePending[actionablePending.length - 1] || null;
+  const currentUsesAdminOverride = Boolean(
+    currentReview && currentReview.assessorId === user.id && canSelfReviewAdministratively,
+  );
 
   return (
     <div className="mx-auto max-w-[1450px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Assessment Review"
-        description="Review the current pending assessment, verify the evidence and record an independent decision."
+        description="Review the current pending assessment, verify the evidence and record an authorized decision."
       />
+
+      {currentUsesAdminOverride && (
+        <Card className="mb-5 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">Administrative self-review override available</p>
+              <p className="mt-1">This assessment was submitted by your account. Administrator and Super Administrator accounts may complete the review, but review comments are required and the override is recorded in the audit log.</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {canReview && currentReview && (
         <Card className="mb-5 overflow-hidden border-[var(--brand-color)]/30">
@@ -133,7 +157,7 @@ export default async function DriverAssessmentReviewQueuePage() {
               <tbody className="divide-y divide-[var(--vims-line)]">
                 {pending.map((record) => {
                   const isCurrent = currentReview?.id === record.id;
-                  const canAct = canReview && record.assessorId !== user.id;
+                  const canAct = canReview && (record.assessorId !== user.id || canSelfReviewAdministratively);
                   return (
                     <tr key={record.id} className={`align-top ${isCurrent ? "bg-amber-50/60" : "hover:bg-[var(--vims-panel-soft)]/60"}`}>
                       <td className="px-5 py-4">
