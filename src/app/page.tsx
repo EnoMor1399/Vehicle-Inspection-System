@@ -14,7 +14,7 @@ import {
   Truck,
   XCircle,
 } from "lucide-react";
-import { requireInternalUser } from "@/lib/require-auth";
+import { requireVehicleInspectionUser } from "@/lib/require-auth";
 import { db } from "@/db";
 import { dailyInspections, vehicles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -45,7 +45,7 @@ import type { ReactNode } from "react";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  await requireInternalUser();
+  await requireVehicleInspectionUser();
   const today = new Date().toISOString().slice(0, 10);
   const [
     stats,

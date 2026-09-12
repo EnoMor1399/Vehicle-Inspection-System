@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
+import { canAccessVehicleInspection } from "@/lib/system-access";
 
 // Protect server-rendered pages with the same revocable session used by login.
 export async function requireAuth() {
@@ -24,15 +25,20 @@ export async function requireAuth() {
   return user;
 }
 
-
 export async function requireInternalUser() {
   const user = await requireAuth();
   if (user.role === "transporter_user") redirect("/portal");
   return user;
 }
 
-export async function requirePermission(resource: string) {
+export async function requireVehicleInspectionUser() {
   const user = await requireInternalUser();
+  if (!canAccessVehicleInspection(user)) redirect("/driver-training");
+  return user;
+}
+
+export async function requirePermission(resource: string) {
+  const user = await requireVehicleInspectionUser();
   if (!hasPermission(user, resource)) redirect("/");
   return user;
 }

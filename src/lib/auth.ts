@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { canAccessVehicleInspection } from "@/lib/system-access";
 
 export const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Administrator",
@@ -235,6 +236,21 @@ const ROLE_MATRIX: Record<string, Record<string, boolean>> = {
   transporter_user: {},
 };
 
+const VEHICLE_INSPECTION_RESOURCES = new Set([
+  "transporters",
+  "vehicles",
+  "inspections",
+  "approve",
+  "reports",
+  "users",
+  "documents",
+  "locations",
+  "import",
+  "notifications",
+  "audit",
+  "settings",
+]);
+
 type UserLike = string | { role: string; permissions?: any };
 function normalize(u: UserLike): { role: string; permissions: any } {
   if (typeof u === "string") return { role: u, permissions: null };
@@ -243,6 +259,11 @@ function normalize(u: UserLike): { role: string; permissions: any } {
 
 export function hasPermission(user: UserLike, resource: string): boolean {
   const u = normalize(user);
+
+  if (VEHICLE_INSPECTION_RESOURCES.has(resource) && !canAccessVehicleInspection(u)) {
+    return false;
+  }
+
   if (u.permissions && typeof u.permissions === "object") {
     if ((u.permissions as Record<string, boolean>)["*"]) return true;
     if ((u.permissions as Record<string, boolean>)[resource] !== undefined) {

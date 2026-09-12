@@ -1,3 +1,5 @@
+import { canAccessDriverTraining } from "@/lib/system-access";
+
 type TrainingUser = {
   role: string;
   permissions?: Record<string, boolean> | null;
@@ -37,12 +39,14 @@ function explicitPermission(user: TrainingUser, key: string) {
 }
 
 export function canViewTraining(user: TrainingUser) {
+  if (!canAccessDriverTraining(user)) return false;
   const explicit = explicitPermission(user, "training");
   if (explicit !== undefined) return Boolean(explicit);
   return TRAINING_VIEW_ROLES.has(user.role);
 }
 
 export function canManageTraining(user: TrainingUser) {
+  if (!canAccessDriverTraining(user)) return false;
   const explicit = explicitPermission(user, "training_manage");
   if (explicit !== undefined) return Boolean(explicit);
   if (!canViewTraining(user)) return false;
@@ -50,6 +54,7 @@ export function canManageTraining(user: TrainingUser) {
 }
 
 export function canReviewTrainingAssessments(user: TrainingUser) {
+  if (!canAccessDriverTraining(user)) return false;
   const explicit = explicitPermission(user, "training_assessment_review");
   if (explicit !== undefined) return Boolean(explicit);
   if (!canViewTraining(user)) return false;

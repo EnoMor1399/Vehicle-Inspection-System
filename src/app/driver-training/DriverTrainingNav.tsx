@@ -59,6 +59,7 @@ const MORE_GROUPS: WorkspaceGroup[] = [
       { href: "/driver-training/instructors", label: "Instructors", icon: BadgeCheck },
       { href: "/driver-training/logistics", label: "Logistics", icon: Boxes },
       { href: "/driver-training/communications", label: "Communications", icon: BellRing },
+      { href: "/driver-training/users", label: "Training users", icon: UsersRound },
     ],
   },
   {
