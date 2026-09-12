@@ -22,6 +22,7 @@ import {
   Landmark,
   ShieldCheck,
   Target,
+  UserCheck,
   UsersRound,
 } from "lucide-react";
 
@@ -62,6 +63,7 @@ const SECONDARY_GROUPS: WorkspaceGroup[] = [
   {
     label: "Safety & assurance",
     items: [
+      { href: "/driver-training/assessments/review", label: "Assessment review", icon: UserCheck, description: "Independent supervisor review and approval queue" },
       { href: "/driver-training/safety", label: "Safety", icon: HardHat, description: "Safety controls and incident prevention" },
       { href: "/driver-training/accreditation", label: "Accreditation", icon: Landmark, description: "Accreditation and external recognition" },
       { href: "/driver-training/readiness", label: "Readiness", icon: ClipboardCheck, description: "Pre-delivery readiness checks" },

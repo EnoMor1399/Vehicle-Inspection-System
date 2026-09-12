@@ -4,7 +4,8 @@
     "deploymentEnabled": {
       "source-only-hardening": false,
       "source-only-driver-training-robustness": false,
-      "source-only-driver-assessment-template": false
+      "source-only-driver-assessment-template": false,
+      "source-only-driver-assessment-governance": false
     }
   }
 }

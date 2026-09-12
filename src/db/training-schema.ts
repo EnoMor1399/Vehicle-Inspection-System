@@ -116,6 +116,10 @@ export const trainingAssessments = pgTable(
     remarks: text("remarks"),
     driverAcknowledged: boolean("driver_acknowledged").notNull().default(false),
     driverComments: text("driver_comments"),
+    reviewStatus: varchar("review_status", { length: 24 }).notNull().default("pending_review"),
+    reviewerId: varchar("reviewer_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    reviewComments: text("review_comments"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     assessedAt: timestamp("assessed_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -125,6 +129,8 @@ export const trainingAssessments = pgTable(
     resultIdx: index("training_assessment_result_idx").on(t.result),
     classificationIdx: index("training_assessment_classification_idx").on(t.classification, t.assessedAt),
     recommendationIdx: index("training_assessment_recommendation_idx").on(t.finalRecommendation, t.assessedAt),
+    reviewStatusIdx: index("training_assessment_review_status_idx").on(t.reviewStatus, t.assessedAt),
+    reviewerIdx: index("training_assessment_reviewer_idx").on(t.reviewerId, t.reviewedAt),
   })
 );
 
