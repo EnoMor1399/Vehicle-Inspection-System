@@ -92,29 +92,28 @@ export default async function TrainingAnalyticsPage() {
     <div className="mx-auto max-w-[1550px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Driver Training Analytics"
-        description="Monitor programme delivery, competence outcomes, high-risk operators, certificate validity, and upcoming renewals across all six Driver Training & Assessment services."
+        description="Programme delivery, competency, risk and certificate status."
         action={<TrainingAnalyticsActions rows={exportRows} />}
       />
 
-      <div className="mb-6 flex flex-wrap gap-2 text-sm font-semibold">
-        <Link href="/driver-training" className="text-[var(--brand-accent)] hover:opacity-75">Department overview →</Link>
-        <Link href="/driver-training/certificates" className="text-[var(--brand-accent)] hover:opacity-75">Certificate register →</Link>
+      <div className="mb-6 flex flex-wrap gap-4 text-sm font-semibold">
+        <Link href="/driver-training" className="text-[var(--brand-accent)] hover:opacity-75">Overview</Link>
+        <Link href="/driver-training/certificates" className="text-[var(--brand-accent)] hover:opacity-75">Certificates</Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard label="Sessions" value={Number(sessionStats?.total || 0)} hint={`${Number(sessionStats?.completed || 0)} completed`} tone="blue" icon={<BarChart3 className="h-5 w-5" />} />
-        <StatCard label="Participants" value={Number(participantStats?.total || 0)} hint="Registered operators" tone="violet" icon={<UsersRound className="h-5 w-5" />} />
+        <StatCard label="Participants" value={Number(participantStats?.total || 0)} hint="Registered" tone="violet" icon={<UsersRound className="h-5 w-5" />} />
         <StatCard label="Pass rate" value={`${passRate}%`} hint={`${assessed} assessed`} tone="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
         <StatCard label="High risk" value={Number(participantStats?.highRisk || 0)} hint="High or critical" tone="red" icon={<AlertTriangle className="h-5 w-5" />} />
         <StatCard label="Active certificates" value={Number(certificateStats?.active || 0)} hint={`${Number(certificateStats?.revoked || 0)} revoked`} tone="emerald" icon={<Award className="h-5 w-5" />} />
-        <StatCard label="Renewal window" value={Number(certificateStats?.expiring || 0)} hint="Expiring within 60 days" tone="amber" icon={<CalendarClock className="h-5 w-5" />} />
+        <StatCard label="Renewals due" value={Number(certificateStats?.expiring || 0)} hint="Within 60 days" tone="amber" icon={<CalendarClock className="h-5 w-5" />} />
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
         <Card className="overflow-hidden">
           <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-            <h2 className="font-semibold text-[var(--vims-ink)]">Performance by service</h2>
-            <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Programme volume, assessment results, and identified safety risk by service line.</p>
+            <h2 className="font-semibold text-[var(--vims-ink)]">Performance by Service</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[850px] text-left text-sm">
@@ -130,11 +129,11 @@ export default async function TrainingAnalyticsPage() {
 
         <Card className="overflow-hidden">
           <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-            <h2 className="font-semibold text-[var(--vims-ink)]">Certificate renewal watch</h2>
-            <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Active certificates expiring within the next 60 days.</p>
+            <h2 className="font-semibold text-[var(--vims-ink)]">Certificate Renewals</h2>
+            <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Due within 60 days.</p>
           </div>
           {renewals.length === 0 ? (
-            <div className="p-5 sm:p-6"><EmptyState icon={<CalendarClock className="h-5 w-5" />} title="No upcoming renewals" description="No active training certificate currently falls inside the 60-day renewal window." /></div>
+            <div className="p-5 sm:p-6"><EmptyState icon={<CalendarClock className="h-5 w-5" />} title="No renewals due" description="No active certificate expires within 60 days." /></div>
           ) : (
             <div className="divide-y divide-[var(--vims-line)]">
               {renewals.map((item) => <div key={item.certificateNumber} className="p-4 sm:px-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-[var(--vims-ink)]">{item.participantName}</p><p className="mt-1 text-xs text-[var(--vims-ink-muted)]">{SERVICE_NAMES.get(item.serviceId) || item.serviceId}</p></div><Badge tone="amber">{formatDate(item.expiryDate)}</Badge></div><p className="mt-2 font-mono text-xs text-[var(--vims-ink-muted)]">{item.certificateNumber}</p></div>)}
