@@ -14,6 +14,7 @@ const TRAINING_VIEW_ROLES = new Set([
   "admin",
   "operations_manager",
   "supervisor",
+  "instructor",
   "inspector",
   "data_entry",
   "auditor",
@@ -21,6 +22,16 @@ const TRAINING_VIEW_ROLES = new Set([
 ]);
 
 const TRAINING_MANAGE_ROLES = new Set([
+  "super_admin",
+  "admin",
+  "operations_manager",
+  "supervisor",
+  "instructor",
+  "inspector",
+  "data_entry",
+]);
+
+const TRAINING_USER_ADMIN_ROLES = new Set([
   "super_admin",
   "admin",
   "operations_manager",
@@ -57,6 +68,12 @@ export function canManageTraining(user: TrainingUser) {
   return TRAINING_MANAGE_ROLES.has(user.role);
 }
 
+export function canManageTrainingUsers(user: TrainingUser) {
+  if (!canAccessDriverTraining(user)) return false;
+  if (!canViewTraining(user)) return false;
+  return TRAINING_USER_ADMIN_ROLES.has(user.role) || user.permissions?.["*"] === true;
+}
+
 export function canReviewTrainingAssessments(user: TrainingUser) {
   if (!canAccessDriverTraining(user)) return false;
   const explicit = explicitPermission(user, "training_assessment_review");
@@ -66,7 +83,7 @@ export function canReviewTrainingAssessments(user: TrainingUser) {
 }
 
 export function canCreateDriverTrainingUsers(user: TrainingUser) {
-  if (!canManageTraining(user)) return false;
+  if (!canManageTrainingUsers(user)) return false;
   return user.role === "super_admin" || user.role === "admin";
 }
 
