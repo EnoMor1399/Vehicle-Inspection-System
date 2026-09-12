@@ -189,13 +189,17 @@ test("training operations are wired into the enterprise migration and verifier",
   assert.match(verify, /training_certificate_verification_uidx/);
 });
 
-test("department UI exposes operational workspaces without removing the service portfolio", () => {
+test("department UI exposes operational workspaces through the streamlined overview", () => {
   const dashboard = readFileSync("src/app/driver-training/page.tsx", "utf8");
+  const navigation = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const sessions = readFileSync("src/app/driver-training/sessions/page.tsx", "utf8");
   const participants = readFileSync("src/app/driver-training/participants/page.tsx", "utf8");
   const certificates = readFileSync("src/app/driver-training/certificates/page.tsx", "utf8");
-  assert.match(dashboard, /Operational overview/);
-  assert.match(dashboard, /DRIVER_TRAINING_SERVICES\.map/);
+  assert.match(dashboard, /Active & upcoming sessions/);
+  assert.match(dashboard, />\s*Create\s*</);
+  assert.doesNotMatch(dashboard, /DRIVER_TRAINING_SERVICES\.map/);
+  assert.match(navigation, /label="Operations"/);
+  assert.match(navigation, /label="Assessments"/);
   assert.match(sessions, /Schedule a training session/);
   assert.match(participants, /Participants & Assessments/);
   assert.match(certificates, /Certificate register/);
@@ -208,10 +212,10 @@ test("Driver Training route degrades safely when data or rendering fails", () =>
   const navigation = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
 
   assert.match(dashboard, /Promise\.allSettled/);
-  assert.match(dashboard, /Some live operational data is temporarily unavailable/);
+  assert.match(dashboard, /Some live metrics are temporarily unavailable/);
   assert.match(loading, /role="status"/);
   assert.match(error, /onClick=\{reset\}/);
   assert.match(error, /\/api\/errors/);
   assert.match(navigation, /onKeyDown=\{handleMoreKeyDown\}/);
-  assert.match(navigation, /max-h-\[min\(72vh,38rem\)\]/);
+  assert.match(navigation, /event\.key !== "Escape"/);
 });
