@@ -14,7 +14,11 @@ import {
   DRIVER_ASSESSMENT_SECTIONS,
   DRIVER_ASSESSMENT_TOTAL_CRITERIA,
 } from "@/lib/driver-assessment-template";
-import { canManageTraining, canReviewTrainingAssessments } from "@/lib/training-access";
+import {
+  canAdministrativelySelfReviewTrainingAssessment,
+  canManageTraining,
+  canReviewTrainingAssessments,
+} from "@/lib/training-access";
 import { isValidTrainingDate, TRAINING_ASSESSMENT_TYPES } from "@/lib/training-policy";
 import { newId } from "@/lib/utils";
 
@@ -60,6 +64,7 @@ function calculatePracticalPercentage(ratings: Record<string, number>) {
 function refreshAssessmentPaths(assessmentId?: string) {
   revalidatePath("/driver-training");
   revalidatePath("/driver-training/assessments");
+  revalidatePath("/driver-training/assessments/review");
   if (assessmentId) revalidatePath(`/driver-training/assessments/${assessmentId}`);
   revalidatePath("/driver-training/participants");
   revalidatePath("/driver-training/certificates");
@@ -227,7 +232,15 @@ export async function reviewDriverAssessment(formData: FormData) {
     const [assessment] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
     if (!assessment) return { ok: false as const, error: "Driver assessment not found" };
     if (assessment.reviewStatus !== "pending_review") return { ok: false as const, error: "This assessment has already been reviewed" };
-    if (assessment.assessorId && assessment.assessorId === user.id) return { ok: false as const, error: "Assessors cannot approve or return their own assessment" };
+
+    const isSelfReview = Boolean(assessment.assessorId && assessment.assessorId === user.id);
+    const administrativeSelfReviewOverride = isSelfReview && canAdministrativelySelfReviewTrainingAssessment(user);
+    if (isSelfReview && !administrativeSelfReviewOverride) {
+      return { ok: false as const, error: "Assessors cannot approve or return their own assessment" };
+    }
+    if (administrativeSelfReviewOverride && reviewComments.length < 5) {
+      return { ok: false as const, error: "Administrative self-review requires review comments explaining the decision" };
+    }
 
     const [latestAssessment] = await tx
       .select({ id: trainingAssessments.id })
@@ -273,7 +286,7 @@ export async function reviewDriverAssessment(formData: FormData) {
       })
       .where(eq(trainingParticipants.id, participant.id));
 
-    return { ok: true as const, assessment, participant, certificateEligible };
+    return { ok: true as const, assessment, participant, certificateEligible, administrativeSelfReviewOverride };
   });
 
   if (!result.ok) throw new Error(result.error);
@@ -285,12 +298,19 @@ export async function reviewDriverAssessment(formData: FormData) {
     entityType: "training_assessment",
     entityId: assessmentId,
     entityLabel: result.participant.fullName,
-    summary: decision === "approved" ? "Driver assessment independently approved" : "Driver assessment returned for corrective action",
+    summary: result.administrativeSelfReviewOverride
+      ? decision === "approved"
+        ? "Driver assessment approved using administrative self-review override"
+        : "Driver assessment returned using administrative self-review override"
+      : decision === "approved"
+        ? "Driver assessment independently approved"
+        : "Driver assessment returned for corrective action",
     before: { reviewStatus: result.assessment.reviewStatus },
     after: {
       reviewStatus: decision,
       certificateEligible: result.certificateEligible,
       reviewComments: reviewComments || undefined,
+      administrativeSelfReviewOverride: result.administrativeSelfReviewOverride,
     },
   });
 
