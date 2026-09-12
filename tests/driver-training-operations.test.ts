@@ -195,8 +195,9 @@ test("department UI exposes operational workspaces through the streamlined overv
   const sessions = readFileSync("src/app/driver-training/sessions/page.tsx", "utf8");
   const participants = readFileSync("src/app/driver-training/participants/page.tsx", "utf8");
   const certificates = readFileSync("src/app/driver-training/certificates/page.tsx", "utf8");
-  assert.match(dashboard, /Active & upcoming sessions/);
-  assert.match(dashboard, />\s*Create\s*</);
+  assert.match(dashboard, /Current sessions/);
+  assert.match(dashboard, /Create record/);
+  assert.match(dashboard, /Scheduled and in-progress programmes\./);
   assert.doesNotMatch(dashboard, /Service portfolio/);
   assert.doesNotMatch(dashboard, /Training & assessment services/);
   assert.match(navigation, /label="Operations"/);
@@ -214,7 +215,7 @@ test("Driver Training route degrades safely when data or rendering fails", () =>
   const navigation = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
 
   assert.match(dashboard, /Promise\.allSettled/);
-  assert.match(dashboard, /Some live metrics are temporarily unavailable/);
+  assert.match(dashboard, /Some metrics are temporarily unavailable/);
   assert.match(loading, /role="status"/);
   assert.match(error, /onClick=\{reset\}/);
   assert.match(error, /\/api\/errors/);
