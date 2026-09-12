@@ -45,3 +45,18 @@ test("Instructor administration only shows eligible Driver Training accounts", (
   assert.match(source, /Only active Driver Training & Assessment users are available for Internal Instructor assignment/);
   assert.match(source, /Only instructor profiles linked to active Driver Training & Assessment users are shown/);
 });
+
+test("session creation rejects accounts outside the Internal Instructor boundary", () => {
+  const source = readFileSync("src/app/driver-training/actions.ts", "utf8");
+  assert.match(source, /canServeAsInternalTrainingInstructor\(instructor\)/);
+  assert.match(source, /profile\?\.status !== "active"/);
+  assert.match(source, /Selected Internal Instructor must be an active Driver Training & Assessment user with an active instructor profile/);
+});
+
+test("instructor profile and readiness actions enforce Driver Training assignment", () => {
+  const source = readFileSync("src/app/driver-training/readiness/actions.ts", "utf8");
+  assert.match(source, /canServeAsInternalTrainingInstructor\(account\)/);
+  assert.match(source, /Internal Instructor profiles can only be assigned to active Driver Training & Assessment users/);
+  assert.match(source, /profile\.status !== "active"/);
+  assert.match(source, /The assigned Internal Instructor is not an active Driver Training & Assessment instructor/);
+});
