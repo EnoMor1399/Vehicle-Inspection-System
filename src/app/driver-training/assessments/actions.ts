@@ -15,7 +15,7 @@ import {
   DRIVER_ASSESSMENT_TOTAL_CRITERIA,
 } from "@/lib/driver-assessment-template";
 import { canManageTraining } from "@/lib/training-access";
-import { TRAINING_ASSESSMENT_TYPES } from "@/lib/training-policy";
+import { isValidTrainingDate, TRAINING_ASSESSMENT_TYPES } from "@/lib/training-policy";
 import { newId } from "@/lib/utils";
 
 const VALID_ASSESSMENT_TYPES = new Set<string>(TRAINING_ASSESSMENT_TYPES);
@@ -35,7 +35,7 @@ function parseDevelopmentPlan(formData: FormData) {
     const targetDate = text(formData, `developmentTarget${index}`, 20);
     if (!area && !action) continue;
     if (!area || !action) throw new Error("Each development-plan item needs both an area and a required action");
-    if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) throw new Error("Use a valid target date in the development plan");
+    if (targetDate && !isValidTrainingDate(targetDate)) throw new Error("Use a valid target date in the development plan");
     items.push({ area, action, ...(targetDate ? { targetDate } : {}) });
   }
   return items;
@@ -125,6 +125,11 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     if (session.status === "cancelled") return { ok: false as const, error: "Cancelled training sessions cannot be assessed" };
 
     const certificateEligible = assessmentType !== "pre_training" && outcome.result === "competent" && criticalViolations.length === 0;
+    const participantAssessmentStatus = assessmentType === "pre_training"
+      ? "assessed"
+      : outcome.result === "competent"
+        ? "passed"
+        : "failed";
     const assessment = {
       id,
       participantId: participant.id,
@@ -159,7 +164,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       .update(trainingParticipants)
       .set({
         attendanceStatus: participant.attendanceStatus === "registered" ? "attended" : participant.attendanceStatus,
-        assessmentStatus: outcome.result === "competent" ? "passed" : "failed",
+        assessmentStatus: participantAssessmentStatus,
         certificateEligible,
         riskLevel: outcome.riskLevel,
         updatedAt: new Date(),
