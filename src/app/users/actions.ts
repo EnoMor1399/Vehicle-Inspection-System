@@ -6,7 +6,7 @@ import { locations, sessions, transporters, users } from "@/db/schema";
 import { and, count, eq, sql } from "drizzle-orm";
 import { getCurrentUser, canManageUsers } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTrainingUsers } from "@/lib/training-access";
 import {
   canAccessDriverTraining,
   canAccessVehicleInspection,
@@ -26,8 +26,8 @@ export async function updateUserAccess(input: {
 }) {
   const actor = await getCurrentUser();
   const actorCanManageInspection = canManageUsers(actor);
-  const actorCanManageTraining = canManageTraining(actor);
-  if (!actorCanManageInspection && !actorCanManageTraining) {
+  const actorCanManageTrainingUsers = canManageTrainingUsers(actor);
+  if (!actorCanManageInspection && !actorCanManageTrainingUsers) {
     throw new Error("You do not have permission to manage users");
   }
 
@@ -71,6 +71,12 @@ export async function updateUserAccess(input: {
       }
     }
 
+    if (requestedRole === "instructor") {
+      if (vehicleInspectionAccess || !driverTrainingAccess) {
+        return { ok: false as const, error: "Instructor Account must be assigned to Driver Training & Assessment only" };
+      }
+    }
+
     if (!vehicleInspectionAccess && !driverTrainingAccess) {
       return { ok: false as const, error: "Assign the account to Vehicle Inspection, Driver Training, or both" };
     }
@@ -79,7 +85,7 @@ export async function updateUserAccess(input: {
       if ((currentVehicleInspectionAccess || vehicleInspectionAccess) && !actorCanManageInspection) {
         return { ok: false as const, error: "You cannot manage Vehicle Inspection user access" };
       }
-      if ((currentDriverTrainingAccess || driverTrainingAccess) && !actorCanManageTraining) {
+      if ((currentDriverTrainingAccess || driverTrainingAccess) && !actorCanManageTrainingUsers) {
         return { ok: false as const, error: "You cannot manage Driver Training user access" };
       }
     }
@@ -134,7 +140,7 @@ export async function updateUserAccess(input: {
     };
 
     const patch: Partial<typeof users.$inferInsert> = {
-      role: requestedRole,
+      role: requestedRole as (typeof users.$inferInsert)["role"],
       permissions,
       isActive: input.isActive,
       locationId,

@@ -7,7 +7,7 @@ import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, StatCard, T
 import { ROLE_LABEL, canManageUsers } from "@/lib/auth";
 import { PASSWORD_MIN_LENGTH } from "@/lib/password";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canCreateDriverTrainingUsers, canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canCreateDriverTrainingUsers, canManageTrainingUsers, canViewTraining } from "@/lib/training-access";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { formatDateTime } from "@/lib/utils";
 import { UserAccessEditor } from "@/app/users/UserAccessEditor";
@@ -20,6 +20,7 @@ const ROLE_TONES: Record<string, "red" | "amber" | "blue" | "violet" | "slate" |
   admin: "red",
   operations_manager: "amber",
   supervisor: "amber",
+  instructor: "blue",
   inspector: "blue",
   data_entry: "blue",
   auditor: "violet",
@@ -31,7 +32,7 @@ const ROLE_TONES: Record<string, "red" | "amber" | "blue" | "violet" | "slate" |
 const TRAINING_ACCOUNT_OPTIONS = [
   { value: "operations_manager", label: "Training Operations Manager" },
   { value: "supervisor", label: "Training Supervisor / Reviewer" },
-  { value: "inspector", label: "Instructor / Assessor" },
+  { value: "instructor", label: "Instructor Account" },
   { value: "data_entry", label: "Training Data Officer" },
   { value: "auditor", label: "Training Auditor" },
   { value: "compliance_officer", label: "Training Compliance Officer" },
@@ -51,10 +52,10 @@ export default async function DriverTrainingUsersPage({ searchParams }: DriverTr
   const accountCreated = params.created === "1";
   const user = await requireInternalUser();
   const canView = canViewTraining(user);
-  const canManage = canManageTraining(user);
+  const canManageUsersForTraining = canManageTrainingUsers(user);
   const canCreateAccounts = canCreateDriverTrainingUsers(user);
 
-  if (!canView || !canManage) {
+  if (!canView || !canManageUsersForTraining) {
     return (
       <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
         <Card className="p-6 sm:p-8">
@@ -123,7 +124,7 @@ export default async function DriverTrainingUsersPage({ searchParams }: DriverTr
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700"><GraduationCap className="h-4 w-4" /></div>
           <div>
             <p className="text-sm font-semibold text-slate-950">Driver Training account boundary</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">New accounts created here are assigned to Driver Training & Assessment only. Vehicle Inspection access can be granted separately when cross-department access is required. Participants and assessed drivers remain in the Participants register.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">New accounts created here are assigned to Driver Training & Assessment only. Instructor Accounts receive operational instructor privileges and an Internal Instructor profile, but cannot independently approve their own assessments or administer user accounts. Participants and assessed drivers remain in the Participants register.</p>
           </div>
         </div>
       </Card>
@@ -144,7 +145,7 @@ export default async function DriverTrainingUsersPage({ searchParams }: DriverTr
               </span>
               <div>
                 <h2 className="text-base font-semibold text-slate-950">Create Driver Training account</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Provision an internal user account with Driver Training access. Instructor / Assessor accounts automatically receive an Internal Instructor profile.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Provision an internal user account with Driver Training access. Instructor Accounts automatically receive an active Internal Instructor profile.</p>
               </div>
             </div>
           </div>
@@ -170,7 +171,7 @@ export default async function DriverTrainingUsersPage({ searchParams }: DriverTr
               <TextInput name="phone" type="tel" maxLength={50} autoComplete="tel" placeholder="Optional" />
             </Field>
             <Field label="Account function" required>
-              <Select name="role" required defaultValue="inspector">
+              <Select name="role" required defaultValue="instructor">
                 {user.role === "super_admin" && <option value="admin">Training Administrator</option>}
                 {TRAINING_ACCOUNT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </Select>
@@ -190,12 +191,12 @@ export default async function DriverTrainingUsersPage({ searchParams }: DriverTr
               </Field>
             </div>
             <div className="sm:col-span-2 xl:col-span-2">
-              <Field label="Instructor specialties" hint="Optional. Applied when Account function is Instructor / Assessor. Separate entries with commas or new lines.">
+              <Field label="Instructor specialties" hint="Optional. Applied when Account function is Instructor Account. Separate entries with commas or new lines.">
                 <TextArea name="specialties" maxLength={4000} className="min-h-[78px]" placeholder="Defensive driving, heavy vehicle operations" />
               </Field>
             </div>
             <div className="sm:col-span-2 xl:col-span-3 flex items-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs leading-5 text-slate-600"><span className="font-semibold text-slate-800">Access policy:</span> the account is active and limited to Driver Training & Assessment. Administrators cannot create Administrator or Super Administrator accounts; only a Super Administrator can create a Training Administrator.</p>
+              <p className="text-xs leading-5 text-slate-600"><span className="font-semibold text-slate-800">Access policy:</span> the account is active and limited to Driver Training & Assessment. Instructor Accounts can deliver sessions, manage participants and record assessments, but cannot approve assessments or administer accounts. Only a Super Administrator can create a Training Administrator.</p>
             </div>
             <div className="flex items-end justify-end">
               <Button type="submit"><UserPlus className="h-4 w-4" /> Create account</Button>

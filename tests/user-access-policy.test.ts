@@ -5,6 +5,7 @@ import { isUserRole, validateDelegatedRoleChange } from "../src/lib/user-access-
 
 test("recognized VIMS roles are validated centrally", () => {
   assert.equal(isUserRole("super_admin"), true);
+  assert.equal(isUserRole("instructor"), true);
   assert.equal(isUserRole("inspector"), true);
   assert.equal(isUserRole("unknown_role"), false);
 });
@@ -28,4 +29,16 @@ test("user access action serializes last-admin checks and session revocation", (
   assert.match(source, /role = 'super_admin' and is_active = true for update/);
   assert.match(source, /tx\s*\.update\(sessions\)/);
   assert.match(source, /sessionsRevoked/);
+});
+
+test("Instructor Account is constrained to the Driver Training system", () => {
+  const editor = readFileSync("src/app/users/UserAccessEditor.tsx", "utf8");
+  const action = readFileSync("src/app/users/actions.ts", "utf8");
+  assert.match(editor, /\["instructor", "Instructor Account"\]/);
+  assert.match(editor, /nextRole === "instructor"/);
+  assert.match(editor, /setVehicleInspectionAccess\(false\)/);
+  assert.match(editor, /setDriverTrainingAccess\(true\)/);
+  assert.match(action, /requestedRole === "instructor"/);
+  assert.match(action, /Instructor Account must be assigned to Driver Training & Assessment only/);
+  assert.match(action, /canManageTrainingUsers/);
 });

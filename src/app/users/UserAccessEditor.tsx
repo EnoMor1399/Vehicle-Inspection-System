@@ -10,6 +10,7 @@ const ROLE_OPTIONS = [
   ["admin", "Administrator"],
   ["operations_manager", "Operations Manager"],
   ["supervisor", "Supervisor"],
+  ["instructor", "Instructor Account"],
   ["inspector", "Inspector"],
   ["data_entry", "Data Entry Officer"],
   ["auditor", "Auditor"],
@@ -52,12 +53,21 @@ export function UserAccessEditor({
     if (nextRole === "super_admin") {
       setVehicleInspectionAccess(true);
       setDriverTrainingAccess(true);
+      return;
     }
     if (nextRole === "transporter_user") {
       setVehicleInspectionAccess(true);
       setDriverTrainingAccess(false);
+      return;
+    }
+    if (nextRole === "instructor") {
+      setVehicleInspectionAccess(false);
+      setDriverTrainingAccess(true);
     }
   }
+
+  const instructorAccount = role === "instructor";
+  const systemAssignmentLocked = role === "super_admin" || role === "transporter_user" || instructorAccount;
 
   function save() {
     setError(null);
@@ -117,7 +127,7 @@ export function UserAccessEditor({
                       type="checkbox"
                       checked={vehicleInspectionAccess}
                       onChange={(event) => setVehicleInspectionAccess(event.target.checked)}
-                      disabled={role === "super_admin" || role === "transporter_user"}
+                      disabled={systemAssignmentLocked}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300"
                     />
                     <span>
@@ -130,7 +140,7 @@ export function UserAccessEditor({
                       type="checkbox"
                       checked={driverTrainingAccess}
                       onChange={(event) => setDriverTrainingAccess(event.target.checked)}
-                      disabled={role === "super_admin" || role === "transporter_user"}
+                      disabled={systemAssignmentLocked}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300"
                     />
                     <span>
@@ -139,6 +149,11 @@ export function UserAccessEditor({
                     </span>
                   </label>
                 </div>
+                {instructorAccount && (
+                  <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+                    Instructor Account is restricted to Driver Training & Assessment and cannot be assigned Vehicle Inspection privileges.
+                  </p>
+                )}
               </div>
 
               {vehicleInspectionAccess && (
