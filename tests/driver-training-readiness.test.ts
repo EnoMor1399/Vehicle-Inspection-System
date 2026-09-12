@@ -92,14 +92,15 @@ test("enterprise upgrade and verifier include readiness migration tables and ind
   assert.match(verifier, /training_readiness_session_uidx/);
 });
 
-test("server actions restrict instructor profiles to active internal users and protect readiness confirmation", () => {
+test("server actions restrict instructor profiles to eligible Driver Training users and protect readiness confirmation", () => {
   const source = readFileSync("src/app/driver-training/readiness/actions.ts", "utf8");
   assert.match(source, /canManageTraining/);
-  assert.match(source, /account\.role === "transporter_user"/);
-  assert.match(source, /account\.isActive/);
+  assert.match(source, /canServeAsInternalTrainingInstructor\(account\)/);
+  assert.match(source, /Internal Instructor profiles can only be assigned to active Driver Training & Assessment users/);
   assert.match(source, /pg_advisory_xact_lock\(hashtext/);
   assert.match(source, /Assign an internal instructor before confirming instructor readiness/);
-  assert.match(source, /does not have a Driver Training instructor profile/);
+  assert.match(source, /profile\.status !== "active"/);
+  assert.match(source, /The assigned Internal Instructor is not an active Driver Training & Assessment instructor/);
   assert.match(source, /instructorDeploymentState/);
   assert.match(source, /\["unavailable", "blocked", "incomplete"\]/);
   assert.match(source, /logAudit/);

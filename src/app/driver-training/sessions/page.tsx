@@ -4,10 +4,11 @@ import { CalendarDays, CheckCircle2, Clock3, Plus, UsersRound, XCircle } from "l
 import { db } from "@/db";
 import { locations, transporters, users } from "@/db/schema";
 import { trainingParticipants, trainingSessions } from "@/db/training-schema";
+import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, TextArea, TextInput } from "@/components/ui";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canManageTraining, canServeAsInternalTrainingInstructor, canViewTraining } from "@/lib/training-access";
 import { formatDateTime } from "@/lib/utils";
 import { createTrainingSession, updateTrainingSessionStatus } from "../actions";
 
@@ -28,7 +29,7 @@ export default async function TrainingSessionsPage() {
   if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to this module.</div>;
   const canManage = canManageTraining(user);
 
-  const [sessions, stationOptions, transporterOptions, instructorOptions] = await Promise.all([
+  const [sessions, stationOptions, transporterOptions, instructorRows] = await Promise.all([
     db
       .select({
         id: trainingSessions.id,
@@ -54,11 +55,22 @@ export default async function TrainingSessionsPage() {
       .where(isNull(transporters.deletedAt))
       .orderBy(transporters.companyName),
     db
-      .select({ id: users.id, name: users.name, role: users.role })
-      .from(users)
-      .where(eq(users.isActive, true))
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        permissions: users.permissions,
+        isActive: users.isActive,
+        profileStatus: trainingInstructorProfiles.status,
+      })
+      .from(trainingInstructorProfiles)
+      .innerJoin(users, eq(users.id, trainingInstructorProfiles.userId))
       .orderBy(users.name),
   ]);
+
+  const instructorOptions = instructorRows.filter((account) =>
+    account.profileStatus === "active" && canServeAsInternalTrainingInstructor(account),
+  );
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
@@ -123,10 +135,10 @@ export default async function TrainingSessionsPage() {
             <Field label="Venue">
               <TextInput name="venue" maxLength={300} placeholder="Training venue or route" />
             </Field>
-            <Field label="Internal instructor">
+            <Field label="Internal instructor" hint="Only active Driver Training users with an Internal Instructor profile are listed.">
               <Select name="instructorId" defaultValue="">
                 <option value="">No internal instructor</option>
-                {instructorOptions.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.role.replaceAll("_", " ")}</option>)}
+                {instructorOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </Select>
             </Field>
             <Field label="Instructor / facilitator">

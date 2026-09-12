@@ -5,6 +5,10 @@ type TrainingUser = {
   permissions?: Record<string, boolean> | null;
 };
 
+type TrainingAccount = TrainingUser & {
+  isActive?: boolean | null;
+};
+
 const TRAINING_VIEW_ROLES = new Set([
   "super_admin",
   "admin",
@@ -59,4 +63,10 @@ export function canReviewTrainingAssessments(user: TrainingUser) {
   if (explicit !== undefined) return Boolean(explicit);
   if (!canViewTraining(user)) return false;
   return TRAINING_ASSESSMENT_REVIEW_ROLES.has(user.role);
+}
+
+export function canServeAsInternalTrainingInstructor(user: TrainingAccount) {
+  if (user.isActive !== true) return false;
+  if (user.role === "transporter_user") return false;
+  return canViewTraining(user);
 }

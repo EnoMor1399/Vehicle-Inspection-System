@@ -10,10 +10,11 @@ import {
   trainingParticipants,
   trainingSessions,
 } from "@/db/training-schema";
+import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTraining, canServeAsInternalTrainingInstructor } from "@/lib/training-access";
 import {
   addUtcMonthsClamped,
   calculateOverallScore,
@@ -88,12 +89,26 @@ export async function createTrainingSession(formData: FormData) {
   }
 
   if (data.instructorId) {
-    const [instructor] = await db
-      .select({ id: users.id, isActive: users.isActive })
-      .from(users)
-      .where(eq(users.id, data.instructorId))
-      .limit(1);
-    if (!instructor?.isActive) throw new Error("Selected instructor is unavailable");
+    const [[instructor], [profile]] = await Promise.all([
+      db
+        .select({
+          id: users.id,
+          role: users.role,
+          permissions: users.permissions,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .where(eq(users.id, data.instructorId))
+        .limit(1),
+      db
+        .select({ status: trainingInstructorProfiles.status })
+        .from(trainingInstructorProfiles)
+        .where(eq(trainingInstructorProfiles.userId, data.instructorId))
+        .limit(1),
+    ]);
+    if (!instructor || !canServeAsInternalTrainingInstructor(instructor) || profile?.status !== "active") {
+      throw new Error("Selected Internal Instructor must be an active Driver Training & Assessment user with an active instructor profile");
+    }
   }
 
   const id = newId();
