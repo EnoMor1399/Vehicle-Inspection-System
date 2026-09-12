@@ -11,7 +11,7 @@ import { trainingSessions } from "@/db/training-schema";
 import { Badge, Button, Card, EmptyState, PageHeader, StatCard, TextArea, TextInput as Input } from "@/components/ui";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canManageTrainingGovernance, canViewTraining } from "@/lib/training-access";
 import { accreditationValidityState, evaluateTrainingRegulatoryCompliance } from "@/lib/training-accreditation-policy";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
@@ -29,7 +29,7 @@ const serviceNames = new Map(DRIVER_TRAINING_SERVICES.map((service) => [service.
 export default async function TrainingAccreditationPage() {
   const user = await requireInternalUser();
   if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
-  const canManage = canManageTraining(user);
+  const canManage = canManageTrainingGovernance(user);
 
   const [requirements, accreditations, sessions, reviews] = await Promise.all([
     db.select().from(trainingRegulatoryRequirements).orderBy(asc(trainingRegulatoryRequirements.requirementCode)).limit(500),
