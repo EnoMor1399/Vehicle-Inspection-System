@@ -6,17 +6,30 @@ import { locations, sessions, transporters, users } from "@/db/schema";
 import { and, count, eq, sql } from "drizzle-orm";
 import { getCurrentUser, canManageUsers } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { canManageTraining } from "@/lib/training-access";
+import {
+  canAccessDriverTraining,
+  canAccessVehicleInspection,
+  DRIVER_TRAINING_ACCESS_KEY,
+  VEHICLE_INSPECTION_ACCESS_KEY,
+} from "@/lib/system-access";
 import { isUserRole, validateDelegatedRoleChange } from "@/lib/user-access-policy";
 
 export async function updateUserAccess(input: {
   userId: string;
   role: string;
   isActive: boolean;
+  vehicleInspectionAccess: boolean;
+  driverTrainingAccess: boolean;
   locationId?: string | null;
   transporterId?: string | null;
 }) {
   const actor = await getCurrentUser();
-  if (!canManageUsers(actor)) throw new Error("You do not have permission to manage users");
+  const actorCanManageInspection = canManageUsers(actor);
+  const actorCanManageTraining = canManageTraining(actor);
+  if (!actorCanManageInspection && !actorCanManageTraining) {
+    throw new Error("You do not have permission to manage users");
+  }
 
   const actorRole = actor.role;
   const requestedRole = input.role;
@@ -38,8 +51,45 @@ export async function updateUserAccess(input: {
     const delegated = validateDelegatedRoleChange(actorRole, targetRole, requestedRole);
     if (!delegated.ok) return { ok: false as const, error: delegated.message };
 
-    if (target.id === actor.id && (!input.isActive || requestedRole !== actorRole)) {
-      return { ok: false as const, error: "You cannot deactivate or change the role of your own active session" };
+    const currentVehicleInspectionAccess = canAccessVehicleInspection(target);
+    const currentDriverTrainingAccess = canAccessDriverTraining(target);
+    let vehicleInspectionAccess = Boolean(input.vehicleInspectionAccess);
+    let driverTrainingAccess = Boolean(input.driverTrainingAccess);
+
+    if (requestedRole === "super_admin") {
+      if (actorRole !== "super_admin") {
+        return { ok: false as const, error: "Only a Super Administrator can assign Super Administrator access" };
+      }
+      // Super Administrators retain governance visibility across both systems.
+      vehicleInspectionAccess = true;
+      driverTrainingAccess = true;
+    }
+
+    if (requestedRole === "transporter_user") {
+      if (!vehicleInspectionAccess || driverTrainingAccess) {
+        return { ok: false as const, error: "Transporter Portal users can only belong to Vehicle Inspection" };
+      }
+    }
+
+    if (!vehicleInspectionAccess && !driverTrainingAccess) {
+      return { ok: false as const, error: "Assign the account to Vehicle Inspection, Driver Training, or both" };
+    }
+
+    if (actorRole !== "super_admin") {
+      if ((currentVehicleInspectionAccess || vehicleInspectionAccess) && !actorCanManageInspection) {
+        return { ok: false as const, error: "You cannot manage Vehicle Inspection user access" };
+      }
+      if ((currentDriverTrainingAccess || driverTrainingAccess) && !actorCanManageTraining) {
+        return { ok: false as const, error: "You cannot manage Driver Training user access" };
+      }
+    }
+
+    const accessChanged =
+      currentVehicleInspectionAccess !== vehicleInspectionAccess
+      || currentDriverTrainingAccess !== driverTrainingAccess;
+
+    if (target.id === actor.id && (!input.isActive || requestedRole !== actorRole || accessChanged)) {
+      return { ok: false as const, error: "You cannot deactivate, change the role, or change the system assignment of your own active session" };
     }
 
     if (targetRole === "super_admin" && (requestedRole !== "super_admin" || !input.isActive)) {
@@ -55,7 +105,7 @@ export async function updateUserAccess(input: {
       }
     }
 
-    const locationId = input.locationId || null;
+    const locationId = vehicleInspectionAccess ? input.locationId || null : null;
     if (locationId) {
       const [location] = await tx.select({ id: locations.id }).from(locations).where(eq(locations.id, locationId)).limit(1);
       if (!location) return { ok: false as const, error: "Selected inspection station does not exist" };
@@ -74,8 +124,18 @@ export async function updateUserAccess(input: {
       }
     }
 
+    const currentPermissions = target.permissions && typeof target.permissions === "object"
+      ? target.permissions
+      : {};
+    const permissions = {
+      ...currentPermissions,
+      [VEHICLE_INSPECTION_ACCESS_KEY]: vehicleInspectionAccess,
+      [DRIVER_TRAINING_ACCESS_KEY]: driverTrainingAccess,
+    };
+
     const patch: Partial<typeof users.$inferInsert> = {
       role: requestedRole,
+      permissions,
       isActive: input.isActive,
       locationId,
       transporterId,
@@ -85,7 +145,8 @@ export async function updateUserAccess(input: {
     const securitySensitiveChange =
       targetRole !== requestedRole
       || target.isActive !== input.isActive
-      || target.transporterId !== transporterId;
+      || target.transporterId !== transporterId
+      || accessChanged;
 
     const [updated] = await tx
       .update(users)
@@ -102,7 +163,16 @@ export async function updateUserAccess(input: {
         .where(eq(sessions.userId, target.id));
     }
 
-    return { ok: true as const, target, updated, securitySensitiveChange };
+    return {
+      ok: true as const,
+      target,
+      updated,
+      securitySensitiveChange,
+      currentVehicleInspectionAccess,
+      currentDriverTrainingAccess,
+      vehicleInspectionAccess,
+      driverTrainingAccess,
+    };
   });
 
   if (!result.ok) throw new Error(result.error);
@@ -120,16 +190,21 @@ export async function updateUserAccess(input: {
       isActive: result.target.isActive,
       locationId: result.target.locationId,
       transporterId: result.target.transporterId,
+      vehicleInspectionAccess: result.currentVehicleInspectionAccess,
+      driverTrainingAccess: result.currentDriverTrainingAccess,
     },
     after: {
       role: result.updated.role,
       isActive: result.updated.isActive,
       locationId: result.updated.locationId,
       transporterId: result.updated.transporterId,
+      vehicleInspectionAccess: result.vehicleInspectionAccess,
+      driverTrainingAccess: result.driverTrainingAccess,
       sessionsRevoked: result.securitySensitiveChange,
     },
   });
 
   revalidatePath("/users");
+  revalidatePath("/driver-training/users");
   return { ok: true };
 }
