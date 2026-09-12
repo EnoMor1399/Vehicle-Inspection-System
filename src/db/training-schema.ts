@@ -89,14 +89,33 @@ export const trainingAssessments = pgTable(
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
     assessorId: varchar("assessor_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
     assessmentType: varchar("assessment_type", { length: 40 }).notNull(),
+    assessmentVersion: varchar("assessment_version", { length: 20 }).notNull().default("driver-v1"),
     theoryScore: numeric("theory_score", { precision: 5, scale: 2 }),
     practicalScore: numeric("practical_score", { precision: 5, scale: 2 }),
     overallScore: numeric("overall_score", { precision: 5, scale: 2 }),
+    scoredPoints: integer("scored_points"),
+    maximumPoints: integer("maximum_points"),
+    classification: varchar("classification", { length: 30 }),
     result: varchar("result", { length: 30 }).notNull(),
     riskLevel: varchar("risk_level", { length: 20 }),
+    criteriaRatings: jsonb("criteria_ratings").$type<Record<string, number>>().notNull().default({}),
+    criteriaComments: jsonb("criteria_comments").$type<Record<string, string>>().notNull().default({}),
+    sectionScores: jsonb("section_scores").$type<Record<string, { score: number; maximum: number; percentage: number | null; ratedCriteria: number }>>().notNull().default({}),
+    criticalViolations: jsonb("critical_violations").$type<string[]>().notNull().default([]),
+    qualitativeFeedback: jsonb("qualitative_feedback").$type<{
+      safetyObservations?: string;
+      vehicleHandlingObservations?: string;
+      communicationObservations?: string;
+      trainerComments?: string;
+      immediateCorrectiveAction?: string;
+    }>().notNull().default({}),
+    developmentPlan: jsonb("development_plan").$type<Array<{ area: string; action: string; targetDate?: string }>>().notNull().default([]),
+    finalRecommendation: varchar("final_recommendation", { length: 50 }),
     strengths: text("strengths"),
     improvementAreas: jsonb("improvement_areas").$type<string[]>().notNull().default([]),
     remarks: text("remarks"),
+    driverAcknowledged: boolean("driver_acknowledged").notNull().default(false),
+    driverComments: text("driver_comments"),
     assessedAt: timestamp("assessed_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -104,6 +123,8 @@ export const trainingAssessments = pgTable(
     participantIdx: index("training_assessment_participant_idx").on(t.participantId, t.assessedAt),
     sessionIdx: index("training_assessment_session_idx").on(t.sessionId),
     resultIdx: index("training_assessment_result_idx").on(t.result),
+    classificationIdx: index("training_assessment_classification_idx").on(t.classification, t.assessedAt),
+    recommendationIdx: index("training_assessment_recommendation_idx").on(t.finalRecommendation, t.assessedAt),
   })
 );
 

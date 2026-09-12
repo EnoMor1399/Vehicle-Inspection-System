@@ -42,6 +42,7 @@ const PRIMARY_WORKSPACES: WorkspaceLink[] = [
   { href: "/driver-training/requests", label: "Requests", icon: ClipboardPlus },
   { href: "/driver-training/sessions", label: "Sessions", icon: CalendarDays },
   { href: "/driver-training/participants", label: "Participants", icon: UsersRound },
+  { href: "/driver-training/assessments", label: "Assessments", icon: ClipboardCheck },
   { href: "/driver-training/certificates", label: "Certificates", icon: Award },
   { href: "/driver-training/analytics", label: "Analytics", icon: BarChart3 },
 ];
