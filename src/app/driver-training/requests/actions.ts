@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { locations, users } from "@/db/schema";
+import { trainingQuotations } from "@/db/training-commercial-schema";
 import { trainingSessions } from "@/db/training-schema";
 import { trainingRequestEvents, trainingRequests } from "@/db/training-request-schema";
 import { getCurrentUser } from "@/lib/auth";
@@ -20,6 +22,8 @@ import {
 } from "@/lib/training-request-policy";
 import { newId } from "@/lib/utils";
 
+const COMMERCIAL_AUTHORIZATION_MESSAGE = "Client training request requires an accepted, valid quotation before scheduling";
+
 function field(formData: FormData, name: string) {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
@@ -29,6 +33,37 @@ function refreshRequestPaths() {
   revalidatePath("/driver-training");
   revalidatePath("/driver-training/requests");
   revalidatePath("/driver-training/sessions");
+}
+
+function commercialWorkspacePath(requestId: string) {
+  const params = new URLSearchParams({ requestId, notice: "quotation-required" });
+  return `/driver-training/commercials?${params.toString()}`;
+}
+
+function isCommercialAuthorizationError(error: unknown) {
+  const queue: unknown[] = [error];
+  const visited = new Set<unknown>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current)) continue;
+    visited.add(current);
+
+    if (current instanceof Error) {
+      if (current.message.includes(COMMERCIAL_AUTHORIZATION_MESSAGE)) return true;
+      const cause = (current as Error & { cause?: unknown }).cause;
+      if (cause) queue.push(cause);
+      continue;
+    }
+
+    if (typeof current === "object") {
+      const record = current as { message?: unknown; cause?: unknown };
+      if (typeof record.message === "string" && record.message.includes(COMMERCIAL_AUTHORIZATION_MESSAGE)) return true;
+      if (record.cause) queue.push(record.cause);
+    }
+  }
+
+  return false;
 }
 
 async function requireTrainingManager() {
@@ -209,6 +244,27 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
     if (!request) return { ok: false as const, error: "Training request not found" };
     if (request.status !== "approved") return { ok: false as const, error: "Only approved training requests can be scheduled" };
     if (request.scheduledSessionId) return { ok: false as const, error: "This training request already has a scheduled session" };
+
+    if (request.requestType === "client") {
+      const today = new Date().toISOString().slice(0, 10);
+      const [acceptedQuotation] = await tx
+        .select({ id: trainingQuotations.id })
+        .from(trainingQuotations)
+        .where(and(
+          eq(trainingQuotations.requestId, request.id),
+          eq(trainingQuotations.status, "accepted"),
+          gte(trainingQuotations.validUntil, today),
+        ))
+        .limit(1);
+      if (!acceptedQuotation) {
+        return {
+          ok: false as const,
+          error: COMMERCIAL_AUTHORIZATION_MESSAGE,
+          redirectToCommercials: true as const,
+        };
+      }
+    }
+
     if (!requestSchedulingCapacityIsValid(request.requestedParticipants, data.capacity)) {
       return { ok: false as const, error: "Session capacity cannot be below the requested participant count" };
     }
@@ -260,9 +316,24 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
       createdBy: user.id,
     });
     return { ok: true as const, request, sessionValues };
+  }).catch((error: unknown) => {
+    if (isCommercialAuthorizationError(error)) {
+      return {
+        ok: false as const,
+        error: COMMERCIAL_AUTHORIZATION_MESSAGE,
+        redirectToCommercials: true as const,
+      };
+    }
+    throw error;
   });
 
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) {
+    if ("redirectToCommercials" in result && result.redirectToCommercials) {
+      redirect(commercialWorkspacePath(data.requestId));
+    }
+    throw new Error(result.error);
+  }
+
   await logAudit({
     userId: user.id,
     userName: user.name,
