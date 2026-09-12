@@ -46,3 +46,14 @@ test("Driver Training user administration exposes formal account creation contro
   assert.match(source, /user\.role === "super_admin" && <option value="admin">/);
   assert.match(source, /form action=\{createDriverTrainingUser\}/);
 });
+
+test("Driver Training account validation errors stay inside the form instead of crashing the workspace", () => {
+  const actionSource = readFileSync("src/app/driver-training/users/actions.ts", "utf8");
+  const pageSource = readFileSync("src/app/driver-training/users/page.tsx", "utf8");
+  assert.match(actionSource, /redirectWithFormError/);
+  assert.match(actionSource, /createError/);
+  assert.match(actionSource, /redirect\("\/driver-training\/users\?created=1"\)/);
+  assert.match(pageSource, /Account not created\./);
+  assert.match(pageSource, /pattern="\\S\*"/);
+  assert.match(pageSource, /Spaces are not allowed\./);
+});
