@@ -84,16 +84,17 @@ test("assessment record exposes evidence, printing and supervisor decision UI", 
   assert.match(printButton, /print:hidden/);
 });
 
-test("review queue is discoverable from Driver Training navigation", () => {
+test("review queue is discoverable from the compact Driver Training navigation", () => {
   const queue = readFileSync("src/app/driver-training/assessments/review/page.tsx", "utf8");
   assert.match(queue, /Assessment Review Queue/);
   assert.match(queue, /pending_review/);
-  assert.match(queue, /Review record/);
-  assert.match(queue, /Assessors cannot review their own records/);
+  assert.match(queue, /Pending independent reviews/);
+  assert.match(queue, /require another reviewer/);
 
   const nav = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   assert.match(nav, /\/driver-training\/assessments\/review/);
-  assert.match(nav, /Independent supervisor review and approval queue/);
+  assert.match(nav, /label: "Review queue"/);
+  assert.match(nav, /label="Assessments"/);
 });
 
 test("assessment governance branch remains excluded from Vercel Git deployment", () => {
