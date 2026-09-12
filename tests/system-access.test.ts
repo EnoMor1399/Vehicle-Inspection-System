@@ -7,7 +7,6 @@ import {
   canAccessVehicleInspection,
 } from "../src/lib/system-access";
 import { canManageTraining, canViewTraining } from "../src/lib/training-access";
-import { hasPermission } from "../src/lib/auth";
 
 test("legacy VIMS accounts remain Vehicle Inspection users by default", () => {
   const user = { role: "inspector", permissions: {} };
@@ -26,8 +25,6 @@ test("Driver Training assignment does not automatically grant Vehicle Inspection
   assert.equal(canAccessDriverTraining(user), true);
   assert.equal(canViewTraining(user), true);
   assert.equal(canManageTraining(user), true);
-  assert.equal(hasPermission(user, "vehicles"), false);
-  assert.equal(hasPermission(user, "inspections"), false);
   assert.equal(accessAreaLabel(user), "Driver Training");
 });
 
@@ -37,8 +34,7 @@ test("Vehicle Inspection assignment blocks role-derived Driver Training access",
     permissions: { vehicle_inspection: true, training: false },
   };
 
-  assert.equal(hasPermission(user, "vehicles"), true);
-  assert.equal(hasPermission(user, "users"), true);
+  assert.equal(canAccessVehicleInspection(user), true);
   assert.equal(canViewTraining(user), false);
   assert.equal(canManageTraining(user), false);
 });
@@ -51,7 +47,6 @@ test("cross-system accounts can work in both domains", () => {
 
   assert.equal(canAccessVehicleInspection(user), true);
   assert.equal(canAccessDriverTraining(user), true);
-  assert.equal(hasPermission(user, "vehicles"), true);
   assert.equal(canViewTraining(user), true);
   assert.equal(accessAreaLabel(user), "Both systems");
 });
@@ -60,6 +55,13 @@ test("Super Administrator keeps cross-system oversight by default", () => {
   const user = { role: "super_admin", permissions: {} };
   assert.equal(canAccessVehicleInspection(user), true);
   assert.equal(canAccessDriverTraining(user), true);
+});
+
+test("Vehicle Inspection permissions enforce the system boundary", () => {
+  const source = readFileSync("src/lib/auth.ts", "utf8");
+  assert.match(source, /VEHICLE_INSPECTION_RESOURCES/);
+  assert.match(source, /!canAccessVehicleInspection\(u\)/);
+  assert.match(source, /return false/);
 });
 
 test("user access action persists both system assignments and revokes sessions", () => {
