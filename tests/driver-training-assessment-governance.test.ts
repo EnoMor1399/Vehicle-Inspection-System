@@ -47,6 +47,7 @@ test("trainer submission cannot unlock certification before independent review",
 
 test("review action prevents self-review, stale approval and duplicate decisions", () => {
   const action = readFileSync("src/app/driver-training/assessments/actions.ts", "utf8");
+  assert.match(action, /export async function reviewDriverAssessment/);
   assert.match(action, /canReviewTrainingAssessments/);
   assert.match(action, /pg_advisory_xact_lock\(hashtext/);
   assert.match(action, /assessment\.reviewStatus !== "pending_review"/);
