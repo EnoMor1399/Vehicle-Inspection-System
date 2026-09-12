@@ -38,7 +38,17 @@ const TRAINING_ACCOUNT_OPTIONS = [
   { value: "viewer", label: "Read-only Training User" },
 ] as const;
 
-export default async function DriverTrainingUsersPage() {
+type DriverTrainingUsersPageProps = {
+  searchParams?: Promise<{
+    createError?: string;
+    created?: string;
+  }>;
+};
+
+export default async function DriverTrainingUsersPage({ searchParams }: DriverTrainingUsersPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const createError = typeof params.createError === "string" ? params.createError : "";
+  const accountCreated = params.created === "1";
   const user = await requireInternalUser();
   const canView = canViewTraining(user);
   const canManage = canManageTraining(user);
@@ -140,6 +150,16 @@ export default async function DriverTrainingUsersPage() {
           </div>
 
           <form action={createDriverTrainingUser} className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4 sm:p-6">
+            {createError && (
+              <div role="alert" className="sm:col-span-2 xl:col-span-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <span className="font-semibold">Account not created.</span> {createError}
+              </div>
+            )}
+            {accountCreated && !createError && (
+              <div role="status" className="sm:col-span-2 xl:col-span-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <span className="font-semibold">Account created successfully.</span> The new Driver Training user can now sign in with the credentials you assigned.
+              </div>
+            )}
             <Field label="Full name" required>
               <TextInput name="name" required minLength={2} maxLength={200} autoComplete="name" placeholder="Full name" />
             </Field>
@@ -156,8 +176,17 @@ export default async function DriverTrainingUsersPage() {
               </Select>
             </Field>
             <div className="sm:col-span-2 xl:col-span-2">
-              <Field label="Initial password" required hint={`Minimum ${PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, number and special character.`}>
-                <TextInput name="password" type="password" required minLength={PASSWORD_MIN_LENGTH} maxLength={128} autoComplete="new-password" />
+              <Field label="Initial password" required hint={`Minimum ${PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, number and special character. Spaces are not allowed.`}>
+                <TextInput
+                  name="password"
+                  type="password"
+                  required
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={128}
+                  pattern="\S*"
+                  title="Password must not contain spaces."
+                  autoComplete="new-password"
+                />
               </Field>
             </div>
             <div className="sm:col-span-2 xl:col-span-2">
