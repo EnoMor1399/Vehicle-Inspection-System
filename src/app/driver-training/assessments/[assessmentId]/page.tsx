@@ -13,7 +13,11 @@ import {
   formatAssessmentRecommendation,
 } from "@/lib/driver-assessment-template";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canReviewTrainingAssessments, canViewTraining } from "@/lib/training-access";
+import {
+  canAdministrativelySelfReviewTrainingAssessment,
+  canReviewTrainingAssessments,
+  canViewTraining,
+} from "@/lib/training-access";
 import { formatDateTime } from "@/lib/utils";
 import { reviewDriverAssessment } from "../actions";
 import PrintAssessmentButton from "./PrintAssessmentButton";
@@ -62,7 +66,12 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
   if (!participant || !session) notFound();
 
   const canReview = canReviewTrainingAssessments(user);
-  const canActOnReview = canReview && assessment.reviewStatus === "pending_review" && assessment.assessorId !== user.id;
+  const isSelfReview = assessment.assessorId === user.id;
+  const canSelfReviewAdministratively = canAdministrativelySelfReviewTrainingAssessment(user);
+  const usesAdministrativeOverride = isSelfReview && canSelfReviewAdministratively;
+  const canActOnReview = canReview
+    && assessment.reviewStatus === "pending_review"
+    && (!isSelfReview || canSelfReviewAdministratively);
   const ratings = assessment.criteriaRatings || {};
   const comments = assessment.criteriaComments || {};
   const sectionScores = assessment.sectionScores || {};
@@ -201,13 +210,19 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
         ) : canActOnReview ? (
           <form action={reviewDriverAssessment} className="mt-4 print:hidden">
             <input type="hidden" name="assessmentId" value={assessment.id} />
-            <label className="block"><span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">Review comments</span><TextArea name="reviewComments" maxLength={4000} className="min-h-[110px]" placeholder="Enter approval notes or required corrections." /></label>
+            {usesAdministrativeOverride && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <ShieldCheck className="mr-2 inline h-4 w-4" />
+                Administrative self-review override. Enter review comments explaining the decision; this override will be recorded in the audit log.
+              </div>
+            )}
+            <label className="block"><span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">Review comments{usesAdministrativeOverride ? " (required)" : ""}</span><TextArea name="reviewComments" required={usesAdministrativeOverride} minLength={usesAdministrativeOverride ? 5 : undefined} maxLength={4000} className="min-h-[110px]" placeholder={usesAdministrativeOverride ? "Document the reason for this administrative review decision." : "Enter approval notes or required corrections."} /></label>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button type="submit" name="decision" value="returned" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><AlertTriangle className="h-4 w-4" /> Return for Correction</button>
               <button type="submit" name="decision" value="approved" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2"><ShieldCheck className="h-4 w-4" /> Approve Assessment</button>
             </div>
           </form>
-        ) : assessment.assessorId === user.id ? (
+        ) : isSelfReview ? (
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><UserCheck className="mr-2 inline h-4 w-4" />Independent review required. Assessors cannot review their own assessment.</div>
         ) : (
           <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4 text-sm text-[var(--vims-ink-muted)]"><ClipboardCheck className="mr-2 inline h-4 w-4" />Awaiting authorized review.</div>

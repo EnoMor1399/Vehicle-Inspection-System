@@ -5,20 +5,25 @@ import { readFileSync } from "node:fs";
 test("assessment review queue surfaces one current actionable assessment", () => {
   const page = readFileSync("src/app/driver-training/assessments/review/page.tsx", "utf8");
 
-  assert.match(page, /const actionablePending = canReview \? pending\.filter\(\(record\) => record\.assessorId !== user\.id\) : \[\]/);
+  assert.match(page, /const canSelfReviewAdministratively = canAdministrativelySelfReviewTrainingAssessment\(user\)/);
+  assert.match(page, /record\.assessorId !== user\.id \|\| canSelfReviewAdministratively/);
   assert.match(page, /const currentReview = actionablePending\[actionablePending\.length - 1\] \|\| null/);
   assert.match(page, /Current assessment to review/);
   assert.match(page, /Review current assessment/);
   assert.match(page, /Review the complete section scores, observations, critical violations, trainer feedback and development plan/);
 });
 
-test("current review workflow preserves independent-review governance", () => {
+test("current review workflow preserves independent review and controlled admin override", () => {
   const page = readFileSync("src/app/driver-training/assessments/review/page.tsx", "utf8");
 
   assert.match(page, /canReviewTrainingAssessments\(user\)/);
-  assert.match(page, /record\.assessorId !== user\.id/);
+  assert.match(page, /canAdministrativelySelfReviewTrainingAssessment\(user\)/);
+  assert.match(page, /record\.assessorId === user\.id && !canSelfReviewAdministratively/);
   assert.match(page, /Independent reviewer required/);
   assert.match(page, /Another authorized reviewer must complete the decision/);
+  assert.match(page, /Administrative self-review override available/);
+  assert.match(page, /review comments are required/);
+  assert.match(page, /audit log/);
   assert.match(page, /Read-only access\. Approval requires a Driver Training account with assessment-review authority/);
 });
 

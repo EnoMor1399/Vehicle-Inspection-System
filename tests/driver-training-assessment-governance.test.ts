@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { canReviewTrainingAssessments } from "../src/lib/training-access";
+import {
+  canAdministrativelySelfReviewTrainingAssessment,
+  canReviewTrainingAssessments,
+} from "../src/lib/training-access";
 
 test("assessment review permission requires Driver Training assignment and an independent supervisory role", () => {
   assert.equal(canReviewTrainingAssessments({ role: "super_admin" }), true, "Super Administrator keeps cross-system oversight");
@@ -26,6 +29,29 @@ test("assessment review permission requires Driver Training assignment and an in
   }
   assert.equal(canReviewTrainingAssessments({ role: "inspector", permissions: { training: true, training_assessment_review: true } }), true);
   assert.equal(canReviewTrainingAssessments({ role: "supervisor", permissions: { training: true, training_assessment_review: false } }), false);
+});
+
+test("administrative self-review override is restricted to authorized administrators", () => {
+  assert.equal(canAdministrativelySelfReviewTrainingAssessment({ role: "super_admin" }), true);
+  assert.equal(
+    canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: true } }),
+    true,
+  );
+  assert.equal(
+    canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: false } }),
+    false,
+  );
+  assert.equal(
+    canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: true, training_assessment_review: false } }),
+    false,
+  );
+  for (const role of ["operations_manager", "supervisor", "instructor", "inspector", "data_entry"]) {
+    assert.equal(
+      canAdministrativelySelfReviewTrainingAssessment({ role, permissions: { training: true, training_assessment_review: true } }),
+      false,
+      `${role} must not self-review assessments`,
+    );
+  }
 });
 
 test("assessment governance migration adds reviewer controls and indexes", () => {
@@ -59,14 +85,18 @@ test("trainer submission cannot unlock certification before independent review",
   assert.match(action, /redirect\(`\/driver-training\/assessments\/\$\{id\}`\)/);
 });
 
-test("review action prevents self-review, stale approval and duplicate decisions", () => {
+test("review action preserves self-review protection with an audited administrator override", () => {
   const action = readFileSync("src/app/driver-training/assessments/actions.ts", "utf8");
   assert.match(action, /export async function reviewDriverAssessment/);
   assert.match(action, /canReviewTrainingAssessments/);
+  assert.match(action, /canAdministrativelySelfReviewTrainingAssessment/);
   assert.match(action, /pg_advisory_xact_lock\(hashtext/);
   assert.match(action, /assessment\.reviewStatus !== "pending_review"/);
   assert.match(action, /assessment\.assessorId === user\.id/);
   assert.match(action, /Assessors cannot approve or return their own assessment/);
+  assert.match(action, /Administrative self-review requires review comments explaining the decision/);
+  assert.match(action, /administrativeSelfReviewOverride/);
+  assert.match(action, /administrative self-review override/);
   assert.match(action, /A newer assessment exists for this driver/);
   assert.match(action, /orderBy\(desc\(trainingAssessments\.assessedAt\), desc\(trainingAssessments\.createdAt\)\)/);
 });
@@ -81,7 +111,7 @@ test("review approval controls final competency and certificate eligibility", ()
   assert.match(action, /action: decision === "approved" \? "approve" : "reject"/);
 });
 
-test("assessment record exposes evidence, printing and supervisor decision UI", () => {
+test("assessment record exposes evidence, printing and controlled administrator decision UI", () => {
   const page = readFileSync("src/app/driver-training/assessments/[assessmentId]/page.tsx", "utf8");
   assert.match(page, /Driver Assessment Record/);
   assert.match(page, /DRIVER_ASSESSMENT_SECTIONS\.map/);
@@ -93,7 +123,10 @@ test("assessment record exposes evidence, printing and supervisor decision UI", 
   assert.match(page, /Return for Correction/);
   assert.match(page, /Independent review required/);
   assert.match(page, /Assessors cannot review their own assessment/);
-  assert.match(page, /assessment\.assessorId !== user\.id/);
+  assert.match(page, /canAdministrativelySelfReviewTrainingAssessment/);
+  assert.match(page, /usesAdministrativeOverride/);
+  assert.match(page, /Administrative self-review override/);
+  assert.match(page, /required=\{usesAdministrativeOverride\}/);
 
   const printButton = readFileSync("src/app/driver-training/assessments/[assessmentId]/PrintAssessmentButton.tsx", "utf8");
   assert.match(printButton, /window\.print\(\)/);
@@ -105,6 +138,7 @@ test("review queue is discoverable from the compact Driver Training navigation",
   assert.match(queue, /Assessment Review/);
   assert.match(queue, /pending_review/);
   assert.match(queue, /Pending reviews/);
+  assert.match(queue, /Administrative self-review override available/);
   assert.match(queue, /require another reviewer/);
 
   const nav = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");

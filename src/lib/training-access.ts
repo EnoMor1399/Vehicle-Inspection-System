@@ -84,6 +84,11 @@ export function canReviewTrainingAssessments(user: TrainingUser) {
   return TRAINING_ASSESSMENT_REVIEW_ROLES.has(user.role);
 }
 
+export function canAdministrativelySelfReviewTrainingAssessment(user: TrainingUser) {
+  if (!canReviewTrainingAssessments(user)) return false;
+  return user.role === "super_admin" || user.role === "admin";
+}
+
 export function canCreateDriverTrainingUsers(user: TrainingUser) {
   if (!canManageTrainingUsers(user)) return false;
   return user.role === "super_admin" || user.role === "admin";
