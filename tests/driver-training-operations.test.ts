@@ -201,9 +201,10 @@ test("department UI exposes operational workspaces through the streamlined overv
   assert.doesNotMatch(dashboard, /Training & assessment services/);
   assert.match(navigation, /label="Operations"/);
   assert.match(navigation, /label="Assessments"/);
-  assert.match(sessions, /Schedule a training session/);
-  assert.match(participants, /Participants & Assessments/);
+  assert.match(sessions, /Schedule session/);
+  assert.match(participants, /Training Participants/);
   assert.match(certificates, /Certificate register/);
+  assert.match(certificates, /Status, validity and verification\./);
 });
 
 test("Driver Training route degrades safely when data or rendering fails", () => {
