@@ -11,7 +11,7 @@ import {
 } from "@/db/training-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTrainingCertificates } from "@/lib/training-access";
 import {
   effectiveTrainingCertificateStatus,
   trainingCertificateRevocationSchema,
@@ -29,8 +29,8 @@ function field(formData: FormData, name: string) {
 
 async function requireTrainingCertificateManager() {
   const user = await getCurrentUser();
-  if (!canManageTraining(user)) {
-    throw new Error("You do not have permission to manage Driver Training certificates");
+  if (!canManageTrainingCertificates(user)) {
+    throw new Error("You do not have permission to issue or revoke Driver Training certificates");
   }
   return user;
 }
