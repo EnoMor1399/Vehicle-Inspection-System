@@ -71,12 +71,14 @@ test("assessment record exposes evidence, printing and supervisor decision UI", 
   const page = readFileSync("src/app/driver-training/assessments/[assessmentId]/page.tsx", "utf8");
   assert.match(page, /Driver Assessment Record/);
   assert.match(page, /DRIVER_ASSESSMENT_SECTIONS\.map/);
-  assert.match(page, /Critical safety violations/);
-  assert.match(page, /Qualitative trainer feedback/);
-  assert.match(page, /Development & acknowledgement/);
-  assert.match(page, /Independent review/);
-  assert.match(page, /Approve assessment/);
-  assert.match(page, /Return for correction/);
+  assert.match(page, /Critical Violations/);
+  assert.match(page, /Trainer Feedback/);
+  assert.match(page, /Development & Acknowledgement/);
+  assert.match(page, /Review Decision/);
+  assert.match(page, /Approve Assessment/);
+  assert.match(page, /Return for Correction/);
+  assert.match(page, /Independent review required/);
+  assert.match(page, /Assessors cannot review their own assessment/);
   assert.match(page, /assessment\.assessorId !== user\.id/);
 
   const printButton = readFileSync("src/app/driver-training/assessments/[assessmentId]/PrintAssessmentButton.tsx", "utf8");
@@ -86,9 +88,9 @@ test("assessment record exposes evidence, printing and supervisor decision UI", 
 
 test("review queue is discoverable from the compact Driver Training navigation", () => {
   const queue = readFileSync("src/app/driver-training/assessments/review/page.tsx", "utf8");
-  assert.match(queue, /Assessment Review Queue/);
+  assert.match(queue, /Assessment Review/);
   assert.match(queue, /pending_review/);
-  assert.match(queue, /Pending independent reviews/);
+  assert.match(queue, /Pending reviews/);
   assert.match(queue, /require another reviewer/);
 
   const nav = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
