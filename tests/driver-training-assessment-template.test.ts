@@ -92,8 +92,9 @@ test("trainer assessment action calculates results server-side and serializes pa
   assert.match(action, /deriveDriverAssessmentOutcome/);
   assert.match(action, /pg_advisory_xact_lock\(hashtext/);
   assert.match(action, /0\.75/);
-  assert.match(action, /certificateEligible/);
-  assert.match(action, /criticalViolations\.length === 0/);
+  assert.match(action, /certificateEligible: false/);
+  assert.match(action, /reviewStatus: "pending_review"/);
+  assert.match(action, /criticalCount === 0/);
   assert.match(action, /assessmentType === "pre_training"/);
   assert.match(action, /logAudit/);
 });
