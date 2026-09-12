@@ -19,7 +19,7 @@ import { isValidTrainingDate, TRAINING_ASSESSMENT_TYPES } from "@/lib/training-p
 import { newId } from "@/lib/utils";
 
 const VALID_ASSESSMENT_TYPES = new Set<string>(TRAINING_ASSESSMENT_TYPES);
-const VALID_CRITICAL_VIOLATIONS = new Set(DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS.map((item) => item.id));
+const VALID_CRITICAL_VIOLATIONS = new Set<string>(DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS.map((item) => item.id));
 
 function text(formData: FormData, name: string, max = 4000) {
   const value = formData.get(name);
@@ -84,15 +84,17 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
 
   const calculated = calculateDriverAssessment(ratings);
   const minimumRequired = Math.ceil(DRIVER_ASSESSMENT_TOTAL_CRITERIA * 0.75);
-  if (calculated.ratedCriteria < minimumRequired || calculated.percentage === null || !calculated.classification) {
+  if (calculated.ratedCriteria < minimumRequired || calculated.percentage === null || calculated.classification === null) {
     throw new Error(`Complete at least ${minimumRequired} of ${DRIVER_ASSESSMENT_TOTAL_CRITERIA} assessment criteria before submitting`);
   }
+  const overallPercentage = calculated.percentage;
+  const classification = calculated.classification;
 
   const criticalViolations = formData
     .getAll("criticalViolations")
     .filter((value): value is string => typeof value === "string" && VALID_CRITICAL_VIOLATIONS.has(value));
 
-  const outcome = deriveDriverAssessmentOutcome(calculated.percentage, criticalViolations.length);
+  const outcome = deriveDriverAssessmentOutcome(overallPercentage, criticalViolations.length);
   const trafficScore = calculated.sectionScores.traffic_regulations?.percentage ?? null;
   const practicalScore = calculatePracticalPercentage(ratings);
   const strengths = text(formData, "strengths");
@@ -139,10 +141,10 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       assessmentVersion: "driver-v1",
       theoryScore: trafficScore === null ? null : trafficScore.toFixed(2),
       practicalScore: practicalScore === null ? null : practicalScore.toFixed(2),
-      overallScore: calculated.percentage.toFixed(2),
+      overallScore: overallPercentage.toFixed(2),
       scoredPoints: calculated.score,
       maximumPoints: calculated.maximum,
-      classification: calculated.classification,
+      classification,
       result: outcome.result,
       riskLevel: outcome.riskLevel,
       criteriaRatings: ratings,
@@ -183,11 +185,11 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     entityType: "training_assessment",
     entityId: id,
     entityLabel: result.participant.fullName,
-    summary: `Comprehensive driver assessment: ${outcome.result} at ${calculated.percentage}%`,
+    summary: `Comprehensive driver assessment: ${outcome.result} at ${overallPercentage}%`,
     after: {
       assessmentType,
-      overallScore: calculated.percentage,
-      classification: calculated.classification,
+      overallScore: overallPercentage,
+      classification,
       result: outcome.result,
       riskLevel: outcome.riskLevel,
       criticalViolations,
