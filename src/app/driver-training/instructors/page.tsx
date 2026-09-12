@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { AlertTriangle, BadgeCheck, GraduationCap, ShieldAlert, UserRoundCheck } from "lucide-react";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, StatCard, TextArea, TextInput } from "@/components/ui";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canManageTraining, canServeAsInternalTrainingInstructor, canViewTraining } from "@/lib/training-access";
 import { instructorDeploymentState, trainingCredentialState } from "@/lib/training-readiness-policy";
 import { formatDate } from "@/lib/utils";
 import { saveTrainingInstructorProfile } from "../readiness/actions";
@@ -27,13 +27,14 @@ export default async function TrainingInstructorsPage() {
   }
   const canManage = canManageTraining(user);
 
-  const [profiles, internalUsers] = await Promise.all([
+  const [profileRows, internalUserRows] = await Promise.all([
     db
       .select({
         profile: trainingInstructorProfiles,
         name: users.name,
         email: users.email,
         role: users.role,
+        permissions: users.permissions,
         accountActive: users.isActive,
       })
       .from(trainingInstructorProfiles)
@@ -41,12 +42,25 @@ export default async function TrainingInstructorsPage() {
       .orderBy(users.name)
       .limit(300),
     db
-      .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        permissions: users.permissions,
+        isActive: users.isActive,
+      })
       .from(users)
-      .where(ne(users.role, "transporter_user"))
       .orderBy(users.name)
       .limit(500),
   ]);
+
+  const profiles = profileRows.filter((row) => canServeAsInternalTrainingInstructor({
+    role: row.role,
+    permissions: row.permissions,
+    isActive: row.accountActive,
+  }));
+  const internalUsers = internalUserRows.filter((account) => canServeAsInternalTrainingInstructor(account));
 
   const deploymentStates = profiles.map((row) => instructorDeploymentState({
     status: row.profile.status,
@@ -65,7 +79,7 @@ export default async function TrainingInstructorsPage() {
     <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Instructor Qualifications"
-        description="Maintain the competence evidence and qualification-expiry visibility needed before assigning internal instructors to Driver Training delivery."
+        description="Manage internal instructors assigned to Driver Training & Assessment."
         action={<Link href="/driver-training/readiness" className="text-sm font-semibold text-[var(--brand-accent)] hover:opacity-75">Session readiness →</Link>}
       />
 
@@ -81,15 +95,18 @@ export default async function TrainingInstructorsPage() {
           <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700"><UserRoundCheck className="h-5 w-5" /></div>
-              <div><h2 className="font-semibold text-[var(--vims-ink)]">Add or update instructor qualification</h2><p className="text-sm text-[var(--vims-ink-muted)]">Selecting an account with an existing profile updates that profile; it never creates a duplicate.</p></div>
+              <div>
+                <h2 className="font-semibold text-[var(--vims-ink)]">Add or update instructor qualification</h2>
+                <p className="text-sm text-[var(--vims-ink-muted)]">Only active Driver Training & Assessment users are available for Internal Instructor assignment.</p>
+              </div>
             </div>
           </div>
           <form action={saveTrainingInstructorProfile} className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4 sm:p-6">
             <div className="sm:col-span-2 xl:col-span-2">
-              <Field label="Internal user account" required>
+              <Field label="Driver Training user" required>
                 <Select name="userId" required defaultValue="">
                   <option value="" disabled>Select instructor account</option>
-                  {internalUsers.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.email}{profileUsers.has(account.id) ? " · profile exists" : ""}</option>)}
+                  {internalUsers.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.email}{profileUsers.has(account.id) ? " · Internal Instructor" : ""}</option>)}
                 </Select>
               </Field>
             </div>
@@ -108,9 +125,12 @@ export default async function TrainingInstructorsPage() {
       )}
 
       <Card className="mt-6 overflow-hidden">
-        <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6"><h2 className="font-semibold text-[var(--vims-ink)]">Instructor qualification register</h2><p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Current internal instructor profiles and credential-expiry indicators.</p></div>
+        <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
+          <h2 className="font-semibold text-[var(--vims-ink)]">Internal Instructor register</h2>
+          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Only instructor profiles linked to active Driver Training & Assessment users are shown.</p>
+        </div>
         {profiles.length === 0 ? (
-          <div className="p-5 sm:p-6"><EmptyState icon={<GraduationCap className="h-5 w-5" />} title="No instructor profiles recorded" description="Add qualification evidence for internal users before confirming them for session readiness." /></div>
+          <div className="p-5 sm:p-6"><EmptyState icon={<GraduationCap className="h-5 w-5" />} title="No eligible Internal Instructors" description="Assign the user to Driver Training & Assessment before creating an instructor profile." /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1200px] text-left text-sm">
