@@ -197,7 +197,8 @@ test("department UI exposes operational workspaces through the streamlined overv
   const certificates = readFileSync("src/app/driver-training/certificates/page.tsx", "utf8");
   assert.match(dashboard, /Active & upcoming sessions/);
   assert.match(dashboard, />\s*Create\s*</);
-  assert.doesNotMatch(dashboard, /DRIVER_TRAINING_SERVICES\.map/);
+  assert.doesNotMatch(dashboard, /Service portfolio/);
+  assert.doesNotMatch(dashboard, /Training & assessment services/);
   assert.match(navigation, /label="Operations"/);
   assert.match(navigation, /label="Assessments"/);
   assert.match(sessions, /Schedule a training session/);
