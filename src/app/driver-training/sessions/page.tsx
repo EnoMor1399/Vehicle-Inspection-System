@@ -25,7 +25,7 @@ function statusTone(status: string): "slate" | "emerald" | "amber" | "red" | "bl
 
 export default async function TrainingSessionsPage() {
   const user = await requireInternalUser();
-  if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
+  if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to this module.</div>;
   const canManage = canManageTraining(user);
 
   const [sessions, stationOptions, transporterOptions, instructorOptions] = await Promise.all([
@@ -64,21 +64,18 @@ export default async function TrainingSessionsPage() {
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Training Sessions"
-        description="Schedule, monitor, and close Driver Training & Assessment programmes without mixing them into vehicle-inspection workflows."
-        action={<Link href="/driver-training" className="text-sm font-semibold text-[var(--brand-accent)] hover:opacity-75">Department overview →</Link>}
+        description="Schedule and manage training programmes."
+        action={<Link href="/driver-training" className="text-sm font-semibold text-[var(--brand-accent)] hover:opacity-75">Overview</Link>}
       />
 
       {canManage && (
         <Card className="mb-6 overflow-hidden">
           <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                <Plus className="h-5 w-5" />
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <Plus className="h-4 w-4" />
               </div>
-              <div>
-                <h2 className="font-semibold text-[var(--vims-ink)]">Schedule a training session</h2>
-                <p className="text-sm text-[var(--vims-ink-muted)]">Create a controlled programme record for one of the six approved service lines.</p>
-              </div>
+              <h2 className="font-semibold text-[var(--vims-ink)]">Schedule session</h2>
             </div>
           </div>
           <form action={createTrainingSession} className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
@@ -117,7 +114,7 @@ export default async function TrainingSessionsPage() {
             <Field label="Capacity" required>
               <TextInput name="capacity" type="number" min={1} max={500} defaultValue={20} required />
             </Field>
-            <Field label="Inspection station / facility">
+            <Field label="Station / facility">
               <Select name="locationId" defaultValue="">
                 <option value="">No linked station</option>
                 {stationOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -132,16 +129,16 @@ export default async function TrainingSessionsPage() {
                 {instructorOptions.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.role.replaceAll("_", " ")}</option>)}
               </Select>
             </Field>
-            <Field label="Instructor / facilitator name">
+            <Field label="Instructor / facilitator">
               <TextInput name="instructorName" maxLength={200} placeholder="External or display name" />
             </Field>
             <div className="sm:col-span-2 xl:col-span-4">
               <Field label="Notes">
-                <TextArea name="notes" maxLength={4000} className="min-h-[90px]" placeholder="Scope, equipment, route, client requirements, or safety notes" />
+                <TextArea name="notes" maxLength={4000} className="min-h-[72px]" placeholder="Programme or safety notes" />
               </Field>
             </div>
             <div className="sm:col-span-2 xl:col-span-4 flex justify-end">
-              <Button type="submit"><CalendarDays className="h-4 w-4" /> Schedule session</Button>
+              <Button type="submit"><CalendarDays className="h-4 w-4" /> Schedule</Button>
             </div>
           </form>
         </Card>
@@ -149,11 +146,11 @@ export default async function TrainingSessionsPage() {
 
       <Card className="overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-          <h2 className="font-semibold text-[var(--vims-ink)]">Programme register</h2>
-          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 100 sessions with live capacity and workflow status.</p>
+          <h2 className="font-semibold text-[var(--vims-ink)]">Session register</h2>
+          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest sessions and status.</p>
         </div>
         {sessions.length === 0 ? (
-          <div className="p-5 sm:p-6"><EmptyState icon={<CalendarDays className="h-5 w-5" />} title="No training sessions yet" description="Schedule the first programme to begin building the department’s operational record." /></div>
+          <div className="p-5 sm:p-6"><EmptyState icon={<CalendarDays className="h-5 w-5" />} title="No training sessions" description="Schedule a session to begin." /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1050px] text-left text-sm">
