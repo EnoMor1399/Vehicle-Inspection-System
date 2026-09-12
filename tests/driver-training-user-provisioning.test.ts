@@ -3,20 +3,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { canCreateDriverTrainingUsers } from "../src/lib/training-access";
 
-test("only Driver Training Super Administrators and Administrators can provision accounts", () => {
+test("only authorized Driver Training Super Administrators and Administrators can provision accounts", () => {
   assert.equal(canCreateDriverTrainingUsers({ role: "super_admin", permissions: { "*": true } }), true);
   assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true } }), true);
+  assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true, training_manage: false } }), false);
   assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: false } }), false);
   assert.equal(canCreateDriverTrainingUsers({ role: "operations_manager", permissions: { training: true } }), false);
   assert.equal(canCreateDriverTrainingUsers({ role: "inspector", permissions: { training: true } }), false);
 });
 
-test("Driver Training provisioning enforces scoped access and password security", () => {
+test("Driver Training provisioning enforces scoped access, uniqueness and password security", () => {
   const source = readFileSync("src/app/driver-training/users/actions.ts", "utf8");
   assert.match(source, /canCreateDriverTrainingUsers\(actor\)/);
   assert.match(source, /actor\.role !== "super_admin" && role === "admin"/);
   assert.match(source, /validatePasswordStrength\(password\)/);
   assert.match(source, /hashPassword\(password\)/);
+  assert.match(source, /lower\(\$\{users\.email\}\) = \$\{email\}/);
   assert.match(source, /\[VEHICLE_INSPECTION_ACCESS_KEY\]: false/);
   assert.match(source, /\[DRIVER_TRAINING_ACCESS_KEY\]: true/);
   assert.match(source, /training_assessment_review: TRAINING_REVIEW_ROLES\.has\(role\)/);
