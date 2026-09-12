@@ -36,18 +36,19 @@ test("Driver Training service catalog remains exactly the six approved services"
   );
 });
 
-test("Driver Training access separates view and manage privileges", () => {
-  assert.equal(canViewTraining({ role: "admin" }), true);
-  assert.equal(canManageTraining({ role: "admin" }), true);
-  assert.equal(canViewTraining({ role: "auditor" }), true);
-  assert.equal(canManageTraining({ role: "auditor" }), false);
-  assert.equal(canViewTraining({ role: "compliance_officer" }), true);
-  assert.equal(canManageTraining({ role: "compliance_officer" }), false);
+test("Driver Training access requires assignment and separates view from manage privileges", () => {
+  assert.equal(canViewTraining({ role: "admin", permissions: { training: true } }), true);
+  assert.equal(canManageTraining({ role: "admin", permissions: { training: true } }), true);
+  assert.equal(canViewTraining({ role: "auditor", permissions: { training: true } }), true);
+  assert.equal(canManageTraining({ role: "auditor", permissions: { training: true } }), false);
+  assert.equal(canViewTraining({ role: "compliance_officer", permissions: { training: true } }), true);
+  assert.equal(canManageTraining({ role: "compliance_officer", permissions: { training: true } }), false);
   assert.equal(canViewTraining({ role: "viewer" }), false);
   assert.equal(canManageTraining({ role: "viewer" }), false);
   assert.equal(canViewTraining({ role: "viewer", permissions: { training: true } }), true);
   assert.equal(canManageTraining({ role: "viewer", permissions: { training: true, training_manage: true } }), true);
   assert.equal(canViewTraining({ role: "admin", permissions: { training: false } }), false);
+  assert.equal(canManageTraining({ role: "admin", permissions: { training: false, training_manage: true } }), false);
 });
 
 test("session validation rejects unknown services and non-positive schedules", () => {
