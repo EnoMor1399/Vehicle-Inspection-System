@@ -39,15 +39,19 @@ export function validateDelegatedRoleChange(
 ): { ok: true } | { ok: false; message: string } {
   if (actorRole === "super_admin") return { ok: true };
 
-  const actorRank = ROLE_RANK[actorRole];
-  if (ROLE_RANK[targetRole] > actorRank) {
-    return { ok: false, message: "You cannot modify an account with a higher role than your own" };
-  }
-  if (ROLE_RANK[requestedRole] > actorRank) {
-    return { ok: false, message: "You cannot assign a role with higher privileges than your own" };
-  }
   if (targetRole === "super_admin" || requestedRole === "super_admin") {
     return { ok: false, message: "Only a Super Administrator can modify Super Administrator access" };
+  }
+  if (targetRole === "admin" || requestedRole === "admin") {
+    return { ok: false, message: "Only a Super Administrator can modify or assign Administrator access" };
+  }
+
+  const actorRank = ROLE_RANK[actorRole];
+  if (ROLE_RANK[targetRole] >= actorRank) {
+    return { ok: false, message: "You cannot modify an account with equal or higher privileges than your own" };
+  }
+  if (ROLE_RANK[requestedRole] >= actorRank) {
+    return { ok: false, message: "You cannot assign a role with privileges equal to or higher than your own" };
   }
 
   return { ok: true };
