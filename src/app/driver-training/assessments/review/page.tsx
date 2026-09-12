@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function DriverAssessmentReviewQueuePage() {
   const user = await requireInternalUser();
   if (!canViewTraining(user)) {
-    return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
+    return <div className="p-8 text-sm text-slate-600">You do not have access to this module.</div>;
   }
   const canReview = canReviewTrainingAssessments(user);
 
@@ -45,8 +45,8 @@ export default async function DriverAssessmentReviewQueuePage() {
   return (
     <div className="mx-auto max-w-[1450px] p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Assessment Review Queue"
-        description="Review completed driver assessments and approve or return the latest eligible record."
+        title="Assessment Review"
+        description="Review submitted assessments and record the final decision."
       />
 
       <Card className="mb-5 p-4 sm:p-5">
@@ -64,21 +64,21 @@ export default async function DriverAssessmentReviewQueuePage() {
             <div><p className="text-xs text-[var(--vims-ink-muted)]">Returned</p><p className="text-xl font-semibold text-[var(--vims-ink)]">{returned}</p></div>
           </div>
         </div>
-        {selfReviewBlocked > 0 && <p className="mt-4 border-t border-[var(--vims-line)] pt-3 text-xs text-[var(--vims-ink-muted)]">{selfReviewBlocked} pending assessment(s) were submitted by you and require another reviewer.</p>}
+        {selfReviewBlocked > 0 && <p className="mt-4 border-t border-[var(--vims-line)] pt-3 text-xs text-[var(--vims-ink-muted)]">{selfReviewBlocked} submission(s) require another reviewer.</p>}
       </Card>
 
       {!canReview && (
         <Card className="mb-5 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          View access only. An authorized supervisor or assessment reviewer is required to approve or return records.
+          Read-only access. Approval requires an authorized reviewer.
         </Card>
       )}
 
       <Card className="overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-          <h2 className="font-semibold text-[var(--vims-ink)]">Pending independent reviews</h2>
+          <h2 className="font-semibold text-[var(--vims-ink)]">Pending reviews</h2>
         </div>
         {pending.length === 0 ? (
-          <div className="p-5 sm:p-6"><EmptyState icon={<BadgeCheck className="h-5 w-5" />} title="No assessments awaiting review" description="New trainer assessments will appear here." /></div>
+          <div className="p-5 sm:p-6"><EmptyState icon={<BadgeCheck className="h-5 w-5" />} title="No pending reviews" description="Submitted assessments will appear here." /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-sm">

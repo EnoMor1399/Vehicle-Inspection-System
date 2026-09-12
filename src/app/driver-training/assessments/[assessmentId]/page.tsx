@@ -76,12 +76,12 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
       <div className="print:hidden">
         <PageHeader
           title="Driver Assessment Record"
-          description="Complete trainer evaluation, independent review status and auditable evidence for this driver assessment."
+          description="Assessment result, evidence and review status."
           action={
             <div className="flex flex-wrap gap-2">
               <PrintAssessmentButton />
               <Link href="/driver-training/assessments" className="inline-flex min-h-10 items-center rounded-xl px-3.5 py-2 text-sm font-semibold text-[var(--brand-color)] hover:bg-[var(--vims-panel-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)]">
-                Assessment workspace →
+                Assessments
               </Link>
             </div>
           }
@@ -92,7 +92,7 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
         <div className="border-b border-[var(--vims-line)] bg-[var(--vims-panel-soft)] px-5 py-5 sm:px-6 print:bg-white">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--brand-color)]">Driver Training & Assessment</p>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--brand-color)]">Driver Training Assessment</p>
               <h1 className="mt-1 text-2xl font-semibold text-[var(--vims-ink)]">{participant.fullName}</h1>
               <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">{session.referenceNumber} · {session.title}</p>
             </div>
@@ -112,23 +112,23 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
         </div>
 
         <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
-          <InfoBlock title="Driver details">
+          <InfoBlock title="Driver Details">
             <InfoRow label="Company" value={participant.companyName || "—"} />
             <InfoRow label="Employee number" value={participant.employeeNumber || "—"} />
             <InfoRow label="Licence" value={participant.driverLicenseNumber || "—"} />
             <InfoRow label="Licence class" value={participant.driverLicenseClass || "—"} />
             <InfoRow label="Licence expiry" value={participant.driverLicenseExpiry || "—"} />
           </InfoBlock>
-          <InfoBlock title="Assessment context">
+          <InfoBlock title="Assessment">
             <InfoRow label="Type" value={assessment.assessmentType.replaceAll("_", " ")} />
             <InfoRow label="Version" value={assessment.assessmentVersion} />
             <InfoRow label="Assessed" value={formatDateTime(assessment.assessedAt)} />
-            <InfoRow label="Trainer" value={assessor?.name || "Assessor record unavailable"} />
-            <InfoRow label="Driver acknowledged" value={assessment.driverAcknowledged ? "Yes" : "No"} />
+            <InfoRow label="Trainer" value={assessor?.name || "Assessor unavailable"} />
+            <InfoRow label="Acknowledged" value={assessment.driverAcknowledged ? "Yes" : "No"} />
           </InfoBlock>
-          <InfoBlock title="Independent review">
+          <InfoBlock title="Review">
             <InfoRow label="Status" value={assessment.reviewStatus.replaceAll("_", " ")} />
-            <InfoRow label="Reviewer" value={reviewer?.name || (assessment.reviewStatus === "pending_review" ? "Awaiting review" : "Reviewer record unavailable")} />
+            <InfoRow label="Reviewer" value={reviewer?.name || (assessment.reviewStatus === "pending_review" ? "Awaiting review" : "Reviewer unavailable")} />
             <InfoRow label="Reviewed" value={assessment.reviewedAt ? formatDateTime(assessment.reviewedAt) : "—"} />
             <InfoRow label="Certificate eligible" value={participant.certificateEligible ? "Yes" : "No"} />
             <InfoRow label="Participant status" value={participant.assessmentStatus.replaceAll("_", " ")} />
@@ -138,11 +138,11 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
 
       {criticalViolations.length > 0 && (
         <Card className="mt-5 border-red-200 bg-red-50/60 p-5 sm:p-6 print:bg-white">
-          <div className="flex items-center gap-2 text-red-800"><AlertTriangle className="h-5 w-5" /><h2 className="font-semibold">Critical safety violations</h2></div>
+          <div className="flex items-center gap-2 text-red-800"><AlertTriangle className="h-5 w-5" /><h2 className="font-semibold">Critical Violations</h2></div>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {criticalViolations.map((id) => <li key={id} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm text-red-900">{criticalViolationLabels.get(id) || id.replaceAll("_", " ")}</li>)}
           </ul>
-          {feedback.immediateCorrectiveAction && <p className="mt-4 text-sm text-red-900"><strong>Immediate corrective action:</strong> {feedback.immediateCorrectiveAction}</p>}
+          {feedback.immediateCorrectiveAction && <p className="mt-4 text-sm text-red-900"><strong>Immediate action:</strong> {feedback.immediateCorrectiveAction}</p>}
         </Card>
       )}
 
@@ -167,7 +167,7 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
                   </tbody>
                 </table>
               </div>
-              {note && <div className="border-t border-[var(--vims-line)] bg-[var(--vims-panel-soft)] px-5 py-3 text-sm text-[var(--vims-ink-soft)] sm:px-6"><strong>Trainer observation:</strong> {note}</div>}
+              {note && <div className="border-t border-[var(--vims-line)] bg-[var(--vims-panel-soft)] px-5 py-3 text-sm text-[var(--vims-ink-soft)] sm:px-6"><strong>Observation:</strong> {note}</div>}
             </Card>
           );
         })}
@@ -175,42 +175,42 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Card className="p-5 sm:p-6">
-          <h2 className="font-semibold text-[var(--vims-ink)]">Qualitative trainer feedback</h2>
+          <h2 className="font-semibold text-[var(--vims-ink)]">Trainer Feedback</h2>
           <FeedbackBlock label="Strengths" value={assessment.strengths} />
-          <FeedbackBlock label="Areas requiring improvement" value={improvementAreas.length ? improvementAreas.join("; ") : null} />
-          <FeedbackBlock label="Safety observations" value={feedback.safetyObservations} />
-          <FeedbackBlock label="Vehicle handling observations" value={feedback.vehicleHandlingObservations} />
-          <FeedbackBlock label="Communication & professional behaviour" value={feedback.communicationObservations} />
-          <FeedbackBlock label="Trainer comments" value={feedback.trainerComments} />
-          <FeedbackBlock label="Additional remarks" value={assessment.remarks} />
+          <FeedbackBlock label="Improvement Areas" value={improvementAreas.length ? improvementAreas.join("; ") : null} />
+          <FeedbackBlock label="Safety" value={feedback.safetyObservations} />
+          <FeedbackBlock label="Vehicle Handling" value={feedback.vehicleHandlingObservations} />
+          <FeedbackBlock label="Professional Conduct" value={feedback.communicationObservations} />
+          <FeedbackBlock label="Trainer Comments" value={feedback.trainerComments} />
+          <FeedbackBlock label="Remarks" value={assessment.remarks} />
         </Card>
 
         <Card className="p-5 sm:p-6">
-          <h2 className="font-semibold text-[var(--vims-ink)]">Development & acknowledgement</h2>
+          <h2 className="font-semibold text-[var(--vims-ink)]">Development & Acknowledgement</h2>
           {developmentPlan.length ? (
             <div className="mt-4 space-y-3">{developmentPlan.map((item, index) => <div key={`${item.area}-${index}`} className="rounded-xl border border-[var(--vims-line)] p-3"><p className="text-sm font-semibold text-[var(--vims-ink)]">{item.area}</p><p className="mt-1 text-sm text-[var(--vims-ink-soft)]">{item.action}</p>{item.targetDate && <p className="mt-1 text-xs text-[var(--vims-ink-muted)]">Target: {item.targetDate}</p>}</div>)}</div>
           ) : <p className="mt-3 text-sm text-[var(--vims-ink-muted)]">No development actions recorded.</p>}
-          <div className="mt-5 rounded-xl bg-[var(--vims-panel-soft)] p-4"><p className="text-sm font-semibold text-[var(--vims-ink)]">Driver acknowledgement: {assessment.driverAcknowledged ? "Received" : "Not recorded"}</p><p className="mt-2 text-sm text-[var(--vims-ink-soft)]">{assessment.driverComments || "No driver comments recorded."}</p></div>
+          <div className="mt-5 rounded-xl bg-[var(--vims-panel-soft)] p-4"><p className="text-sm font-semibold text-[var(--vims-ink)]">Acknowledgement: {assessment.driverAcknowledged ? "Received" : "Not recorded"}</p><p className="mt-2 text-sm text-[var(--vims-ink-soft)]">{assessment.driverComments || "No driver comments."}</p></div>
         </Card>
       </div>
 
       <Card className="mt-5 p-5 sm:p-6">
-        <div className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-[var(--brand-color)]" /><h2 className="font-semibold text-[var(--vims-ink)]">Review decision</h2></div>
+        <div className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-[var(--brand-color)]" /><h2 className="font-semibold text-[var(--vims-ink)]">Review Decision</h2></div>
         {assessment.reviewStatus !== "pending_review" ? (
-          <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4"><div className="flex flex-wrap items-center gap-2"><Badge tone={reviewTone(assessment.reviewStatus)}>{assessment.reviewStatus.replaceAll("_", " ")}</Badge>{reviewer && <span className="text-sm text-[var(--vims-ink-soft)]">by {reviewer.name}</span>}</div><p className="mt-2 text-sm text-[var(--vims-ink-soft)]">{assessment.reviewComments || "No review comments recorded."}</p></div>
+          <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4"><div className="flex flex-wrap items-center gap-2"><Badge tone={reviewTone(assessment.reviewStatus)}>{assessment.reviewStatus.replaceAll("_", " ")}</Badge>{reviewer && <span className="text-sm text-[var(--vims-ink-soft)]">by {reviewer.name}</span>}</div><p className="mt-2 text-sm text-[var(--vims-ink-soft)]">{assessment.reviewComments || "No review comments."}</p></div>
         ) : canActOnReview ? (
           <form action={reviewDriverAssessment} className="mt-4 print:hidden">
             <input type="hidden" name="assessmentId" value={assessment.id} />
-            <label className="block"><span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">Supervisor review comments</span><TextArea name="reviewComments" maxLength={4000} className="min-h-[110px]" placeholder="Record approval observations, or explain required corrections when returning the assessment." /></label>
+            <label className="block"><span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">Review comments</span><TextArea name="reviewComments" maxLength={4000} className="min-h-[110px]" placeholder="Enter approval notes or required corrections." /></label>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button type="submit" name="decision" value="returned" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><AlertTriangle className="h-4 w-4" /> Return for correction</button>
-              <button type="submit" name="decision" value="approved" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2"><ShieldCheck className="h-4 w-4" /> Approve assessment</button>
+              <button type="submit" name="decision" value="returned" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><AlertTriangle className="h-4 w-4" /> Return for Correction</button>
+              <button type="submit" name="decision" value="approved" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2"><ShieldCheck className="h-4 w-4" /> Approve Assessment</button>
             </div>
           </form>
         ) : assessment.assessorId === user.id ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><UserCheck className="mr-2 inline h-4 w-4" />Independent review is required. The assessor cannot review their own assessment.</div>
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><UserCheck className="mr-2 inline h-4 w-4" />Independent review required. Assessors cannot review their own assessment.</div>
         ) : (
-          <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4 text-sm text-[var(--vims-ink-muted)]"><ClipboardCheck className="mr-2 inline h-4 w-4" />This assessment is awaiting an authorized supervisor or assessment reviewer.</div>
+          <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4 text-sm text-[var(--vims-ink-muted)]"><ClipboardCheck className="mr-2 inline h-4 w-4" />Awaiting authorized review.</div>
         )}
       </Card>
     </div>

@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { Award, BadgeCheck, ExternalLink, ShieldCheck, ShieldX } from "lucide-react";
+import { Award, BadgeCheck, ExternalLink, ShieldX } from "lucide-react";
 import { db } from "@/db";
 import { trainingCertificates, trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, TextInput } from "@/components/ui";
@@ -9,6 +8,7 @@ import { requireInternalUser } from "@/lib/require-auth";
 import { canManageTraining, canViewTraining } from "@/lib/training-access";
 import { effectiveTrainingCertificateStatus } from "@/lib/training-policy";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import Link from "next/link";
 import { issueAssuredTrainingCertificate, revokeTrainingCertificate } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ const serviceNames = new Map(DRIVER_TRAINING_SERVICES.map((service) => [service.
 
 export default async function TrainingCertificatesPage() {
   const user = await requireInternalUser();
-  if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
+  if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to this module.</div>;
   const canManage = canManageTraining(user);
   const now = new Date();
 
@@ -60,21 +60,15 @@ export default async function TrainingCertificatesPage() {
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Training Certificates"
-        description="Issue, verify, monitor, and revoke controlled competence certificates after successful Driver Training & Assessment outcomes."
-        action={
-          <div className="flex flex-wrap gap-3 text-sm font-semibold">
-            <Link href="/driver-training/participants" className="text-[var(--brand-accent)] hover:opacity-75">Participants & assessments →</Link>
-            <Link href="/driver-training/analytics" className="text-[var(--brand-accent)] hover:opacity-75">Analytics →</Link>
-          </div>
-        }
+        description="Issue and manage verified competency certificates."
       />
 
       {canManage && (
         <Card className="mb-6 overflow-hidden">
           <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><Award className="h-5 w-5" /></div>
-              <div><h2 className="font-semibold text-[var(--vims-ink)]">Issue certificate</h2><p className="text-sm text-[var(--vims-ink-muted)]">Requires a completed session and current passing assessment; renewals normalize expired records and revoked certificates require reassessment.</p></div>
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><Award className="h-4 w-4" /></div>
+              <div><h2 className="font-semibold text-[var(--vims-ink)]">Issue certificate</h2><p className="text-sm text-[var(--vims-ink-muted)]">Available to eligible participants only.</p></div>
             </div>
           </div>
           <form action={issueAssuredTrainingCertificate} className="grid gap-4 p-5 sm:grid-cols-[1fr_220px_auto] sm:items-end sm:p-6">
@@ -87,20 +81,18 @@ export default async function TrainingCertificatesPage() {
             <Field label="Validity (months)" required hint="Use 0 for no expiry.">
               <TextInput name="validityMonths" type="number" min={0} max={60} defaultValue={12} required />
             </Field>
-            <Button type="submit" className="sm:mb-0"><BadgeCheck className="h-4 w-4" /> Issue certificate</Button>
+            <Button type="submit" className="sm:mb-0"><BadgeCheck className="h-4 w-4" /> Issue</Button>
           </form>
         </Card>
       )}
 
       <Card className="overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div><h2 className="font-semibold text-[var(--vims-ink)]">Certificate register</h2><p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 300 certificates with effective validity, public verification, and controlled revocation.</p></div>
-            <ShieldCheck className="h-5 w-5 text-emerald-600" />
-          </div>
+          <h2 className="font-semibold text-[var(--vims-ink)]">Certificate register</h2>
+          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Status, validity and verification.</p>
         </div>
         {certificates.length === 0 ? (
-          <div className="p-5 sm:p-6"><EmptyState icon={<Award className="h-5 w-5" />} title="No training certificates issued" description="Complete an assessment with a passing or competent result before issuing a certificate." /></div>
+          <div className="p-5 sm:p-6"><EmptyState icon={<Award className="h-5 w-5" />} title="No certificates issued" description="Issued certificates will appear here." /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1250px] text-left text-sm">

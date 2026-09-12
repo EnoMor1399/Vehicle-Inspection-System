@@ -36,7 +36,7 @@ export default async function DriverTrainingPage() {
             <div>
               <h1 className="text-lg font-semibold text-[var(--vims-ink)]">Driver Training access required</h1>
               <p className="mt-1.5 text-sm leading-6 text-[var(--vims-ink-muted)]">
-                Your account does not currently have permission to view Driver Training & Assessment Services.
+                You do not have permission to access this module.
               </p>
             </div>
           </div>
@@ -102,12 +102,12 @@ export default async function DriverTrainingPage() {
     <div className="mx-auto max-w-[1450px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={DRIVER_TRAINING_DEPARTMENT.name}
-        description="Manage training delivery, driver assessment, participant risk and certification from one workspace."
+        description="Training, assessment and certification operations."
         action={
           canManage ? (
             <details className="group relative">
               <summary className="inline-flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
-                Create
+                Create record
                 <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
               </summary>
               <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] p-1.5 shadow-xl">
@@ -129,7 +129,7 @@ export default async function DriverTrainingPage() {
       {hasDataIssue && (
         <div role="status" className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <p className="text-sm leading-5">Some live metrics are temporarily unavailable. Available workspaces remain usable.</p>
+          <p className="text-sm leading-5">Some metrics are temporarily unavailable.</p>
         </div>
       )}
 
@@ -137,21 +137,21 @@ export default async function DriverTrainingPage() {
         <StatCard
           label="Training sessions"
           value={sessionStats ? Number(sessionStats.total || 0) : "—"}
-          hint={sessionStats ? `${Number(sessionStats.active || 0)} active or upcoming` : "Temporarily unavailable"}
+          hint={sessionStats ? `${Number(sessionStats.active || 0)} active or upcoming` : "Unavailable"}
           tone="blue"
           icon={<GraduationCap className="h-5 w-5" />}
         />
         <StatCard
           label="Participants"
           value={participantStats ? Number(participantStats.total || 0) : "—"}
-          hint={participantStats ? `${Number(participantStats.highRisk || 0)} high or critical risk` : "Temporarily unavailable"}
+          hint={participantStats ? `${Number(participantStats.highRisk || 0)} high or critical risk` : "Unavailable"}
           tone="violet"
           icon={<UsersRound className="h-5 w-5" />}
         />
         <StatCard
           label="Active certificates"
           value={certificateStats ? Number(certificateStats.active || 0) : "—"}
-          hint={certificateStats ? "Current competence records" : "Temporarily unavailable"}
+          hint={certificateStats ? "Valid competence records" : "Unavailable"}
           tone="emerald"
           icon={<Award className="h-5 w-5" />}
         />
@@ -160,18 +160,18 @@ export default async function DriverTrainingPage() {
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-4 border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
           <div>
-            <h2 className="font-semibold text-[var(--vims-ink)]">Active & upcoming sessions</h2>
-            <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Next scheduled or in-progress programmes.</p>
+            <h2 className="font-semibold text-[var(--vims-ink)]">Current sessions</h2>
+            <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Scheduled and in-progress programmes.</p>
           </div>
           <Link href="/driver-training/sessions" className="shrink-0 text-sm font-semibold text-[var(--brand-color)] hover:opacity-75">
-            View sessions →
+            View all →
           </Link>
         </div>
 
         {scheduleResult.status === "rejected" ? (
-          <div className="p-6 text-sm text-[var(--vims-ink-muted)]">The live programme schedule is temporarily unavailable.</div>
+          <div className="p-6 text-sm text-[var(--vims-ink-muted)]">Schedule unavailable.</div>
         ) : upcomingSessions.length === 0 ? (
-          <div className="p-6 text-sm text-[var(--vims-ink-muted)]">No scheduled or in-progress training sessions.</div>
+          <div className="p-6 text-sm text-[var(--vims-ink-muted)]">No active or upcoming sessions.</div>
         ) : (
           <div className="divide-y divide-[var(--vims-line)]">
             {upcomingSessions.map((session) => (

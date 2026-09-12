@@ -53,24 +53,21 @@ export default async function TrainingRequestsPage() {
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Training Requests & Delivery Planning"
-        description="Capture client and internal training demand, control review and approval, and convert approved requests into scheduled Driver Training sessions with a traceable request-to-delivery history."
+        title="Training Requests"
+        description="Manage training demand, approval and scheduling."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Awaiting review" value={awaitingReview} hint="Submitted or under review" tone="amber" icon={<Clock3 className="h-5 w-5" />} />
-        <StatCard label="Approved" value={approvedAwaitingSchedule} hint="Ready for session scheduling" tone="emerald" icon={<ShieldCheck className="h-5 w-5" />} />
-        <StatCard label="Scheduled" value={scheduled} hint="Converted to delivery sessions" tone="blue" icon={<CalendarCheck2 className="h-5 w-5" />} />
-        <StatCard label="Urgent open" value={urgentOpen} hint="Priority demand needing action" tone={urgentOpen > 0 ? "red" : "slate"} icon={<FileCheck2 className="h-5 w-5" />} />
+        <StatCard label="Awaiting review" value={awaitingReview} hint="Submitted / review" tone="amber" icon={<Clock3 className="h-5 w-5" />} />
+        <StatCard label="Approved" value={approvedAwaitingSchedule} hint="Awaiting schedule" tone="emerald" icon={<ShieldCheck className="h-5 w-5" />} />
+        <StatCard label="Scheduled" value={scheduled} hint="Sessions created" tone="blue" icon={<CalendarCheck2 className="h-5 w-5" />} />
+        <StatCard label="Urgent" value={urgentOpen} hint="Requires action" tone={urgentOpen > 0 ? "red" : "slate"} icon={<FileCheck2 className="h-5 w-5" />} />
       </div>
 
       {canManage && (
         <Card className="mt-6 p-5 sm:p-6">
-          <div className="flex flex-col gap-1">
-            <h2 className="font-semibold text-[var(--vims-ink)]">Create training request</h2>
-            <p className="text-sm text-[var(--vims-ink-muted)]">Requests start as drafts so demand can be reviewed before approval and scheduling.</p>
-          </div>
-          <form action={createTrainingRequest} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <h2 className="font-semibold text-[var(--vims-ink)]">New Request</h2>
+          <form action={createTrainingRequest} className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Field label="Request type">
               <select name="requestType" defaultValue="client" className={selectClass}><option value="client">Client</option><option value="internal">Internal</option></select>
             </Field>
@@ -82,26 +79,25 @@ export default async function TrainingRequestsPage() {
             <Field label="Contact person"><Input name="contactName" maxLength={180} /></Field>
             <Field label="Contact email"><Input name="contactEmail" type="email" maxLength={200} /></Field>
             <Field label="Contact phone"><Input name="contactPhone" maxLength={50} /></Field>
-            <Field label="Requested participants"><Input name="requestedParticipants" type="number" min="1" max="5000" defaultValue="20" required /></Field>
+            <Field label="Participants"><Input name="requestedParticipants" type="number" min="1" max="5000" defaultValue="20" required /></Field>
             <Field label="Preferred start"><Input name="preferredStartDate" type="date" /></Field>
             <Field label="Preferred end"><Input name="preferredEndDate" type="date" /></Field>
             <Field label="Priority"><select name="priority" defaultValue="normal" className={selectClass}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></Field>
             <Field label="Delivery mode"><select name="deliveryMode" defaultValue="onsite" className={selectClass}><option value="onsite">Onsite</option><option value="classroom">Classroom</option><option value="practical">Practical</option><option value="hybrid">Hybrid</option></select></Field>
-            <Field label="Preferred station"><select name="locationId" className={selectClass}><option value="">Not specified</option>{trainingLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></Field>
-            <Field label="Preferred venue" className="md:col-span-2"><Input name="venue" maxLength={300} /></Field>
-            <Field label="Business / operational need" className="md:col-span-2"><TextArea name="businessNeed" maxLength={4000} className="min-h-[100px]" /></Field>
-            <Field label="Additional notes" className="md:col-span-2"><TextArea name="notes" maxLength={4000} className="min-h-[100px]" /></Field>
-            <div className="md:col-span-2 xl:col-span-4 flex justify-end"><Button type="submit"><ClipboardPlus className="h-4 w-4" /> Create draft request</Button></div>
+            <Field label="Station"><select name="locationId" className={selectClass}><option value="">Not specified</option>{trainingLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></Field>
+            <Field label="Venue" className="md:col-span-2"><Input name="venue" maxLength={300} /></Field>
+            <Field label="Operational requirement" className="md:col-span-2"><TextArea name="businessNeed" maxLength={4000} className="min-h-[90px]" /></Field>
+            <Field label="Notes" className="md:col-span-2"><TextArea name="notes" maxLength={4000} className="min-h-[90px]" /></Field>
+            <div className="md:col-span-2 xl:col-span-4 flex justify-end"><Button type="submit"><ClipboardPlus className="h-4 w-4" /> Create Draft</Button></div>
           </form>
         </Card>
       )}
 
       <Card className="mt-6 overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-          <h2 className="font-semibold text-[var(--vims-ink)]">Request pipeline</h2>
-          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Approval and scheduling remain separate controls. Scheduling creates exactly one Driver Training session from an approved request.</p>
+          <h2 className="font-semibold text-[var(--vims-ink)]">Request Register</h2>
         </div>
-        {requests.length === 0 ? <div className="p-5"><EmptyState title="No training requests" description="Create the first training request to begin controlled demand planning." /></div> : (
+        {requests.length === 0 ? <div className="p-5"><EmptyState title="No requests recorded" description="Create a request to begin." /></div> : (
           <div className="divide-y divide-[var(--vims-line)]">
             {requests.map((request) => {
               const requestEvents = eventByRequest.get(request.id) || [];
@@ -126,8 +122,8 @@ export default async function TrainingRequestsPage() {
                       </div>
                       {(request.contactName || request.contactEmail || request.contactPhone) && <p className="mt-2 text-xs text-[var(--vims-ink-muted)]">Contact: {[request.contactName, request.contactEmail, request.contactPhone].filter(Boolean).join(" · ")}</p>}
                       {request.businessNeed && <p className="mt-3 max-w-4xl text-sm text-[var(--vims-ink-soft)]">{request.businessNeed}</p>}
-                      {request.reviewNotes && <div className="mt-3 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-3 text-sm text-[var(--vims-ink-soft)]"><strong className="text-[var(--vims-ink)]">Review note:</strong> {request.reviewNotes}</div>}
-                      {request.status === "scheduled" && request.scheduledSessionId && <p className="mt-3 text-sm font-medium text-[var(--vims-ink)]">Scheduled session: <Link href="/driver-training/sessions" className="underline underline-offset-4">{scheduledReference || request.scheduledSessionId}</Link></p>}
+                      {request.reviewNotes && <div className="mt-3 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-3 text-sm text-[var(--vims-ink-soft)]"><strong className="text-[var(--vims-ink)]">Review:</strong> {request.reviewNotes}</div>}
+                      {request.status === "scheduled" && request.scheduledSessionId && <p className="mt-3 text-sm font-medium text-[var(--vims-ink)]">Session: <Link href="/driver-training/sessions" className="underline underline-offset-4">{scheduledReference || request.scheduledSessionId}</Link></p>}
                     </div>
 
                     {canManage && <div className="w-full max-w-xl space-y-3 xl:w-[430px]">
@@ -135,25 +131,25 @@ export default async function TrainingRequestsPage() {
                       {request.status === "approved" && (
                         <form action={scheduleApprovedTrainingRequest} className="rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4">
                           <input type="hidden" name="requestId" value={request.id} />
-                          <p className="text-sm font-semibold text-[var(--vims-ink)]">Schedule approved request</p>
+                          <p className="text-sm font-semibold text-[var(--vims-ink)]">Schedule Request</p>
                           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                            <Field label="Start date/time"><Input name="startAt" type="datetime-local" required /></Field>
-                            <Field label="End date/time"><Input name="endAt" type="datetime-local" required /></Field>
+                            <Field label="Start"><Input name="startAt" type="datetime-local" required /></Field>
+                            <Field label="End"><Input name="endAt" type="datetime-local" required /></Field>
                             <Field label="Capacity"><Input name="capacity" type="number" min={request.requestedParticipants} max="5000" defaultValue={request.requestedParticipants} required /></Field>
                             <Field label="Instructor"><select name="instructorId" className={selectClass}><option value="">Unassigned</option>{internalUsers.map((member) => <option key={member.id} value={member.id}>{member.name} · {member.role.replaceAll("_", " ")}</option>)}</select></Field>
-                            <Field label="Instructor display name"><Input name="instructorName" maxLength={200} /></Field>
+                            <Field label="Instructor name"><Input name="instructorName" maxLength={200} /></Field>
                             <Field label="Station"><select name="locationId" defaultValue={request.locationId || ""} className={selectClass}><option value="">Not specified</option>{trainingLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></Field>
                             <Field label="Venue" className="sm:col-span-2"><Input name="venue" maxLength={300} defaultValue={request.venue || ""} /></Field>
-                            <Field label="Scheduling notes" className="sm:col-span-2"><TextArea name="notes" maxLength={4000} className="min-h-[70px]" /></Field>
+                            <Field label="Notes" className="sm:col-span-2"><TextArea name="notes" maxLength={4000} className="min-h-[70px]" /></Field>
                           </div>
-                          <div className="mt-3 flex justify-end"><Button type="submit"><CalendarCheck2 className="h-4 w-4" /> Create session</Button></div>
+                          <div className="mt-3 flex justify-end"><Button type="submit"><CalendarCheck2 className="h-4 w-4" /> Create Session</Button></div>
                         </form>
                       )}
                     </div>}
                   </div>
 
                   <div className="mt-5 border-t border-[var(--vims-line)] pt-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--vims-ink-muted)]">Request history</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--vims-ink-muted)]">History</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {requestEvents.slice(0, 8).map((event) => <span key={event.id} className="rounded-full border border-[var(--vims-line)] px-2.5 py-1 text-xs text-[var(--vims-ink-muted)]">{event.eventType.replaceAll("_", " ")} · {formatDateTime(event.createdAt)}</span>)}
                     </div>
@@ -171,7 +167,7 @@ export default async function TrainingRequestsPage() {
 function TransitionControls({ requestId, status }: { requestId: string; status: string }) {
   const actions: Array<{ status: string; label: string; tone?: "primary" | "secondary" | "danger" }> = [];
   if (canTransitionTrainingRequest(status, "submitted")) actions.push({ status: "submitted", label: "Submit", tone: "primary" });
-  if (canTransitionTrainingRequest(status, "under_review")) actions.push({ status: "under_review", label: "Start review", tone: "secondary" });
+  if (canTransitionTrainingRequest(status, "under_review")) actions.push({ status: "under_review", label: "Review", tone: "secondary" });
   if (canTransitionTrainingRequest(status, "approved")) actions.push({ status: "approved", label: "Approve", tone: "primary" });
   if (canTransitionTrainingRequest(status, "cancelled")) actions.push({ status: "cancelled", label: "Cancel", tone: "secondary" });
 
@@ -189,7 +185,7 @@ function TransitionControls({ requestId, status }: { requestId: string; status: 
           <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="status" value="rejected" />
           <Field label="Rejection reason"><TextArea name="reviewNotes" required maxLength={4000} className="min-h-[70px]" /></Field>
-          <div className="mt-2 flex justify-end"><Button type="submit" size="sm" variant="secondary">Reject request</Button></div>
+          <div className="mt-2 flex justify-end"><Button type="submit" size="sm" variant="secondary">Reject</Button></div>
         </form>
       )}
     </div>
