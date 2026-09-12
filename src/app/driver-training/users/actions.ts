@@ -21,7 +21,7 @@ const TRAINING_ACCOUNT_ROLES = new Set([
   "admin",
   "operations_manager",
   "supervisor",
-  "inspector",
+  "instructor",
   "data_entry",
   "auditor",
   "compliance_officer",
@@ -32,7 +32,7 @@ const TRAINING_MANAGE_ROLES = new Set([
   "admin",
   "operations_manager",
   "supervisor",
-  "inspector",
+  "instructor",
   "data_entry",
 ]);
 
@@ -112,7 +112,7 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
 
   const passwordHash = await hashPassword(password);
   const accountId = newId();
-  const createInstructorProfile = role === "inspector";
+  const createInstructorProfile = role === "instructor";
   const permissions = permissionsForTrainingRole(role);
 
   let result: {
@@ -149,7 +149,7 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
           name,
           email,
           phone: phone || null,
-          role,
+          role: role as (typeof users.$inferInsert)["role"],
           passwordHash,
           permissions,
           isActive: true,
