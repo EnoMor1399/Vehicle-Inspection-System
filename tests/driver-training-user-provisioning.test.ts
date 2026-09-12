@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { canCreateDriverTrainingUsers } from "../src/lib/training-access";
+import { canCreateDriverTrainingUsers, canManageTrainingUsers } from "../src/lib/training-access";
 
 test("only authorized Driver Training Super Administrators and Administrators can provision accounts", () => {
   assert.equal(canCreateDriverTrainingUsers({ role: "super_admin", permissions: { "*": true } }), true);
@@ -9,7 +9,13 @@ test("only authorized Driver Training Super Administrators and Administrators ca
   assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true, training_manage: false } }), false);
   assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: false } }), false);
   assert.equal(canCreateDriverTrainingUsers({ role: "operations_manager", permissions: { training: true } }), false);
-  assert.equal(canCreateDriverTrainingUsers({ role: "inspector", permissions: { training: true } }), false);
+  assert.equal(canCreateDriverTrainingUsers({ role: "instructor", permissions: { training: true, training_manage: true } }), false);
+});
+
+test("Instructor Accounts cannot administer Driver Training users", () => {
+  assert.equal(canManageTrainingUsers({ role: "instructor", permissions: { training: true, training_manage: true } }), false);
+  assert.equal(canManageTrainingUsers({ role: "admin", permissions: { training: true } }), true);
+  assert.equal(canManageTrainingUsers({ role: "operations_manager", permissions: { training: true } }), true);
 });
 
 test("Driver Training provisioning enforces scoped access, uniqueness and password security", () => {
@@ -28,21 +34,23 @@ test("Driver Training provisioning enforces scoped access, uniqueness and passwo
 test("Instructor account provisioning creates the linked Internal Instructor profile atomically", () => {
   const source = readFileSync("src/app/driver-training/users/actions.ts", "utf8");
   assert.match(source, /db\.transaction/);
-  assert.match(source, /const createInstructorProfile = role === "inspector"/);
+  assert.match(source, /const createInstructorProfile = role === "instructor"/);
   assert.match(source, /insert\(trainingInstructorProfiles\)/);
   assert.match(source, /instructorCode = `DTI-/);
   assert.match(source, /status: "active"/);
   assert.match(source, /revalidatePath\("\/driver-training\/instructors"\)/);
 });
 
-test("Driver Training user administration exposes formal account creation controls", () => {
+test("Driver Training user administration exposes Instructor Account controls", () => {
   const source = readFileSync("src/app/driver-training/users/page.tsx", "utf8");
   assert.match(source, /canCreateDriverTrainingUsers\(user\)/);
+  assert.match(source, /canManageTrainingUsers\(user\)/);
   assert.match(source, /Create Driver Training account/);
   assert.match(source, /Training Administrator/);
-  assert.match(source, /Instructor \/ Assessor/);
+  assert.match(source, /Instructor Account/);
   assert.match(source, /Training Supervisor \/ Reviewer/);
   assert.match(source, /Read-only Training User/);
+  assert.match(source, /defaultValue="instructor"/);
   assert.match(source, /user\.role === "super_admin" && <option value="admin">/);
   assert.match(source, /form action=\{createDriverTrainingUser\}/);
 });
@@ -56,4 +64,11 @@ test("Driver Training account validation errors stay inside the form instead of 
   assert.match(pageSource, /Account not created\./);
   assert.match(pageSource, /pattern="\\S\*"/);
   assert.match(pageSource, /Spaces are not allowed\./);
+});
+
+test("instructor role migration is registered with the enterprise upgrade", () => {
+  const migration = readFileSync("migrations/20260912_driver_training_instructor_role.sql", "utf8");
+  const apply = readFileSync("scripts/apply-enterprise-upgrade.mjs", "utf8");
+  assert.match(migration, /ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'instructor'/);
+  assert.match(apply, /20260912_driver_training_instructor_role\.sql/);
 });
