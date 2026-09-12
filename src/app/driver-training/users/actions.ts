@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
@@ -99,7 +99,7 @@ export async function createDriverTrainingUser(formData: FormData) {
 
   const passwordValidation = validatePasswordStrength(password);
   if (!passwordValidation.valid) {
-    throw new Error(passwordValidation.errors[0] || "The temporary password does not meet the password policy");
+    throw new Error(passwordValidation.errors[0] || "The initial password does not meet the password policy");
   }
 
   const passwordHash = await hashPassword(password);
@@ -113,7 +113,7 @@ export async function createDriverTrainingUser(formData: FormData) {
     const [existing] = await tx
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, email))
+      .where(sql`lower(${users.email}) = ${email}`)
       .limit(1);
     if (existing) {
       throw new Error("An account with this email address already exists");
