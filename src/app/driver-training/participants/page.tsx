@@ -7,8 +7,7 @@ import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, TextArea, T
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
 import { canManageTraining, canViewTraining } from "@/lib/training-access";
-import { formatDateTime } from "@/lib/utils";
-import { addTrainingParticipant, recordTrainingAssessment, updateTrainingAttendance } from "../actions";
+import { addTrainingParticipant, updateTrainingAttendance } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +69,7 @@ export default async function TrainingParticipantsPage() {
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Participants & Assessments"
-        description="Register drivers and equipment operators, track attendance, capture proficiency outcomes, and identify high-risk operators requiring coaching or retraining."
+        description="Register drivers and equipment operators, track attendance, and send eligible participants through the structured trainer assessment workflow."
         action={<Link href="/driver-training/sessions" className="text-sm font-semibold text-[var(--brand-accent)] hover:opacity-75">Training sessions →</Link>}
       />
 
@@ -109,47 +108,21 @@ export default async function TrainingParticipantsPage() {
             <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100"><ClipboardCheck className="h-5 w-5" /></div>
-                <div><h2 className="font-semibold text-[var(--vims-ink)]">Record assessment</h2><p className="text-sm text-[var(--vims-ink-muted)]">Capture theory/practical results and safety risk level.</p></div>
+                <div><h2 className="font-semibold text-[var(--vims-ink)]">Comprehensive trainer assessment</h2><p className="text-sm text-[var(--vims-ink-muted)]">Use the controlled 124-criterion evaluation instead of a manual summary score.</p></div>
               </div>
             </div>
-            <form action={recordTrainingAssessment} className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-              <div className="sm:col-span-2">
-                <Field label="Participant" required>
-                  <Select name="participantId" required defaultValue="">
-                    <option value="" disabled>Select participant</option>
-                    {participants.filter((item) => item.attendanceStatus !== "withdrawn").map((item) => <option key={item.id} value={item.id}>{item.fullName} · {item.referenceNumber}</option>)}
-                  </Select>
-                </Field>
+            <div className="p-5 sm:p-6">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4"><p className="text-sm font-semibold text-[var(--vims-ink)]">Quantitative assessment</p><p className="mt-1 text-xs leading-5 text-[var(--vims-ink-muted)]">12 sections covering safe driving, regulations, handling, hazards, communication and emergency response.</p></div>
+                <div className="rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4"><p className="text-sm font-semibold text-[var(--vims-ink)]">Qualitative evidence</p><p className="mt-1 text-xs leading-5 text-[var(--vims-ink-muted)]">Trainer observations, critical violations, strengths, improvement areas and development actions.</p></div>
               </div>
-              <Field label="Assessment type" required>
-                <Select name="assessmentType" defaultValue="post_training" required>
-                  <option value="pre_training">Pre-training</option>
-                  <option value="post_training">Post-training</option>
-                  <option value="proficiency">Driving proficiency</option>
-                  <option value="practical">Practical</option>
-                  <option value="refresher">Refresher</option>
-                </Select>
-              </Field>
-              <Field label="Result" required>
-                <Select name="result" defaultValue="competent" required>
-                  <option value="competent">Competent</option>
-                  <option value="not_yet_competent">Not yet competent</option>
-                  <option value="pass">Pass</option>
-                  <option value="fail">Fail</option>
-                </Select>
-              </Field>
-              <Field label="Theory score (%)"><TextInput name="theoryScore" type="number" min={0} max={100} step="0.01" /></Field>
-              <Field label="Practical score (%)"><TextInput name="practicalScore" type="number" min={0} max={100} step="0.01" /></Field>
-              <Field label="Risk level">
-                <Select name="riskLevel" defaultValue="">
-                  <option value="">Not classified</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
-                </Select>
-              </Field>
-              <Field label="Strengths"><TextInput name="strengths" maxLength={4000} /></Field>
-              <div className="sm:col-span-2"><Field label="Improvement areas" hint="Separate items with commas or new lines."><TextArea name="improvementAreas" maxLength={4000} className="min-h-[75px]" /></Field></div>
-              <div className="sm:col-span-2"><Field label="Assessment remarks"><TextArea name="remarks" maxLength={4000} className="min-h-[75px]" /></Field></div>
-              <div className="sm:col-span-2 flex justify-end"><Button type="submit"><ClipboardCheck className="h-4 w-4" /> Save assessment</Button></div>
-            </form>
+              <p className="mt-4 text-sm leading-6 text-[var(--vims-ink-muted)]">Scores, risk level, competency result and certificate eligibility are calculated by the server to protect assessment integrity.</p>
+              <div className="mt-5 flex justify-end">
+                <Link href="/driver-training/assessments" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--vims-ink)] px-4 py-2 text-sm font-semibold text-[var(--vims-panel-solid)] shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2">
+                  <ClipboardCheck className="h-4 w-4" /> Open assessment workspace
+                </Link>
+              </div>
+            </div>
           </Card>
         </div>
       )}
@@ -157,15 +130,15 @@ export default async function TrainingParticipantsPage() {
       <Card className="overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
           <h2 className="font-semibold text-[var(--vims-ink)]">Participant register</h2>
-          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 200 registrations with attendance, assessment, risk, and certificate eligibility.</p>
+          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 200 registrations with attendance, assessment, risk, certificate eligibility and assessment actions.</p>
         </div>
         {participants.length === 0 ? (
           <div className="p-5 sm:p-6"><EmptyState icon={<UsersRound className="h-5 w-5" />} title="No participants registered" description="Register drivers or operators against a scheduled training session." /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-left text-sm">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead className="bg-[var(--vims-panel-soft)] text-xs uppercase tracking-wide text-[var(--vims-ink-muted)]">
-                <tr><th className="px-5 py-3 font-semibold">Participant</th><th className="px-5 py-3 font-semibold">Session</th><th className="px-5 py-3 font-semibold">Licence</th><th className="px-5 py-3 font-semibold">Attendance</th><th className="px-5 py-3 font-semibold">Assessment</th><th className="px-5 py-3 font-semibold">Risk</th><th className="px-5 py-3 font-semibold">Certificate</th>{canManage && <th className="px-5 py-3 font-semibold">Attendance action</th>}</tr>
+                <tr><th className="px-5 py-3 font-semibold">Participant</th><th className="px-5 py-3 font-semibold">Session</th><th className="px-5 py-3 font-semibold">Licence</th><th className="px-5 py-3 font-semibold">Attendance</th><th className="px-5 py-3 font-semibold">Assessment</th><th className="px-5 py-3 font-semibold">Risk</th><th className="px-5 py-3 font-semibold">Certificate</th>{canManage && <th className="px-5 py-3 font-semibold">Actions</th>}</tr>
               </thead>
               <tbody className="divide-y divide-[var(--vims-line)]">
                 {participants.map((item) => (
@@ -179,13 +152,20 @@ export default async function TrainingParticipantsPage() {
                     <td className="px-5 py-4"><Badge tone={item.certificateEligible ? "emerald" : "slate"}>{item.certificateEligible ? "Eligible" : "Not eligible"}</Badge></td>
                     {canManage && (
                       <td className="px-5 py-4">
-                        <form action={updateTrainingAttendance} className="flex items-center gap-2">
-                          <input type="hidden" name="participantId" value={item.id} />
-                          <Select name="status" defaultValue={item.attendanceStatus} className="min-w-32 py-1.5 text-xs">
-                            <option value="registered">Registered</option><option value="attended">Attended</option><option value="absent">Absent</option><option value="withdrawn">Withdrawn</option>
-                          </Select>
-                          <Button type="submit" size="sm" variant="secondary">Save</Button>
-                        </form>
+                        <div className="flex min-w-64 flex-col gap-2">
+                          <form action={updateTrainingAttendance} className="flex items-center gap-2">
+                            <input type="hidden" name="participantId" value={item.id} />
+                            <Select name="status" defaultValue={item.attendanceStatus} className="min-w-32 py-1.5 text-xs">
+                              <option value="registered">Registered</option><option value="attended">Attended</option><option value="absent">Absent</option><option value="withdrawn">Withdrawn</option>
+                            </Select>
+                            <Button type="submit" size="sm" variant="secondary">Save</Button>
+                          </form>
+                          {item.attendanceStatus !== "absent" && item.attendanceStatus !== "withdrawn" ? (
+                            <Link href="/driver-training/assessments" className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-[var(--vims-line-strong)] bg-[var(--vims-panel-solid)] px-3 py-2 text-xs font-semibold text-[var(--vims-ink)] shadow-sm hover:bg-[var(--vims-panel-soft)]">
+                              <ClipboardCheck className="h-4 w-4" /> Assess driver
+                            </Link>
+                          ) : null}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -196,7 +176,7 @@ export default async function TrainingParticipantsPage() {
         )}
       </Card>
 
-      <p className="mt-4 text-xs text-[var(--vims-ink-muted)]">Participant records are operational safety records. Access is limited to authenticated internal users with Driver Training permissions.</p>
+      <p className="mt-4 text-xs text-[var(--vims-ink-muted)]">Participant and assessment records are operational safety records. Access is limited to authenticated internal users with Driver Training permissions.</p>
     </div>
   );
 }
