@@ -9,7 +9,7 @@ import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { hashPassword, validateEmail, validatePasswordStrength } from "@/lib/password";
-import { canCreateDriverTrainingUsers } from "@/lib/training-access";
+import { canCreateDriverTrainingUsers, trainingPermissionsForRole } from "@/lib/training-access";
 import {
   DRIVER_TRAINING_ACCESS_KEY,
   VEHICLE_INSPECTION_ACCESS_KEY,
@@ -26,20 +26,6 @@ const TRAINING_ACCOUNT_ROLES = new Set([
   "auditor",
   "compliance_officer",
   "viewer",
-]);
-
-const TRAINING_MANAGE_ROLES = new Set([
-  "admin",
-  "operations_manager",
-  "supervisor",
-  "instructor",
-  "data_entry",
-]);
-
-const TRAINING_REVIEW_ROLES = new Set([
-  "admin",
-  "operations_manager",
-  "supervisor",
 ]);
 
 const DUPLICATE_EMAIL_MESSAGE = "An account with this email address already exists";
@@ -66,8 +52,7 @@ function permissionsForTrainingRole(role: string): Record<string, boolean> {
   return {
     [VEHICLE_INSPECTION_ACCESS_KEY]: false,
     [DRIVER_TRAINING_ACCESS_KEY]: true,
-    training_manage: TRAINING_MANAGE_ROLES.has(role),
-    training_assessment_review: TRAINING_REVIEW_ROLES.has(role),
+    ...trainingPermissionsForRole(role),
   };
 }
 
