@@ -67,6 +67,19 @@ test("commercial migration enforces accepted-quote uniqueness and client schedul
   assert.match(migration, /q\.valid_until >= CURRENT_DATE/);
 });
 
+test("request scheduling handles commercial authorization before the workspace error boundary", () => {
+  const actions = readFileSync("src/app/driver-training/requests/actions.ts", "utf8");
+  const page = readFileSync("src/app/driver-training/requests/page.tsx", "utf8");
+  assert.match(actions, /trainingQuotations/);
+  assert.match(actions, /gte\(trainingQuotations\.validUntil, today\)/);
+  assert.match(actions, /COMMERCIAL_AUTHORIZATION_MESSAGE/);
+  assert.match(actions, /redirect\(commercialWorkspacePath/);
+  assert.match(actions, /isCommercialAuthorizationError/);
+  assert.match(page, /acceptedQuotationByRequest/);
+  assert.match(page, /Quotation required before scheduling/);
+  assert.match(page, /Open Training Commercials & Quotations/);
+});
+
 test("enterprise migration runner and verifier include commercial objects", () => {
   const runner = readFileSync("scripts/apply-enterprise-upgrade.mjs", "utf8");
   const verifier = readFileSync("scripts/verify-enterprise-upgrade.mjs", "utf8");
