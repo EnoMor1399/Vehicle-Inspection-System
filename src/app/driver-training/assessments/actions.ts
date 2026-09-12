@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { getCurrentUser } from "@/lib/auth";
@@ -14,12 +14,13 @@ import {
   DRIVER_ASSESSMENT_SECTIONS,
   DRIVER_ASSESSMENT_TOTAL_CRITERIA,
 } from "@/lib/driver-assessment-template";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTraining, canReviewTrainingAssessments } from "@/lib/training-access";
 import { isValidTrainingDate, TRAINING_ASSESSMENT_TYPES } from "@/lib/training-policy";
 import { newId } from "@/lib/utils";
 
 const VALID_ASSESSMENT_TYPES = new Set<string>(TRAINING_ASSESSMENT_TYPES);
 const VALID_CRITICAL_VIOLATIONS = new Set<string>(DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS.map((item) => item.id));
+const VALID_REVIEW_DECISIONS = new Set(["approved", "returned"]);
 
 function text(formData: FormData, name: string, max = 4000) {
   const value = formData.get(name);
@@ -54,6 +55,16 @@ function calculatePracticalPercentage(ratings: Record<string, number>) {
     }
   }
   return maximum > 0 ? Math.round((score / maximum) * 10_000) / 100 : null;
+}
+
+function refreshAssessmentPaths(assessmentId?: string) {
+  revalidatePath("/driver-training");
+  revalidatePath("/driver-training/assessments");
+  if (assessmentId) revalidatePath(`/driver-training/assessments/${assessmentId}`);
+  revalidatePath("/driver-training/participants");
+  revalidatePath("/driver-training/certificates");
+  revalidatePath("/driver-training/analytics");
+  revalidatePath("/driver-training/compliance");
 }
 
 export async function recordComprehensiveDriverAssessment(formData: FormData) {
@@ -126,12 +137,6 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status === "cancelled") return { ok: false as const, error: "Cancelled training sessions cannot be assessed" };
 
-    const certificateEligible = assessmentType !== "pre_training" && outcome.result === "competent" && criticalViolations.length === 0;
-    const participantAssessmentStatus = assessmentType === "pre_training"
-      ? "assessed"
-      : outcome.result === "competent"
-        ? "passed"
-        : "failed";
     const assessment = {
       id,
       participantId: participant.id,
@@ -159,6 +164,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       remarks: text(formData, "remarks") || null,
       driverAcknowledged,
       driverComments: driverComments || null,
+      reviewStatus: "pending_review",
     } as const;
 
     await tx.insert(trainingAssessments).values(assessment);
@@ -166,8 +172,8 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       .update(trainingParticipants)
       .set({
         attendanceStatus: participant.attendanceStatus === "registered" ? "attended" : participant.attendanceStatus,
-        assessmentStatus: participantAssessmentStatus,
-        certificateEligible,
+        assessmentStatus: "assessed",
+        certificateEligible: false,
         riskLevel: outcome.riskLevel,
         updatedAt: new Date(),
       })
@@ -185,7 +191,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     entityType: "training_assessment",
     entityId: id,
     entityLabel: result.participant.fullName,
-    summary: `Comprehensive driver assessment: ${outcome.result} at ${overallPercentage}%`,
+    summary: `Comprehensive driver assessment submitted for independent review: ${outcome.result} at ${overallPercentage}%`,
     after: {
       assessmentType,
       overallScore: overallPercentage,
@@ -194,14 +200,100 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       riskLevel: outcome.riskLevel,
       criticalViolations,
       finalRecommendation: outcome.finalRecommendation,
+      reviewStatus: "pending_review",
     },
   });
 
-  revalidatePath("/driver-training");
-  revalidatePath("/driver-training/assessments");
-  revalidatePath("/driver-training/participants");
-  revalidatePath("/driver-training/certificates");
-  revalidatePath("/driver-training/analytics");
-  revalidatePath("/driver-training/compliance");
-  redirect(`/driver-training/assessments?saved=1&participant=${participantId}`);
+  refreshAssessmentPaths(id);
+  redirect(`/driver-training/assessments/${id}`);
+}
+
+export async function reviewDriverAssessment(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!canReviewTrainingAssessments(user)) throw new Error("You do not have permission to review driver assessments");
+
+  const assessmentId = text(formData, "assessmentId", 36);
+  const decision = text(formData, "decision", 24);
+  const reviewComments = text(formData, "reviewComments", 4000);
+  if (!assessmentId) throw new Error("Assessment reference is required");
+  if (!VALID_REVIEW_DECISIONS.has(decision)) throw new Error("Select a valid assessment review decision");
+  if (decision === "returned" && reviewComments.length < 5) throw new Error("Explain what the trainer must correct before reassessment");
+
+  const result = await db.transaction(async (tx) => {
+    const [initial] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
+    if (!initial) return { ok: false as const, error: "Driver assessment not found" };
+
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${initial.participantId}))`);
+    const [assessment] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
+    if (!assessment) return { ok: false as const, error: "Driver assessment not found" };
+    if (assessment.reviewStatus !== "pending_review") return { ok: false as const, error: "This assessment has already been reviewed" };
+    if (assessment.assessorId && assessment.assessorId === user.id) return { ok: false as const, error: "Assessors cannot approve or return their own assessment" };
+
+    const [latestAssessment] = await tx
+      .select({ id: trainingAssessments.id })
+      .from(trainingAssessments)
+      .where(eq(trainingAssessments.participantId, assessment.participantId))
+      .orderBy(desc(trainingAssessments.assessedAt), desc(trainingAssessments.createdAt))
+      .limit(1);
+    if (!latestAssessment || latestAssessment.id !== assessment.id) {
+      return { ok: false as const, error: "A newer assessment exists for this driver. Review the latest assessment instead" };
+    }
+
+    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, assessment.participantId)).limit(1);
+    if (!participant) return { ok: false as const, error: "Training participant not found" };
+
+    const criticalCount = Array.isArray(assessment.criticalViolations) ? assessment.criticalViolations.length : 0;
+    const passed = assessment.result === "competent" || assessment.result === "pass";
+    const isBaseline = assessment.assessmentType === "pre_training";
+    const certificateEligible = decision === "approved" && !isBaseline && passed && criticalCount === 0 && assessment.riskLevel !== "critical";
+    const participantAssessmentStatus = decision === "returned" || isBaseline
+      ? "assessed"
+      : passed
+        ? "passed"
+        : "failed";
+    const reviewedAt = new Date();
+
+    await tx
+      .update(trainingAssessments)
+      .set({
+        reviewStatus: decision,
+        reviewerId: user.id,
+        reviewComments: reviewComments || null,
+        reviewedAt,
+      })
+      .where(eq(trainingAssessments.id, assessment.id));
+
+    await tx
+      .update(trainingParticipants)
+      .set({
+        assessmentStatus: participantAssessmentStatus,
+        certificateEligible,
+        riskLevel: assessment.riskLevel,
+        updatedAt: reviewedAt,
+      })
+      .where(eq(trainingParticipants.id, participant.id));
+
+    return { ok: true as const, assessment, participant, certificateEligible };
+  });
+
+  if (!result.ok) throw new Error(result.error);
+
+  await logAudit({
+    userId: user.id,
+    userName: user.name,
+    action: decision === "approved" ? "approve" : "reject",
+    entityType: "training_assessment",
+    entityId: assessmentId,
+    entityLabel: result.participant.fullName,
+    summary: decision === "approved" ? "Driver assessment independently approved" : "Driver assessment returned for corrective action",
+    before: { reviewStatus: result.assessment.reviewStatus },
+    after: {
+      reviewStatus: decision,
+      certificateEligible: result.certificateEligible,
+      reviewComments: reviewComments || undefined,
+    },
+  });
+
+  refreshAssessmentPaths(assessmentId);
+  redirect(`/driver-training/assessments/${assessmentId}`);
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { AlertTriangle, ClipboardCheck, Gauge, ShieldCheck, Target, UsersRound } from "lucide-react";
 import { db } from "@/db";
@@ -22,6 +23,13 @@ export const dynamic = "force-dynamic";
 function resultTone(result: string): "emerald" | "red" | "amber" | "slate" {
   if (result === "competent" || result === "pass") return "emerald";
   if (result === "not_yet_competent" || result === "fail") return "red";
+  return "slate";
+}
+
+function reviewTone(status: string): "emerald" | "red" | "amber" | "slate" {
+  if (status === "approved") return "emerald";
+  if (status === "returned") return "red";
+  if (status === "pending_review") return "amber";
   return "slate";
 }
 
@@ -56,6 +64,7 @@ export default async function DriverAssessmentsPage() {
         classification: trainingAssessments.classification,
         result: trainingAssessments.result,
         riskLevel: trainingAssessments.riskLevel,
+        reviewStatus: trainingAssessments.reviewStatus,
         criticalViolations: trainingAssessments.criticalViolations,
         finalRecommendation: trainingAssessments.finalRecommendation,
         assessedAt: trainingAssessments.assessedAt,
@@ -75,7 +84,7 @@ export default async function DriverAssessmentsPage() {
     <div className="mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Driver Performance Assessment"
-        description="Structured trainer assessment covering safe driving, regulations, vehicle handling, hazard awareness, communication, professional conduct and emergency response. Scores and competency outcomes are calculated by the system."
+        description="Structured trainer assessment covering safe driving, regulations, vehicle handling, hazard awareness, communication, professional conduct and emergency response. The system calculates a recommended competency outcome; final certificate eligibility requires independent review."
         action={
           <div className="flex flex-wrap gap-2">
             <Badge tone="blue"><ClipboardCheck className="h-4 w-4" /> {DRIVER_ASSESSMENT_TOTAL_CRITERIA} criteria</Badge>
@@ -88,7 +97,7 @@ export default async function DriverAssessmentsPage() {
         <Card className="p-5">
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/45 dark:text-emerald-300"><ShieldCheck className="h-5 w-5" /></div>
-            <div><p className="font-semibold text-[var(--vims-ink)]">Competency threshold</p><p className="mt-1 text-sm leading-5 text-[var(--vims-ink-muted)]">70% or higher, provided no critical safety violation is recorded.</p></div>
+            <div><p className="font-semibold text-[var(--vims-ink)]">Competency threshold</p><p className="mt-1 text-sm leading-5 text-[var(--vims-ink-muted)]">70% or higher, provided no critical safety violation is recorded and the assessment passes independent review.</p></div>
           </div>
         </Card>
         <Card className="p-5">
@@ -251,7 +260,7 @@ export default async function DriverAssessmentsPage() {
           </Card>
 
           <div className="sticky bottom-3 z-20 flex flex-col gap-3 rounded-2xl border border-[var(--vims-line-strong)] bg-[var(--vims-panel-solid)]/95 p-4 shadow-xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="font-semibold text-[var(--vims-ink)]">Ready to finalize?</p><p className="text-sm text-[var(--vims-ink-muted)]">The server will calculate section scores, overall percentage, risk, competency and certificate eligibility.</p></div>
+            <div><p className="font-semibold text-[var(--vims-ink)]">Ready to submit?</p><p className="text-sm text-[var(--vims-ink-muted)]">The server will calculate section scores, overall percentage, risk and recommended competency. Certificate eligibility remains locked until independent review.</p></div>
             <Button type="submit" className="shrink-0"><ClipboardCheck className="h-4 w-4" /> Finalize assessment</Button>
           </div>
         </form>
@@ -261,16 +270,18 @@ export default async function DriverAssessmentsPage() {
 
       <Card className="mt-8 overflow-hidden">
         <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-          <h2 className="font-semibold text-[var(--vims-ink)]">Recent assessments</h2>
-          <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 30 trainer evaluations and system-calculated outcomes.</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div><h2 className="font-semibold text-[var(--vims-ink)]">Recent assessments</h2><p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Latest 30 trainer evaluations, recommended outcomes and independent-review status.</p></div>
+            <Link href="/driver-training/assessments/review" className="text-sm font-semibold text-[var(--brand-color)] hover:opacity-75">Review queue →</Link>
+          </div>
         </div>
         {recentAssessments.length === 0 ? (
           <div className="p-5 sm:p-6"><EmptyState icon={<UsersRound className="h-5 w-5" />} title="No assessments recorded" description="Completed driver assessments will appear here." /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-left text-sm">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead className="bg-[var(--vims-panel-soft)] text-xs uppercase tracking-wide text-[var(--vims-ink-muted)]">
-                <tr><th className="px-5 py-3">Driver</th><th className="px-5 py-3">Session</th><th className="px-5 py-3">Type</th><th className="px-5 py-3">Score</th><th className="px-5 py-3">Result</th><th className="px-5 py-3">Risk</th><th className="px-5 py-3">Recommendation</th><th className="px-5 py-3">Assessed</th></tr>
+                <tr><th className="px-5 py-3">Driver</th><th className="px-5 py-3">Session</th><th className="px-5 py-3">Type</th><th className="px-5 py-3">Score</th><th className="px-5 py-3">Result</th><th className="px-5 py-3">Review</th><th className="px-5 py-3">Risk</th><th className="px-5 py-3">Recommendation</th><th className="px-5 py-3">Assessed</th><th className="px-5 py-3">Record</th></tr>
               </thead>
               <tbody className="divide-y divide-[var(--vims-line)]">
                 {recentAssessments.map((assessment) => (
@@ -280,9 +291,11 @@ export default async function DriverAssessmentsPage() {
                     <td className="px-5 py-4 capitalize text-[var(--vims-ink-soft)]">{assessment.assessmentType.replaceAll("_", " ")}</td>
                     <td className="px-5 py-4"><span className="font-semibold text-[var(--vims-ink)]">{assessment.overallScore ? `${assessment.overallScore}%` : "—"}</span>{assessment.classification ? <span className="mt-1 block text-xs capitalize text-[var(--vims-ink-muted)]">{assessment.classification.replaceAll("_", " ")}</span> : null}</td>
                     <td className="px-5 py-4"><Badge tone={resultTone(assessment.result)}>{assessment.result.replaceAll("_", " ")}</Badge></td>
+                    <td className="px-5 py-4"><Badge tone={reviewTone(assessment.reviewStatus)}>{assessment.reviewStatus.replaceAll("_", " ")}</Badge></td>
                     <td className="px-5 py-4"><span className="capitalize text-[var(--vims-ink-soft)]">{assessment.riskLevel || "—"}</span>{Array.isArray(assessment.criticalViolations) && assessment.criticalViolations.length > 0 ? <span className="mt-1 block text-xs font-semibold text-red-600">{assessment.criticalViolations.length} critical violation(s)</span> : null}</td>
                     <td className="px-5 py-4 text-[var(--vims-ink-soft)]">{assessment.finalRecommendation ? formatAssessmentRecommendation(assessment.finalRecommendation) : "—"}</td>
                     <td className="px-5 py-4 text-xs text-[var(--vims-ink-muted)]">{formatDateTime(assessment.assessedAt)}</td>
+                    <td className="px-5 py-4"><Link href={`/driver-training/assessments/${assessment.id}`} className="text-xs font-semibold text-[var(--brand-color)] hover:opacity-75">View →</Link></td>
                   </tr>
                 ))}
               </tbody>

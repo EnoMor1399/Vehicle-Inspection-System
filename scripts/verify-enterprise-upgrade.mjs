@@ -67,6 +67,10 @@ const requiredAssessmentColumns = [
   "final_recommendation",
   "driver_acknowledged",
   "driver_comments",
+  "review_status",
+  "reviewer_id",
+  "review_comments",
+  "reviewed_at",
 ];
 
 const requiredIndexes = [
@@ -82,6 +86,8 @@ const requiredIndexes = [
   "training_assessment_participant_idx",
   "training_assessment_classification_idx",
   "training_assessment_recommendation_idx",
+  "training_assessment_review_status_idx",
+  "training_assessment_reviewer_idx",
   "training_certificate_number_uidx",
   "training_certificate_verification_uidx",
   "training_compliance_participant_idx",
