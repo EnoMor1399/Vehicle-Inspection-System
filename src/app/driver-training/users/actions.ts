@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -41,6 +42,8 @@ const TRAINING_REVIEW_ROLES = new Set([
   "supervisor",
 ]);
 
+const DUPLICATE_EMAIL_MESSAGE = "An account with this email address already exists";
+
 function field(formData: FormData, name: string) {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
@@ -68,6 +71,11 @@ function permissionsForTrainingRole(role: string): Record<string, boolean> {
   };
 }
 
+function redirectWithFormError(message: string): never {
+  const params = new URLSearchParams({ createError: message });
+  redirect(`/driver-training/users?${params.toString()}`);
+}
+
 export async function createDriverTrainingUser(formData: FormData): Promise<void> {
   const actor = await getCurrentUser();
   if (!canCreateDriverTrainingUsers(actor)) {
@@ -82,24 +90,24 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
   const specialties = parseSpecialties(field(formData, "specialties"));
 
   if (name.length < 2 || name.length > 200) {
-    throw new Error("Enter a valid full name between 2 and 200 characters");
+    redirectWithFormError("Enter a valid full name between 2 and 200 characters");
   }
   if (!validateEmail(email) || email.length > 200) {
-    throw new Error("Enter a valid email address");
+    redirectWithFormError("Enter a valid email address");
   }
   if (phone.length > 50) {
-    throw new Error("Phone number must not exceed 50 characters");
+    redirectWithFormError("Phone number must not exceed 50 characters");
   }
   if (!isUserRole(role) || !TRAINING_ACCOUNT_ROLES.has(role)) {
-    throw new Error("Select a valid Driver Training account function");
+    redirectWithFormError("Select a valid Driver Training account function");
   }
   if (actor.role !== "super_admin" && role === "admin") {
-    throw new Error("Only a Super Administrator can create an Administrator account");
+    redirectWithFormError("Only a Super Administrator can create an Administrator account");
   }
 
   const passwordValidation = validatePasswordStrength(password);
   if (!passwordValidation.valid) {
-    throw new Error(passwordValidation.errors[0] || "The initial password does not meet the password policy");
+    redirectWithFormError(passwordValidation.errors[0] || "The initial password does not meet the password policy");
   }
 
   const passwordHash = await hashPassword(password);
@@ -107,67 +115,88 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
   const createInstructorProfile = role === "inspector";
   const permissions = permissionsForTrainingRole(role);
 
-  const result = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
+  let result: {
+    account: {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      phone: string | null;
+      permissions: Record<string, boolean> | null;
+      isActive: boolean;
+      createdAt: Date;
+    };
+    instructorProfile: typeof trainingInstructorProfiles.$inferSelect | null;
+  };
 
-    const [existing] = await tx
-      .select({ id: users.id })
-      .from(users)
-      .where(sql`lower(${users.email}) = ${email}`)
-      .limit(1);
-    if (existing) {
-      throw new Error("An account with this email address already exists");
-    }
+  try {
+    result = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
 
-    const [account] = await tx
-      .insert(users)
-      .values({
-        id: accountId,
-        name,
-        email,
-        phone: phone || null,
-        role,
-        passwordHash,
-        permissions,
-        isActive: true,
-        locationId: null,
-        transporterId: null,
-      })
-      .returning({
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        role: users.role,
-        phone: users.phone,
-        permissions: users.permissions,
-        isActive: users.isActive,
-        createdAt: users.createdAt,
-      });
+      const [existing] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(sql`lower(${users.email}) = ${email}`)
+        .limit(1);
+      if (existing) {
+        throw new Error(DUPLICATE_EMAIL_MESSAGE);
+      }
 
-    if (!account) {
-      throw new Error("Driver Training account creation did not complete");
-    }
-
-    let instructorProfile: typeof trainingInstructorProfiles.$inferSelect | null = null;
-    if (createInstructorProfile) {
-      const profileId = newId();
-      const instructorCode = `DTI-${new Date().getUTCFullYear()}-${profileId.slice(0, 8).toUpperCase()}`;
-      const [createdProfile] = await tx
-        .insert(trainingInstructorProfiles)
+      const [account] = await tx
+        .insert(users)
         .values({
-          id: profileId,
-          userId: account.id,
-          instructorCode,
-          status: "active",
-          specialties,
-          createdBy: actor.id,
+          id: accountId,
+          name,
+          email,
+          phone: phone || null,
+          role,
+          passwordHash,
+          permissions,
+          isActive: true,
+          locationId: null,
+          transporterId: null,
         })
-        .returning();
-      instructorProfile = createdProfile || null;
-    }
+        .returning({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          phone: users.phone,
+          permissions: users.permissions,
+          isActive: users.isActive,
+          createdAt: users.createdAt,
+        });
 
-    return { account, instructorProfile };
-  });
+      if (!account) {
+        throw new Error("Driver Training account creation did not complete");
+      }
+
+      let instructorProfile: typeof trainingInstructorProfiles.$inferSelect | null = null;
+      if (createInstructorProfile) {
+        const profileId = newId();
+        const instructorCode = `DTI-${new Date().getUTCFullYear()}-${profileId.slice(0, 8).toUpperCase()}`;
+        const [createdProfile] = await tx
+          .insert(trainingInstructorProfiles)
+          .values({
+            id: profileId,
+            userId: account.id,
+            instructorCode,
+            status: "active",
+            specialties,
+            createdBy: actor.id,
+          })
+          .returning();
+        instructorProfile = createdProfile || null;
+      }
+
+      return { account, instructorProfile };
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === DUPLICATE_EMAIL_MESSAGE) {
+      redirectWithFormError(DUPLICATE_EMAIL_MESSAGE);
+    }
+    throw error;
+  }
 
   await logAudit({
     userId: actor.id,
@@ -195,4 +224,5 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
   revalidatePath("/driver-training/instructors");
   revalidatePath("/driver-training/sessions");
   revalidatePath("/users");
+  redirect("/driver-training/users?created=1");
 }
