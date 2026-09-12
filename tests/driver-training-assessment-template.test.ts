@@ -79,7 +79,11 @@ test("assessment migration preserves structured evidence and governance fields",
   assert.match(migration, /training_assessment_recommendation_idx/);
 
   const apply = readFileSync("scripts/apply-enterprise-upgrade.mjs", "utf8");
+  const verify = readFileSync("scripts/verify-enterprise-upgrade.mjs", "utf8");
   assert.match(apply, /20260912_driver_training_assessment_template\.sql/);
+  assert.match(verify, /requiredAssessmentColumns/);
+  assert.match(verify, /training_assessment_classification_idx/);
+  assert.match(verify, /training_assessment_recommendation_idx/);
 });
 
 test("trainer assessment action calculates results server-side and serializes participant writes", () => {
@@ -90,6 +94,7 @@ test("trainer assessment action calculates results server-side and serializes pa
   assert.match(action, /0\.75/);
   assert.match(action, /certificateEligible/);
   assert.match(action, /criticalViolations\.length === 0/);
+  assert.match(action, /assessmentType === "pre_training"/);
   assert.match(action, /logAudit/);
 });
 
@@ -105,6 +110,13 @@ test("assessment UI exposes quantitative, qualitative and safety-override contro
 
   const nav = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   assert.match(nav, /href: "\/driver-training\/assessments"/);
+});
+
+test("participant workspace routes trainers to the comprehensive assessment instead of the legacy score form", () => {
+  const participants = readFileSync("src/app/driver-training/participants/page.tsx", "utf8");
+  assert.match(participants, /Comprehensive trainer assessment/);
+  assert.match(participants, /href="\/driver-training\/assessments"/);
+  assert.doesNotMatch(participants, /recordTrainingAssessment/);
 });
 
 test("source-only assessment branch remains excluded from Vercel Git deployment", () => {
