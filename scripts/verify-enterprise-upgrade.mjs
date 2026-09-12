@@ -53,6 +53,22 @@ const requiredTables = [
   "training_communication_events",
 ];
 
+const requiredAssessmentColumns = [
+  "assessment_version",
+  "criteria_ratings",
+  "criteria_comments",
+  "section_scores",
+  "scored_points",
+  "maximum_points",
+  "classification",
+  "critical_violations",
+  "qualitative_feedback",
+  "development_plan",
+  "final_recommendation",
+  "driver_acknowledged",
+  "driver_comments",
+];
+
 const requiredIndexes = [
   "login_attempt_email_failed_created_idx",
   "login_attempt_ip_failed_created_idx",
@@ -64,6 +80,8 @@ const requiredIndexes = [
   "training_session_status_start_idx",
   "training_participant_session_idx",
   "training_assessment_participant_idx",
+  "training_assessment_classification_idx",
+  "training_assessment_recommendation_idx",
   "training_certificate_number_uidx",
   "training_certificate_verification_uidx",
   "training_compliance_participant_idx",
@@ -200,6 +218,17 @@ try {
   const presentTables = new Set(tableResult.rows.map((row) => row.tablename));
   const missingTables = requiredTables.filter((name) => !presentTables.has(name));
 
+  const assessmentColumnResult = await client.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'training_assessments'
+        AND column_name = ANY($1::text[])`,
+    [requiredAssessmentColumns],
+  );
+  const presentAssessmentColumns = new Set(assessmentColumnResult.rows.map((row) => row.column_name));
+  const missingAssessmentColumns = requiredAssessmentColumns.filter((name) => !presentAssessmentColumns.has(name));
+
   const { rows } = await client.query(
     `SELECT indexname
        FROM pg_indexes
@@ -219,14 +248,17 @@ try {
       serverVersionNum: metadata?.server_version_num ?? null,
       requiredTablesVerified: requiredTables.length - missingTables.length,
       requiredTablesExpected: requiredTables.length,
+      assessmentColumnsVerified: requiredAssessmentColumns.length - missingAssessmentColumns.length,
+      assessmentColumnsExpected: requiredAssessmentColumns.length,
       requiredIndexesVerified: requiredIndexes.length - missing.length,
       requiredIndexesExpected: requiredIndexes.length,
       redundantIndexesRemaining: redundantStillPresent.length,
     }),
   );
 
-  if (missingTables.length > 0 || missing.length > 0 || redundantStillPresent.length > 0) {
+  if (missingTables.length > 0 || missingAssessmentColumns.length > 0 || missing.length > 0 || redundantStillPresent.length > 0) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
+    if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
     if (missing.length > 0) console.error(`Missing required indexes: ${missing.join(", ")}`);
     if (redundantStillPresent.length > 0) console.error(`Redundant indexes still present: ${redundantStillPresent.join(", ")}`);
     process.exitCode = 1;
