@@ -3,15 +3,29 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { canReviewTrainingAssessments } from "../src/lib/training-access";
 
-test("assessment review permission defaults to independent supervisory roles", () => {
-  for (const role of ["super_admin", "admin", "operations_manager", "supervisor"]) {
-    assert.equal(canReviewTrainingAssessments({ role }), true, `${role} should review assessments`);
+test("assessment review permission requires Driver Training assignment and an independent supervisory role", () => {
+  assert.equal(canReviewTrainingAssessments({ role: "super_admin" }), true, "Super Administrator keeps cross-system oversight");
+  for (const role of ["admin", "operations_manager", "supervisor"]) {
+    assert.equal(
+      canReviewTrainingAssessments({ role, permissions: { training: true } }),
+      true,
+      `${role} assigned to Driver Training should review assessments`,
+    );
+    assert.equal(
+      canReviewTrainingAssessments({ role, permissions: { training: false } }),
+      false,
+      `${role} assigned only to Vehicle Inspection should not review assessments`,
+    );
   }
   for (const role of ["inspector", "data_entry", "auditor", "compliance_officer", "viewer"]) {
-    assert.equal(canReviewTrainingAssessments({ role }), false, `${role} should not review by default`);
+    assert.equal(
+      canReviewTrainingAssessments({ role, permissions: { training: true } }),
+      false,
+      `${role} should not review by default even when assigned to Driver Training`,
+    );
   }
   assert.equal(canReviewTrainingAssessments({ role: "inspector", permissions: { training: true, training_assessment_review: true } }), true);
-  assert.equal(canReviewTrainingAssessments({ role: "supervisor", permissions: { training_assessment_review: false } }), false);
+  assert.equal(canReviewTrainingAssessments({ role: "supervisor", permissions: { training: true, training_assessment_review: false } }), false);
 });
 
 test("assessment governance migration adds reviewer controls and indexes", () => {
