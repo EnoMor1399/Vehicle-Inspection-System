@@ -65,6 +65,11 @@ export function canReviewTrainingAssessments(user: TrainingUser) {
   return TRAINING_ASSESSMENT_REVIEW_ROLES.has(user.role);
 }
 
+export function canCreateDriverTrainingUsers(user: TrainingUser) {
+  if (!canManageTraining(user)) return false;
+  return user.role === "super_admin" || user.role === "admin";
+}
+
 export function canServeAsInternalTrainingInstructor(user: TrainingAccount) {
   if (user.isActive !== true) return false;
   if (user.role === "transporter_user") return false;

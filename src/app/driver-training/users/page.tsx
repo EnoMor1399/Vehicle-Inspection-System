@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
-import { GraduationCap, Mail, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
+import { GraduationCap, Mail, ShieldCheck, UserCheck, UserPlus, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import { locations, transporters, users } from "@/db/schema";
-import { Badge, Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, StatCard, TextArea, TextInput } from "@/components/ui";
 import { ROLE_LABEL, canManageUsers } from "@/lib/auth";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canCreateDriverTrainingUsers, canManageTraining, canViewTraining } from "@/lib/training-access";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { formatDateTime } from "@/lib/utils";
 import { UserAccessEditor } from "@/app/users/UserAccessEditor";
+import { createDriverTrainingUser } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +28,21 @@ const ROLE_TONES: Record<string, "red" | "amber" | "blue" | "violet" | "slate" |
   transporter_user: "emerald",
 };
 
+const TRAINING_ACCOUNT_OPTIONS = [
+  { value: "operations_manager", label: "Training Operations Manager" },
+  { value: "supervisor", label: "Training Supervisor / Reviewer" },
+  { value: "inspector", label: "Instructor / Assessor" },
+  { value: "data_entry", label: "Training Data Officer" },
+  { value: "auditor", label: "Training Auditor" },
+  { value: "compliance_officer", label: "Training Compliance Officer" },
+  { value: "viewer", label: "Read-only Training User" },
+] as const;
+
 export default async function DriverTrainingUsersPage() {
   const user = await requireInternalUser();
   const canView = canViewTraining(user);
   const canManage = canManageTraining(user);
+  const canCreateAccounts = canCreateDriverTrainingUsers(user);
 
   if (!canView || !canManage) {
     return (
@@ -82,7 +95,7 @@ export default async function DriverTrainingUsersPage() {
       <PageHeader
         eyebrow="Driver Training · Access Control"
         title="Driver Training Users"
-        description="Staff accounts assigned to training operations, assessments, independent review, certification and programme administration."
+        description="Create and administer staff accounts for training delivery, assessment, review, certification and programme operations."
         action={
           canManageUsers(user) ? (
             <Link
@@ -100,7 +113,7 @@ export default async function DriverTrainingUsersPage() {
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700"><GraduationCap className="h-4 w-4" /></div>
           <div>
             <p className="text-sm font-semibold text-slate-950">Driver Training account boundary</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Training staff are managed independently from Vehicle Inspection staff. Participants and assessed drivers remain in the separate Participants register and are not system user accounts.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">New accounts created here are assigned to Driver Training & Assessment only. Vehicle Inspection access can be granted separately when cross-department access is required. Participants and assessed drivers remain in the Participants register.</p>
           </div>
         </div>
       </Card>
@@ -111,6 +124,56 @@ export default async function DriverTrainingUsersPage() {
         <StatCard label="Review-capable roles" value={reviewers} hint="Subject to permissions" tone="violet" icon={<ShieldCheck className="h-5 w-5" />} />
         <StatCard label="Cross-system" value={crossSystemUsers} hint="Access to both systems" tone="slate" icon={<GraduationCap className="h-5 w-5" />} />
       </div>
+
+      {canCreateAccounts && (
+        <Card className="mb-6 overflow-hidden">
+          <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-800">
+                <UserPlus className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Create Driver Training account</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Provision an internal user account with Driver Training access. Instructor / Assessor accounts automatically receive an Internal Instructor profile.</p>
+              </div>
+            </div>
+          </div>
+
+          <form action={createDriverTrainingUser} className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4 sm:p-6">
+            <Field label="Full name" required>
+              <TextInput name="name" required minLength={2} maxLength={200} autoComplete="name" placeholder="Full name" />
+            </Field>
+            <Field label="Email address" required>
+              <TextInput name="email" type="email" required maxLength={200} autoComplete="email" placeholder="name@example.com" />
+            </Field>
+            <Field label="Phone number">
+              <TextInput name="phone" type="tel" maxLength={50} autoComplete="tel" placeholder="Optional" />
+            </Field>
+            <Field label="Account function" required>
+              <Select name="role" required defaultValue="inspector">
+                {user.role === "super_admin" && <option value="admin">Training Administrator</option>}
+                {TRAINING_ACCOUNT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </Select>
+            </Field>
+            <div className="sm:col-span-2 xl:col-span-2">
+              <Field label="Initial password" required hint={`Minimum ${PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, number and special character.`}>
+                <TextInput name="password" type="password" required minLength={PASSWORD_MIN_LENGTH} maxLength={128} autoComplete="new-password" />
+              </Field>
+            </div>
+            <div className="sm:col-span-2 xl:col-span-2">
+              <Field label="Instructor specialties" hint="Optional. Applied when Account function is Instructor / Assessor. Separate entries with commas or new lines.">
+                <TextArea name="specialties" maxLength={4000} className="min-h-[78px]" placeholder="Defensive driving, heavy vehicle operations" />
+              </Field>
+            </div>
+            <div className="sm:col-span-2 xl:col-span-3 flex items-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs leading-5 text-slate-600"><span className="font-semibold text-slate-800">Access policy:</span> the account is active and limited to Driver Training & Assessment. Administrators cannot create Administrator or Super Administrator accounts; only a Super Administrator can create a Training Administrator.</p>
+            </div>
+            <div className="flex items-end justify-end">
+              <Button type="submit"><UserPlus className="h-4 w-4" /> Create account</Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       <Card className="p-5 sm:p-6">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
