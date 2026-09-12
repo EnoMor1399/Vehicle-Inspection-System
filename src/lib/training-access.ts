@@ -66,7 +66,7 @@ export function canReviewTrainingAssessments(user: TrainingUser) {
 }
 
 export function canCreateDriverTrainingUsers(user: TrainingUser) {
-  if (!canAccessDriverTraining(user)) return false;
+  if (!canManageTraining(user)) return false;
   return user.role === "super_admin" || user.role === "admin";
 }
 
