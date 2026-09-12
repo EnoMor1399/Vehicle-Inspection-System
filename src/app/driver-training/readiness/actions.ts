@@ -8,7 +8,7 @@ import { trainingSessions } from "@/db/training-schema";
 import { trainingInstructorProfiles, trainingSessionReadiness } from "@/db/training-readiness-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTraining, canServeAsInternalTrainingInstructor } from "@/lib/training-access";
 import {
   evaluateTrainingReadiness,
   instructorDeploymentState,
@@ -60,12 +60,18 @@ export async function saveTrainingInstructorProfile(formData: FormData) {
   const data = parsed.data;
 
   const [account] = await db
-    .select({ id: users.id, name: users.name, role: users.role, isActive: users.isActive })
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      permissions: users.permissions,
+      isActive: users.isActive,
+    })
     .from(users)
     .where(eq(users.id, data.userId))
     .limit(1);
-  if (!account || !account.isActive || account.role === "transporter_user") {
-    throw new Error("Instructor profiles can only be assigned to active internal user accounts");
+  if (!account || !canServeAsInternalTrainingInstructor(account)) {
+    throw new Error("Internal Instructor profiles can only be assigned to active Driver Training & Assessment users");
   }
 
   const result = await db.transaction(async (tx) => {
@@ -159,12 +165,21 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
     if (!session.instructorId) {
       throw new Error("Assign an internal instructor before confirming instructor readiness");
     }
-    const [profile] = await db
-      .select()
-      .from(trainingInstructorProfiles)
-      .where(eq(trainingInstructorProfiles.userId, session.instructorId))
-      .limit(1);
-    if (!profile) throw new Error("The assigned instructor does not have a Driver Training instructor profile");
+    const [[account], [profile]] = await Promise.all([
+      db
+        .select({ role: users.role, permissions: users.permissions, isActive: users.isActive })
+        .from(users)
+        .where(eq(users.id, session.instructorId))
+        .limit(1),
+      db
+        .select()
+        .from(trainingInstructorProfiles)
+        .where(eq(trainingInstructorProfiles.userId, session.instructorId))
+        .limit(1),
+    ]);
+    if (!account || !canServeAsInternalTrainingInstructor(account) || !profile || profile.status !== "active") {
+      throw new Error("The assigned Internal Instructor is not an active Driver Training & Assessment instructor");
+    }
     const deploymentState = instructorDeploymentState(profile);
     if (["unavailable", "blocked", "incomplete"].includes(deploymentState)) {
       throw new Error(`The assigned instructor is not deployment-ready (${deploymentState})`);
