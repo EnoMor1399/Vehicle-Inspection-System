@@ -1,13 +1,11 @@
 import Link from "next/link";
-import type { ComponentType } from "react";
 import { inArray, sql } from "drizzle-orm";
 import {
   AlertTriangle,
-  ArrowRight,
   Award,
-  BarChart3,
   CalendarDays,
-  ClipboardList,
+  ChevronDown,
+  ClipboardCheck,
   ClipboardPlus,
   GraduationCap,
   ShieldCheck,
@@ -22,52 +20,6 @@ import { canManageTraining, canViewTraining } from "@/lib/training-access";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-type QuickWorkspace = {
-  href: string;
-  label: string;
-  description: string;
-  icon: ComponentType<{ className?: string }>;
-};
-
-const QUICK_WORKSPACES: QuickWorkspace[] = [
-  {
-    href: "/driver-training/requests",
-    label: "Training requests",
-    description: "Review demand, approvals and programme intake.",
-    icon: ClipboardPlus,
-  },
-  {
-    href: "/driver-training/sessions",
-    label: "Sessions",
-    description: "Schedule and manage training delivery.",
-    icon: CalendarDays,
-  },
-  {
-    href: "/driver-training/participants",
-    label: "Participants",
-    description: "Manage operator records, risk and assessment status.",
-    icon: UsersRound,
-  },
-  {
-    href: "/driver-training/certificates",
-    label: "Certificates",
-    description: "Control competence records and certificate status.",
-    icon: Award,
-  },
-  {
-    href: "/driver-training/analytics",
-    label: "Analytics",
-    description: "Review programme, participant and performance trends.",
-    icon: BarChart3,
-  },
-  {
-    href: "/driver-training/compliance",
-    label: "Compliance",
-    description: "Track obligations, controls and compliance evidence.",
-    icon: ShieldCheck,
-  },
-];
 
 const SERVICE_NAMES = new Map(DRIVER_TRAINING_SERVICES.map((service) => [service.id, service.title]));
 
@@ -126,7 +78,7 @@ export default async function DriverTrainingPage() {
       .from(trainingSessions)
       .where(inArray(trainingSessions.status, ["scheduled", "in_progress"]))
       .orderBy(trainingSessions.startAt)
-      .limit(5),
+      .limit(6),
   ] as const);
 
   const sessionStats = sessionResult.status === "fulfilled" ? sessionResult.value[0] : undefined;
@@ -134,7 +86,7 @@ export default async function DriverTrainingPage() {
   const certificateStats = certificateResult.status === "fulfilled" ? certificateResult.value[0] : undefined;
   const upcomingSessions = scheduleResult.status === "fulfilled" ? scheduleResult.value : [];
   const hasDataIssue = [sessionResult, participantResult, certificateResult, scheduleResult].some(
-    (result) => result.status === "rejected"
+    (result) => result.status === "rejected",
   );
 
   if (hasDataIssue) {
@@ -147,196 +99,98 @@ export default async function DriverTrainingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 xl:p-10">
+    <div className="mx-auto max-w-[1450px] p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={DRIVER_TRAINING_DEPARTMENT.name}
-        description={DRIVER_TRAINING_DEPARTMENT.description}
+        description="Manage training delivery, driver assessment, participant risk and certification from one workspace."
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="emerald">
-              <GraduationCap className="h-4 w-4" />
-              {DRIVER_TRAINING_SERVICES.length} services
-            </Badge>
-            <Badge tone={canManage ? "blue" : "slate"}>{canManage ? "Management access" : "View access"}</Badge>
-          </div>
+          canManage ? (
+            <details className="group relative">
+              <summary className="inline-flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                Create
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] p-1.5 shadow-xl">
+                <Link href="/driver-training/requests" className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-soft)] hover:text-[var(--vims-ink)]">
+                  <ClipboardPlus className="h-4 w-4" /> Training request
+                </Link>
+                <Link href="/driver-training/sessions" className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-soft)] hover:text-[var(--vims-ink)]">
+                  <CalendarDays className="h-4 w-4" /> Training session
+                </Link>
+                <Link href="/driver-training/assessments" className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-[var(--vims-ink-soft)] hover:bg-[var(--vims-panel-soft)] hover:text-[var(--vims-ink)]">
+                  <ClipboardCheck className="h-4 w-4" /> Driver assessment
+                </Link>
+              </div>
+            </details>
+          ) : undefined
         }
       />
 
-      <section aria-labelledby="training-overview">
-        <div className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-color)]">Department operations</p>
-          <h2 id="training-overview" className="mt-1 text-xl font-semibold tracking-tight text-[var(--vims-ink)]">
-            Operational overview
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--vims-ink-muted)]">
-            Current training activity, participant risk and certification status at a glance.
-          </p>
+      {hasDataIssue && (
+        <div role="status" className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="text-sm leading-5">Some live metrics are temporarily unavailable. Available workspaces remain usable.</p>
+        </div>
+      )}
+
+      <section aria-label="Driver Training summary" className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Training sessions"
+          value={sessionStats ? Number(sessionStats.total || 0) : "—"}
+          hint={sessionStats ? `${Number(sessionStats.active || 0)} active or upcoming` : "Temporarily unavailable"}
+          tone="blue"
+          icon={<GraduationCap className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Participants"
+          value={participantStats ? Number(participantStats.total || 0) : "—"}
+          hint={participantStats ? `${Number(participantStats.highRisk || 0)} high or critical risk` : "Temporarily unavailable"}
+          tone="violet"
+          icon={<UsersRound className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Active certificates"
+          value={certificateStats ? Number(certificateStats.active || 0) : "—"}
+          hint={certificateStats ? "Current competence records" : "Temporarily unavailable"}
+          tone="emerald"
+          icon={<Award className="h-5 w-5" />}
+        />
+      </section>
+
+      <Card className="mt-6 overflow-hidden">
+        <div className="flex items-center justify-between gap-4 border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
+          <div>
+            <h2 className="font-semibold text-[var(--vims-ink)]">Active & upcoming sessions</h2>
+            <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Next scheduled or in-progress programmes.</p>
+          </div>
+          <Link href="/driver-training/sessions" className="shrink-0 text-sm font-semibold text-[var(--brand-color)] hover:opacity-75">
+            View sessions →
+          </Link>
         </div>
 
-        {hasDataIssue && (
-          <div
-            role="status"
-            className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-200"
-          >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p className="text-sm leading-5">
-              Some live operational data is temporarily unavailable. Available sections remain usable; refresh the page to retry the affected metrics.
-            </p>
+        {scheduleResult.status === "rejected" ? (
+          <div className="p-6 text-sm text-[var(--vims-ink-muted)]">The live programme schedule is temporarily unavailable.</div>
+        ) : upcomingSessions.length === 0 ? (
+          <div className="p-6 text-sm text-[var(--vims-ink-muted)]">No scheduled or in-progress training sessions.</div>
+        ) : (
+          <div className="divide-y divide-[var(--vims-line)]">
+            {upcomingSessions.map((session) => (
+              <div key={session.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-[var(--vims-ink)]">{session.referenceNumber}</p>
+                    <Badge tone={session.status === "in_progress" ? "blue" : "amber"}>{session.status.replaceAll("_", " ")}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-[var(--vims-ink-soft)]">{SERVICE_NAMES.get(session.serviceId) || session.title}</p>
+                </div>
+                <p className="shrink-0 text-xs text-[var(--vims-ink-muted)]">
+                  {formatDateTime(session.startAt)} · {session.clientName || "Internal programme"}
+                </p>
+              </div>
+            ))}
           </div>
         )}
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            label="Training sessions"
-            value={sessionStats ? Number(sessionStats.total || 0) : "—"}
-            hint={sessionStats ? "All programmes" : "Temporarily unavailable"}
-            tone="blue"
-            icon={<CalendarDays className="h-5 w-5" />}
-          />
-          <StatCard
-            label="Active / upcoming"
-            value={sessionStats ? Number(sessionStats.active || 0) : "—"}
-            hint={sessionStats ? "Scheduled or in progress" : "Temporarily unavailable"}
-            tone="amber"
-            icon={<GraduationCap className="h-5 w-5" />}
-          />
-          <StatCard
-            label="Participants"
-            value={participantStats ? Number(participantStats.total || 0) : "—"}
-            hint={participantStats ? "Registered operators" : "Temporarily unavailable"}
-            tone="violet"
-            icon={<UsersRound className="h-5 w-5" />}
-          />
-          <StatCard
-            label="High-risk operators"
-            value={participantStats ? Number(participantStats.highRisk || 0) : "—"}
-            hint={participantStats ? "High or critical" : "Temporarily unavailable"}
-            tone="red"
-            icon={<AlertTriangle className="h-5 w-5" />}
-          />
-          <StatCard
-            label="Active certificates"
-            value={certificateStats ? Number(certificateStats.active || 0) : "—"}
-            hint={certificateStats ? "Competence records" : "Temporarily unavailable"}
-            tone="emerald"
-            icon={<Award className="h-5 w-5" />}
-          />
-        </div>
-      </section>
-
-      <section className="mt-6 grid gap-4 xl:grid-cols-[1.08fr_.92fr]">
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950/45 dark:text-blue-300">
-                <CalendarDays className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--vims-ink-muted)]">Programme schedule</p>
-                <h2 className="text-base font-semibold text-[var(--vims-ink)]">Active & upcoming sessions</h2>
-              </div>
-            </div>
-            <Link
-              href="/driver-training/sessions"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand-color)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2"
-            >
-              View all <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-
-          {scheduleResult.status === "rejected" ? (
-            <div className="p-6 text-sm leading-6 text-[var(--vims-ink-muted)]">
-              The live programme schedule is temporarily unavailable. Other Driver Training workspaces remain available.
-            </div>
-          ) : upcomingSessions.length === 0 ? (
-            <div className="p-6 text-sm leading-6 text-[var(--vims-ink-muted)]">
-              No scheduled or in-progress training sessions.
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--vims-line)]">
-              {upcomingSessions.map((session) => (
-                <div key={session.id} className="px-5 py-4 sm:px-6">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[var(--vims-ink)]">{session.referenceNumber}</p>
-                      <p className="mt-1 text-sm text-[var(--vims-ink-soft)]">
-                        {SERVICE_NAMES.get(session.serviceId) || session.title}
-                      </p>
-                    </div>
-                    <Badge tone={session.status === "in_progress" ? "blue" : "amber"}>
-                      {session.status.replaceAll("_", " ")}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-xs text-[var(--vims-ink-muted)]">
-                    {formatDateTime(session.startAt)} · {session.clientName || "Internal programme"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card className="overflow-hidden">
-          <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--vims-ink-muted)]">Workspace</p>
-            <h2 className="mt-0.5 text-base font-semibold text-[var(--vims-ink)]">Quick access</h2>
-          </div>
-          <div className="grid gap-px bg-[var(--vims-line)] sm:grid-cols-2">
-            {QUICK_WORKSPACES.map(({ href, label, description, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="group flex min-h-28 gap-3 bg-[var(--vims-panel-solid)] p-4 transition-colors hover:bg-[var(--vims-panel-soft)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-inset sm:p-5"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--vims-panel-soft)] text-[var(--brand-color)] ring-1 ring-inset ring-[var(--vims-line)] transition-colors group-hover:bg-[var(--vims-panel-solid)]">
-                  <Icon className="h-4.5 w-4.5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--vims-ink)]">
-                    {label}
-                    <ArrowRight className="h-3.5 w-3.5 text-[var(--vims-ink-muted)] transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--vims-ink-muted)]">{description}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </Card>
-      </section>
-
-      <section className="mt-6" aria-labelledby="training-services">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-color)]">Service portfolio</p>
-            <h2 id="training-services" className="mt-1 text-xl font-semibold tracking-tight text-[var(--vims-ink)]">
-              Training & assessment services
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--vims-ink-muted)]">
-              Core services delivered by the department. Detailed programme controls are available from the workspace navigation above.
-            </p>
-          </div>
-          <Badge tone="slate">Safety · Competence · Compliance</Badge>
-        </div>
-
-        <Card className="overflow-hidden">
-          <div className="grid gap-px bg-[var(--vims-line)] md:grid-cols-2 xl:grid-cols-3">
-            {DRIVER_TRAINING_SERVICES.map((service, index) => (
-              <div key={service.id} className="bg-[var(--vims-panel-solid)] p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--vims-panel-soft)] text-[var(--brand-color)] ring-1 ring-inset ring-[var(--vims-line)]">
-                    <ClipboardList className="h-4 w-4" />
-                  </div>
-                  <span className="font-mono text-[11px] font-semibold text-[var(--vims-ink-muted)]">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold text-[var(--vims-ink)]">{service.title}</h3>
-                <p className="mt-1.5 text-xs leading-5 text-[var(--vims-ink-muted)]">{service.summary}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </section>
+      </Card>
     </div>
   );
 }
