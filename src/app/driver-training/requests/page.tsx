@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ne } from "drizzle-orm";
 import { CalendarCheck2, ClipboardPlus, Clock3, FileCheck2, Send, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
 import { locations, users } from "@/db/schema";
+import { trainingQuotations } from "@/db/training-commercial-schema";
 import { trainingSessions } from "@/db/training-schema";
 import { trainingRequestEvents, trainingRequests } from "@/db/training-request-schema";
 import { Badge, Button, Card, EmptyState, PageHeader, StatCard, TextArea, TextInput as Input } from "@/components/ui";
@@ -24,8 +25,9 @@ export default async function TrainingRequestsPage() {
     return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
   }
   const canManage = canManageTraining(user);
+  const today = new Date().toISOString().slice(0, 10);
 
-  const [requests, events, trainingLocations, internalUsers, sessions] = await Promise.all([
+  const [requests, events, trainingLocations, internalUsers, sessions, acceptedQuotations] = await Promise.all([
     db.select().from(trainingRequests).orderBy(desc(trainingRequests.createdAt)).limit(300),
     db.select().from(trainingRequestEvents).orderBy(desc(trainingRequestEvents.createdAt)).limit(1200),
     db.select({ id: locations.id, name: locations.name }).from(locations).orderBy(asc(locations.name)).limit(300),
@@ -36,6 +38,15 @@ export default async function TrainingRequestsPage() {
       .orderBy(asc(users.name))
       .limit(300),
     db.select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber }).from(trainingSessions).limit(1000),
+    db
+      .select({
+        requestId: trainingQuotations.requestId,
+        quotationNumber: trainingQuotations.quotationNumber,
+        validUntil: trainingQuotations.validUntil,
+      })
+      .from(trainingQuotations)
+      .where(and(eq(trainingQuotations.status, "accepted"), gte(trainingQuotations.validUntil, today)))
+      .limit(1000),
   ]);
 
   const eventByRequest = new Map<string, typeof events>();
@@ -45,6 +56,7 @@ export default async function TrainingRequestsPage() {
     eventByRequest.set(event.requestId, items);
   }
   const sessionById = new Map(sessions.map((session) => [session.id, session.referenceNumber]));
+  const acceptedQuotationByRequest = new Map(acceptedQuotations.map((quotation) => [quotation.requestId, quotation]));
   const awaitingReview = requests.filter((item) => item.status === "submitted" || item.status === "under_review").length;
   const approvedAwaitingSchedule = requests.filter((item) => item.status === "approved").length;
   const scheduled = requests.filter((item) => item.status === "scheduled").length;
@@ -102,6 +114,8 @@ export default async function TrainingRequestsPage() {
             {requests.map((request) => {
               const requestEvents = eventByRequest.get(request.id) || [];
               const scheduledReference = request.scheduledSessionId ? sessionById.get(request.scheduledSessionId) : undefined;
+              const acceptedQuotation = acceptedQuotationByRequest.get(request.id);
+              const commercialAuthorizationMissing = request.requestType === "client" && !acceptedQuotation;
               return (
                 <article key={request.id} className="p-5 sm:p-6">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -128,10 +142,20 @@ export default async function TrainingRequestsPage() {
 
                     {canManage && <div className="w-full max-w-xl space-y-3 xl:w-[430px]">
                       <TransitionControls requestId={request.id} status={request.status} />
-                      {request.status === "approved" && (
+                      {request.status === "approved" && (commercialAuthorizationMissing ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                          <p className="font-semibold">Quotation required before scheduling</p>
+                          <p className="mt-1 text-amber-900">This client request needs an accepted quotation that is still within its validity period before a training session can be created.</p>
+                          <Link href={`/driver-training/commercials?requestId=${encodeURIComponent(request.id)}&notice=quotation-required`} className="mt-3 inline-flex font-semibold underline underline-offset-4">Open Training Commercials & Quotations</Link>
+                        </div>
+                      ) : (
                         <form action={scheduleApprovedTrainingRequest} className="rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4">
                           <input type="hidden" name="requestId" value={request.id} />
-                          <p className="text-sm font-semibold text-[var(--vims-ink)]">Schedule Request</p>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="text-sm font-semibold text-[var(--vims-ink)]">Schedule Request</p>
+                            {acceptedQuotation && <Badge tone="emerald">{acceptedQuotation.quotationNumber} accepted</Badge>}
+                          </div>
+                          {acceptedQuotation && <p className="mt-1 text-xs text-[var(--vims-ink-muted)]">Commercial authorization valid through {formatDate(acceptedQuotation.validUntil)}.</p>}
                           <div className="mt-3 grid gap-3 sm:grid-cols-2">
                             <Field label="Start"><Input name="startAt" type="datetime-local" required /></Field>
                             <Field label="End"><Input name="endAt" type="datetime-local" required /></Field>
@@ -144,7 +168,7 @@ export default async function TrainingRequestsPage() {
                           </div>
                           <div className="mt-3 flex justify-end"><Button type="submit"><CalendarCheck2 className="h-4 w-4" /> Create Session</Button></div>
                         </form>
-                      )}
+                      ))}
                     </div>}
                   </div>
 
