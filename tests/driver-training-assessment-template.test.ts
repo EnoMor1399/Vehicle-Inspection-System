@@ -103,11 +103,12 @@ test("assessment UI exposes quantitative, qualitative and safety-override contro
   const page = readFileSync("src/app/driver-training/assessments/page.tsx", "utf8");
   assert.match(page, /Driver Performance Assessment/);
   assert.match(page, /DRIVER_ASSESSMENT_SECTIONS\.map/);
-  assert.match(page, /Critical safety violations/);
-  assert.match(page, /Qualitative trainer feedback/);
-  assert.match(page, /Corrective action \/ development plan/);
-  assert.match(page, /Driver acknowledgement/);
-  assert.match(page, /Finalize assessment/);
+  assert.match(page, /Critical Violations/);
+  assert.match(page, /Trainer Feedback/);
+  assert.match(page, /Development Plan/);
+  assert.match(page, /Driver Acknowledgement/);
+  assert.match(page, /Submit Assessment/);
+  assert.match(page, /critical violation blocks competence/);
 
   const nav = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   assert.match(nav, /href: "\/driver-training\/assessments"/);
@@ -115,7 +116,7 @@ test("assessment UI exposes quantitative, qualitative and safety-override contro
 
 test("participant workspace routes trainers to the comprehensive assessment instead of the legacy score form", () => {
   const participants = readFileSync("src/app/driver-training/participants/page.tsx", "utf8");
-  assert.match(participants, /Comprehensive trainer assessment/);
+  assert.match(participants, /> Assess/);
   assert.match(participants, /href="\/driver-training\/assessments"/);
   assert.doesNotMatch(participants, /recordTrainingAssessment/);
 });
