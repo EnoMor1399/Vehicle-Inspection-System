@@ -71,6 +71,8 @@ export function canManageTraining(user: TrainingUser) {
 export function canManageTrainingUsers(user: TrainingUser) {
   if (!canAccessDriverTraining(user)) return false;
   if (!canViewTraining(user)) return false;
+  const managePermission = explicitPermission(user, "training_manage");
+  if (managePermission === false) return false;
   return TRAINING_USER_ADMIN_ROLES.has(user.role) || user.permissions?.["*"] === true;
 }
 
