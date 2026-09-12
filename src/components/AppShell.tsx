@@ -63,7 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/", label: "Dashboard", icon: LayoutDashboard, resource: "vehicle_inspection" },
       { href: "/vehicles", label: "Vehicles", icon: Car, resource: "vehicles" },
       { href: "/transporters", label: "Transporters", icon: Truck, resource: "transporters" },
       { href: "/inspections", label: "Inspections", icon: ClipboardCheck, resource: "inspections" },
@@ -74,7 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Departments",
     items: [
-      { href: "/driver-training", label: "Driver Training & Assessment", icon: GraduationCap },
+      { href: "/driver-training", label: "Driver Training & Assessment", icon: GraduationCap, resource: "training" },
     ],
   },
   {
@@ -89,7 +89,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Administration",
     items: [
-      { href: "/users", label: "Users & Roles", icon: Users, resource: "users" },
+      { href: "/users", label: "Vehicle Inspection Users", icon: Users, resource: "users" },
       { href: "/documents", label: "Documents", icon: FileText, resource: "documents" },
       { href: "/notifications", label: "Notifications", icon: Bell, resource: "notifications" },
       { href: "/import", label: "Import / Export", icon: Upload, resource: "import" },
