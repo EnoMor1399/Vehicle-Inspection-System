@@ -28,12 +28,13 @@ test("Driver Training overview avoids duplicated quick-access and service-catalo
 test("Assessment workspace keeps core controls while collapsing secondary follow-up content", () => {
   const page = readFileSync("src/app/driver-training/assessments/page.tsx", "utf8");
 
-  assert.match(page, /Performance ratings/);
-  assert.match(page, /Critical safety violations/);
-  assert.match(page, /Qualitative trainer feedback/);
-  assert.match(page, /Corrective action \/ development plan/);
-  assert.match(page, /Driver acknowledgement/);
-  assert.match(page, /Finalize assessment/);
+  assert.match(page, /Performance Ratings/);
+  assert.match(page, /Critical Violations/);
+  assert.match(page, /Trainer Feedback/);
+  assert.match(page, /Development Plan/);
+  assert.match(page, /Driver Acknowledgement/);
+  assert.match(page, /Submit Assessment/);
+  assert.match(page, /critical violation blocks competence/);
   assert.doesNotMatch(page, /Safety behaviour observations/);
   assert.doesNotMatch(page, /Vehicle handling observations/);
   assert.doesNotMatch(page, /Communication & professional behaviour/);
@@ -43,7 +44,7 @@ test("Assessment workspace keeps core controls while collapsing secondary follow
 test("Assessment review queue focuses on pending work instead of duplicating review history", () => {
   const page = readFileSync("src/app/driver-training/assessments/review/page.tsx", "utf8");
 
-  assert.match(page, /Pending independent reviews/);
+  assert.match(page, /Pending reviews/);
   assert.doesNotMatch(page, /Recent review decisions/);
   assert.doesNotMatch(page, /Your own assessments/);
 });
