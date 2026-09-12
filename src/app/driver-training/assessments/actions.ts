@@ -1,0 +1,200 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
+import { getCurrentUser } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
+import {
+  calculateDriverAssessment,
+  deriveDriverAssessmentOutcome,
+  DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS,
+  DRIVER_ASSESSMENT_SECTIONS,
+  DRIVER_ASSESSMENT_TOTAL_CRITERIA,
+} from "@/lib/driver-assessment-template";
+import { canManageTraining } from "@/lib/training-access";
+import { TRAINING_ASSESSMENT_TYPES } from "@/lib/training-policy";
+import { newId } from "@/lib/utils";
+
+const VALID_ASSESSMENT_TYPES = new Set<string>(TRAINING_ASSESSMENT_TYPES);
+const VALID_CRITICAL_VIOLATIONS = new Set(DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS.map((item) => item.id));
+
+function text(formData: FormData, name: string, max = 4000) {
+  const value = formData.get(name);
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, max);
+}
+
+function parseDevelopmentPlan(formData: FormData) {
+  const items: Array<{ area: string; action: string; targetDate?: string }> = [];
+  for (let index = 1; index <= 4; index += 1) {
+    const area = text(formData, `developmentArea${index}`, 500);
+    const action = text(formData, `developmentAction${index}`, 1200);
+    const targetDate = text(formData, `developmentTarget${index}`, 20);
+    if (!area && !action) continue;
+    if (!area || !action) throw new Error("Each development-plan item needs both an area and a required action");
+    if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) throw new Error("Use a valid target date in the development plan");
+    items.push({ area, action, ...(targetDate ? { targetDate } : {}) });
+  }
+  return items;
+}
+
+function calculatePracticalPercentage(ratings: Record<string, number>) {
+  let score = 0;
+  let maximum = 0;
+  for (const section of DRIVER_ASSESSMENT_SECTIONS) {
+    if (section.id === "traffic_regulations") continue;
+    for (const criterion of section.criteria) {
+      const value = ratings[criterion.id];
+      if (!value) continue;
+      score += value;
+      maximum += 5;
+    }
+  }
+  return maximum > 0 ? Math.round((score / maximum) * 10_000) / 100 : null;
+}
+
+export async function recordComprehensiveDriverAssessment(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!canManageTraining(user)) throw new Error("You do not have permission to record driver assessments");
+
+  const participantId = text(formData, "participantId", 36);
+  const assessmentType = text(formData, "assessmentType", 40);
+  if (!participantId) throw new Error("Select a participant to assess");
+  if (!VALID_ASSESSMENT_TYPES.has(assessmentType)) throw new Error("Select a valid assessment type");
+
+  const ratings: Record<string, number> = {};
+  const sectionNotes: Record<string, string> = {};
+  for (const section of DRIVER_ASSESSMENT_SECTIONS) {
+    let sectionRated = 0;
+    for (const criterion of section.criteria) {
+      const raw = formData.get(`rating__${criterion.id}`);
+      if (raw === null || raw === "") continue;
+      const rating = Number(raw);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new Error(`Invalid rating for ${criterion.label}`);
+      ratings[criterion.id] = rating;
+      sectionRated += 1;
+    }
+    if (sectionRated === 0) throw new Error(`Rate at least one criterion in ${section.title}`);
+    const note = text(formData, `sectionNote__${section.id}`, 2000);
+    if (note) sectionNotes[`section:${section.id}`] = note;
+  }
+
+  const calculated = calculateDriverAssessment(ratings);
+  const minimumRequired = Math.ceil(DRIVER_ASSESSMENT_TOTAL_CRITERIA * 0.75);
+  if (calculated.ratedCriteria < minimumRequired || calculated.percentage === null || !calculated.classification) {
+    throw new Error(`Complete at least ${minimumRequired} of ${DRIVER_ASSESSMENT_TOTAL_CRITERIA} assessment criteria before submitting`);
+  }
+
+  const criticalViolations = formData
+    .getAll("criticalViolations")
+    .filter((value): value is string => typeof value === "string" && VALID_CRITICAL_VIOLATIONS.has(value));
+
+  const outcome = deriveDriverAssessmentOutcome(calculated.percentage, criticalViolations.length);
+  const trafficScore = calculated.sectionScores.traffic_regulations?.percentage ?? null;
+  const practicalScore = calculatePracticalPercentage(ratings);
+  const strengths = text(formData, "strengths");
+  const improvementText = text(formData, "improvementAreas");
+  const improvementAreas = improvementText
+    ? [...new Set(improvementText.split(/[,\n]/).map((item) => item.trim()).filter(Boolean))].slice(0, 30)
+    : [];
+  const developmentPlan = parseDevelopmentPlan(formData);
+  const qualitativeFeedback = {
+    safetyObservations: text(formData, "safetyObservations") || undefined,
+    vehicleHandlingObservations: text(formData, "vehicleHandlingObservations") || undefined,
+    communicationObservations: text(formData, "communicationObservations") || undefined,
+    trainerComments: text(formData, "trainerComments") || undefined,
+    immediateCorrectiveAction: text(formData, "immediateCorrectiveAction") || undefined,
+  };
+  const driverAcknowledged = formData.get("driverAcknowledged") === "on";
+  const driverComments = text(formData, "driverComments");
+  const id = newId();
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${participantId}))`);
+    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, participantId)).limit(1);
+    if (!participant) return { ok: false as const, error: "Training participant not found" };
+    if (participant.attendanceStatus === "absent" || participant.attendanceStatus === "withdrawn") {
+      return { ok: false as const, error: "Absent or withdrawn participants cannot receive a practical driver assessment" };
+    }
+
+    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, participant.sessionId)).limit(1);
+    if (!session) return { ok: false as const, error: "Training session not found" };
+    if (session.status === "cancelled") return { ok: false as const, error: "Cancelled training sessions cannot be assessed" };
+
+    const certificateEligible = assessmentType !== "pre_training" && outcome.result === "competent" && criticalViolations.length === 0;
+    const assessment = {
+      id,
+      participantId: participant.id,
+      sessionId: participant.sessionId,
+      assessorId: user.id,
+      assessmentType,
+      assessmentVersion: "driver-v1",
+      theoryScore: trafficScore === null ? null : trafficScore.toFixed(2),
+      practicalScore: practicalScore === null ? null : practicalScore.toFixed(2),
+      overallScore: calculated.percentage.toFixed(2),
+      scoredPoints: calculated.score,
+      maximumPoints: calculated.maximum,
+      classification: calculated.classification,
+      result: outcome.result,
+      riskLevel: outcome.riskLevel,
+      criteriaRatings: ratings,
+      criteriaComments: sectionNotes,
+      sectionScores: calculated.sectionScores,
+      criticalViolations,
+      qualitativeFeedback,
+      developmentPlan,
+      finalRecommendation: outcome.finalRecommendation,
+      strengths: strengths || null,
+      improvementAreas,
+      remarks: text(formData, "remarks") || null,
+      driverAcknowledged,
+      driverComments: driverComments || null,
+    } as const;
+
+    await tx.insert(trainingAssessments).values(assessment);
+    await tx
+      .update(trainingParticipants)
+      .set({
+        attendanceStatus: participant.attendanceStatus === "registered" ? "attended" : participant.attendanceStatus,
+        assessmentStatus: outcome.result === "competent" ? "passed" : "failed",
+        certificateEligible,
+        riskLevel: outcome.riskLevel,
+        updatedAt: new Date(),
+      })
+      .where(eq(trainingParticipants.id, participant.id));
+
+    return { ok: true as const, participant, session, assessment };
+  });
+
+  if (!result.ok) throw new Error(result.error);
+
+  await logAudit({
+    userId: user.id,
+    userName: user.name,
+    action: "inspect",
+    entityType: "training_assessment",
+    entityId: id,
+    entityLabel: result.participant.fullName,
+    summary: `Comprehensive driver assessment: ${outcome.result} at ${calculated.percentage}%`,
+    after: {
+      assessmentType,
+      overallScore: calculated.percentage,
+      classification: calculated.classification,
+      result: outcome.result,
+      riskLevel: outcome.riskLevel,
+      criticalViolations,
+      finalRecommendation: outcome.finalRecommendation,
+    },
+  });
+
+  revalidatePath("/driver-training");
+  revalidatePath("/driver-training/assessments");
+  revalidatePath("/driver-training/participants");
+  revalidatePath("/driver-training/certificates");
+  revalidatePath("/driver-training/analytics");
+  revalidatePath("/driver-training/compliance");
+  redirect(`/driver-training/assessments?saved=1&participant=${participantId}`);
+}
