@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { getSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
 
 export const dynamic = "force-dynamic";
@@ -89,10 +90,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   try {
     const user = await getCurrentUser();
     accountTheme = await getUserThemePreference(user.id);
+    const allowedResources = SHELL_RESOURCES.filter((resource) => hasPermission(user, resource)) as string[];
+    if (canAccessVehicleInspection(user)) allowedResources.push("vehicle_inspection");
+    if (canAccessDriverTraining(user)) allowedResources.push("training");
+
     shellUser = {
       role: user.role,
       name: user.name,
-      allowedResources: SHELL_RESOURCES.filter((resource) => hasPermission(user, resource)),
+      allowedResources,
     };
   } catch {
     // Public and login routes intentionally render without an authenticated shell identity.
