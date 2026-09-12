@@ -68,7 +68,7 @@ function permissionsForTrainingRole(role: string): Record<string, boolean> {
   };
 }
 
-export async function createDriverTrainingUser(formData: FormData) {
+export async function createDriverTrainingUser(formData: FormData): Promise<void> {
   const actor = await getCurrentUser();
   if (!canCreateDriverTrainingUsers(actor)) {
     throw new Error("Only a Super Administrator or Administrator assigned to Driver Training can create Driver Training accounts");
@@ -152,7 +152,7 @@ export async function createDriverTrainingUser(formData: FormData) {
     if (createInstructorProfile) {
       const profileId = newId();
       const instructorCode = `DTI-${new Date().getUTCFullYear()}-${profileId.slice(0, 8).toUpperCase()}`;
-      [instructorProfile] = await tx
+      const [createdProfile] = await tx
         .insert(trainingInstructorProfiles)
         .values({
           id: profileId,
@@ -163,6 +163,7 @@ export async function createDriverTrainingUser(formData: FormData) {
           createdBy: actor.id,
         })
         .returning();
+      instructorProfile = createdProfile || null;
     }
 
     return { account, instructorProfile };
@@ -194,6 +195,4 @@ export async function createDriverTrainingUser(formData: FormData) {
   revalidatePath("/driver-training/instructors");
   revalidatePath("/driver-training/sessions");
   revalidatePath("/users");
-
-  return { ok: true, userId: result.account.id };
 }
