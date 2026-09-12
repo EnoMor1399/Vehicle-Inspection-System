@@ -208,7 +208,7 @@ export default async function DriverAssessmentsPage() {
           <Card className="overflow-hidden">
             <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
               <h2 className="font-semibold text-[var(--vims-ink)]">Qualitative trainer feedback</h2>
-              <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Capture the evidence behind the score and the driver's development priorities.</p>
+              <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Capture the evidence behind the score and the driver&apos;s development priorities.</p>
             </div>
             <div className="grid gap-4 p-5 md:grid-cols-2 sm:p-6">
               <Field label="Key strengths"><TextArea name="strengths" maxLength={4000} className="min-h-[100px]" /></Field>
@@ -240,7 +240,7 @@ export default async function DriverAssessmentsPage() {
           <Card className="overflow-hidden">
             <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
               <h2 className="font-semibold text-[var(--vims-ink)]">Driver acknowledgement</h2>
-              <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Acknowledgement records receipt of feedback; it does not alter the trainer's assessment result.</p>
+              <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">Acknowledgement records receipt of feedback; it does not alter the trainer&apos;s assessment result.</p>
             </div>
             <div className="grid gap-4 p-5 md:grid-cols-[auto_1fr] md:items-start sm:p-6">
               <label className="flex items-center gap-3 rounded-xl border border-[var(--vims-line)] px-4 py-3 text-sm font-semibold text-[var(--vims-ink)]">
