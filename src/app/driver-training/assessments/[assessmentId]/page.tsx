@@ -20,7 +20,9 @@ import PrintAssessmentButton from "./PrintAssessmentButton";
 
 export const dynamic = "force-dynamic";
 
-const criticalViolationLabels = new Map(DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS.map((item) => [item.id, item.label]));
+const criticalViolationLabels = new Map<string, string>(
+  DRIVER_ASSESSMENT_CRITICAL_VIOLATIONS.map((item) => [item.id, item.label]),
+);
 
 function reviewTone(status: string): "amber" | "emerald" | "red" | "slate" {
   if (status === "approved") return "emerald";
