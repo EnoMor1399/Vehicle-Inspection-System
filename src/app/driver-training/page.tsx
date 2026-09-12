@@ -74,12 +74,28 @@ const SERVICE_NAMES = new Map(DRIVER_TRAINING_SERVICES.map((service) => [service
 export default async function DriverTrainingPage() {
   const user = await requireInternalUser();
   if (!canViewTraining(user)) {
-    return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
+    return (
+      <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
+        <Card className="p-6 sm:p-8">
+          <div className="flex items-start gap-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-950/45 dark:text-amber-300 dark:ring-amber-800">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-lg font-semibold text-[var(--vims-ink)]">Driver Training access required</h1>
+              <p className="mt-1.5 text-sm leading-6 text-[var(--vims-ink-muted)]">
+                Your account does not currently have permission to view Driver Training & Assessment Services.
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   const canManage = canManageTraining(user);
 
-  const [[sessionStats], [participantStats], [certificateStats], upcomingSessions] = await Promise.all([
+  const [sessionResult, participantResult, certificateResult, scheduleResult] = await Promise.allSettled([
     db
       .select({
         total: sql<number>`count(*)::int`,
@@ -111,7 +127,24 @@ export default async function DriverTrainingPage() {
       .where(inArray(trainingSessions.status, ["scheduled", "in_progress"]))
       .orderBy(trainingSessions.startAt)
       .limit(5),
-  ]);
+  ] as const);
+
+  const sessionStats = sessionResult.status === "fulfilled" ? sessionResult.value[0] : undefined;
+  const participantStats = participantResult.status === "fulfilled" ? participantResult.value[0] : undefined;
+  const certificateStats = certificateResult.status === "fulfilled" ? certificateResult.value[0] : undefined;
+  const upcomingSessions = scheduleResult.status === "fulfilled" ? scheduleResult.value : [];
+  const hasDataIssue = [sessionResult, participantResult, certificateResult, scheduleResult].some(
+    (result) => result.status === "rejected"
+  );
+
+  if (hasDataIssue) {
+    console.error("[driver-training] One or more dashboard data segments could not be loaded", {
+      sessions: sessionResult.status,
+      participants: participantResult.status,
+      certificates: certificateResult.status,
+      schedule: scheduleResult.status,
+    });
+  }
 
   return (
     <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 xl:p-10">
@@ -140,39 +173,51 @@ export default async function DriverTrainingPage() {
           </p>
         </div>
 
+        {hasDataIssue && (
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-200"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="text-sm leading-5">
+              Some live operational data is temporarily unavailable. Available sections remain usable; refresh the page to retry the affected metrics.
+            </p>
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             label="Training sessions"
-            value={Number(sessionStats?.total || 0)}
-            hint="All programmes"
+            value={sessionStats ? Number(sessionStats.total || 0) : "—"}
+            hint={sessionStats ? "All programmes" : "Temporarily unavailable"}
             tone="blue"
             icon={<CalendarDays className="h-5 w-5" />}
           />
           <StatCard
             label="Active / upcoming"
-            value={Number(sessionStats?.active || 0)}
-            hint="Scheduled or in progress"
+            value={sessionStats ? Number(sessionStats.active || 0) : "—"}
+            hint={sessionStats ? "Scheduled or in progress" : "Temporarily unavailable"}
             tone="amber"
             icon={<GraduationCap className="h-5 w-5" />}
           />
           <StatCard
             label="Participants"
-            value={Number(participantStats?.total || 0)}
-            hint="Registered operators"
+            value={participantStats ? Number(participantStats.total || 0) : "—"}
+            hint={participantStats ? "Registered operators" : "Temporarily unavailable"}
             tone="violet"
             icon={<UsersRound className="h-5 w-5" />}
           />
           <StatCard
             label="High-risk operators"
-            value={Number(participantStats?.highRisk || 0)}
-            hint="High or critical"
+            value={participantStats ? Number(participantStats.highRisk || 0) : "—"}
+            hint={participantStats ? "High or critical" : "Temporarily unavailable"}
             tone="red"
             icon={<AlertTriangle className="h-5 w-5" />}
           />
           <StatCard
             label="Active certificates"
-            value={Number(certificateStats?.active || 0)}
-            hint="Competence records"
+            value={certificateStats ? Number(certificateStats.active || 0) : "—"}
+            hint={certificateStats ? "Competence records" : "Temporarily unavailable"}
             tone="emerald"
             icon={<Award className="h-5 w-5" />}
           />
@@ -193,13 +238,17 @@ export default async function DriverTrainingPage() {
             </div>
             <Link
               href="/driver-training/sessions"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand-color)] hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand-color)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2"
             >
               View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
-          {upcomingSessions.length === 0 ? (
+          {scheduleResult.status === "rejected" ? (
+            <div className="p-6 text-sm leading-6 text-[var(--vims-ink-muted)]">
+              The live programme schedule is temporarily unavailable. Other Driver Training workspaces remain available.
+            </div>
+          ) : upcomingSessions.length === 0 ? (
             <div className="p-6 text-sm leading-6 text-[var(--vims-ink-muted)]">
               No scheduled or in-progress training sessions.
             </div>
@@ -237,7 +286,7 @@ export default async function DriverTrainingPage() {
               <Link
                 key={href}
                 href={href}
-                className="group flex min-h-28 gap-3 bg-[var(--vims-panel-solid)] p-4 transition-colors hover:bg-[var(--vims-panel-soft)] sm:p-5"
+                className="group flex min-h-28 gap-3 bg-[var(--vims-panel-solid)] p-4 transition-colors hover:bg-[var(--vims-panel-soft)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-inset sm:p-5"
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--vims-panel-soft)] text-[var(--brand-color)] ring-1 ring-inset ring-[var(--vims-line)] transition-colors group-hover:bg-[var(--vims-panel-solid)]">
                   <Icon className="h-4.5 w-4.5" />

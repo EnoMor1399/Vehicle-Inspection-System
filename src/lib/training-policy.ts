@@ -13,13 +13,21 @@ export const TRAINING_COMPLIANCE_PRIORITIES = ["low", "medium", "high", "critica
 export const TRAINING_COMPLIANCE_CHANNELS = ["email", "phone", "sms", "whatsapp", "in_person"] as const;
 
 const SERVICE_IDS = new Set(DRIVER_TRAINING_SERVICES.map((service) => service.id));
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const optionalText = (max: number) => z.string().trim().max(max).optional().transform((value) => value || undefined);
 const optionalEmail = z.string().trim().max(200).optional().transform((value) => value || undefined).refine(
   (value) => !value || z.string().email().safeParse(value).success,
   "Enter a valid email address"
 );
+
+export function isValidTrainingDate(value: string) {
+  if (!ISO_DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 const optionalDate = z.string().trim().max(20).optional().transform((value) => value || undefined).refine(
-  (value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value),
+  (value) => !value || isValidTrainingDate(value),
   "Use a valid date"
 );
 const optionalScore = z.preprocess(
@@ -43,7 +51,7 @@ export const trainingSessionSchema = z.object({
   capacity: z.coerce.number().int().min(1).max(500).default(20),
   notes: optionalText(4000),
 }).superRefine((value, ctx) => {
-  if (value.endAt < value.startAt) {
+  if (value.endAt <= value.startAt) {
     ctx.addIssue({ code: "custom", path: ["endAt"], message: "End date/time must be after the start date/time" });
   }
 });
@@ -142,6 +150,19 @@ export function calculateOverallScore(theoryScore?: number, practicalScore?: num
 
 export function isPassingTrainingResult(result: string) {
   return result === "pass" || result === "competent";
+}
+
+export function addUtcMonthsClamped(value: Date, months: number) {
+  if (!Number.isFinite(value.getTime())) throw new RangeError("Invalid certificate issue date");
+  if (!Number.isInteger(months) || months < 0 || months > 120) throw new RangeError("Invalid certificate validity period");
+
+  const result = new Date(value.getTime());
+  const originalDay = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(originalDay, lastDay));
+  return result;
 }
 
 export function effectiveTrainingCertificateStatus(
