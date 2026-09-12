@@ -18,8 +18,9 @@ test("Driver Training navigation groups related workspaces into fewer controls",
 test("Driver Training overview avoids duplicated quick-access and service-catalogue content", () => {
   const page = readFileSync("src/app/driver-training/page.tsx", "utf8");
 
-  assert.match(page, /\bCreate\b/);
-  assert.match(page, /Active & upcoming sessions/);
+  assert.match(page, /Create record/);
+  assert.match(page, /Current sessions/);
+  assert.match(page, /Scheduled and in-progress programmes\./);
   assert.doesNotMatch(page, /QUICK_WORKSPACES/);
   assert.doesNotMatch(page, /Service portfolio/);
   assert.doesNotMatch(page, /Training & assessment services/);
