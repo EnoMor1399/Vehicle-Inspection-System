@@ -5,19 +5,26 @@ import { canServeAsInternalTrainingInstructor } from "../src/lib/training-access
 
 test("Internal Instructor eligibility requires an active Driver Training account", () => {
   assert.equal(canServeAsInternalTrainingInstructor({
+    role: "instructor",
+    permissions: { training: true, training_manage: true },
+    isActive: true,
+  }), true);
+
+  // Legacy training inspectors remain eligible for compatibility.
+  assert.equal(canServeAsInternalTrainingInstructor({
     role: "inspector",
     permissions: { training: true },
     isActive: true,
   }), true);
 
   assert.equal(canServeAsInternalTrainingInstructor({
-    role: "inspector",
+    role: "instructor",
     permissions: { vehicle_inspection: true, training: false },
     isActive: true,
   }), false);
 
   assert.equal(canServeAsInternalTrainingInstructor({
-    role: "inspector",
+    role: "instructor",
     permissions: { training: true },
     isActive: false,
   }), false);
