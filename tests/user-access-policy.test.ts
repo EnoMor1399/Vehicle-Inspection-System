@@ -10,11 +10,11 @@ test("recognized VIMS roles are validated centrally", () => {
   assert.equal(isUserRole("unknown_role"), false);
 });
 
-test("delegated user managers cannot assign roles above their own", () => {
+test("delegated user managers cannot assign or modify roles at or above their own", () => {
   assert.equal(validateDelegatedRoleChange("viewer", "viewer", "admin").ok, false);
   assert.equal(validateDelegatedRoleChange("operations_manager", "viewer", "admin").ok, false);
   assert.equal(validateDelegatedRoleChange("admin", "viewer", "operations_manager").ok, true);
-  assert.equal(validateDelegatedRoleChange("admin", "admin", "admin").ok, true);
+  assert.equal(validateDelegatedRoleChange("admin", "admin", "admin").ok, false);
 });
 
 test("only Super Administrators may touch Super Administrator access", () => {
