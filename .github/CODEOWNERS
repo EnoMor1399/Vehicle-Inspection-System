@@ -1,0 +1,11 @@
+# Default ownership
+* @EnoMor1399
+
+# Production-critical configuration and data paths
+/.github/workflows/ @EnoMor1399
+/migrations/ @EnoMor1399
+/scripts/apply-enterprise-upgrade.mjs @EnoMor1399
+/scripts/verify-database-target.mjs @EnoMor1399
+/src/db/ @EnoMor1399
+/src/app/api/health/ @EnoMor1399
+/vercel.json @EnoMor1399
