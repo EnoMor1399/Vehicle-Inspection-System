@@ -1,12 +1,15 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { normalizePostgresConnectionString } from "@/lib/database-url";
+import { assertExpectedApplicationDatabase } from "@/lib/database-contract";
 
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
+
+assertExpectedApplicationDatabase(databaseUrl);
 
 function boundedInteger(value: string | undefined, fallback: number, min: number, max: number) {
   const parsed = Number.parseInt(value || "", 10);
