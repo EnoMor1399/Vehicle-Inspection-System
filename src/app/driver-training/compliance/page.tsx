@@ -12,7 +12,7 @@ import {
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, StatCard, TextArea, TextInput } from "@/components/ui";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canManageTrainingCompliance, canViewTraining } from "@/lib/training-access";
 import { daysUntilTrainingDate, deriveTrainingCompliancePriority, effectiveTrainingCertificateStatus } from "@/lib/training-policy";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
@@ -40,7 +40,7 @@ export default async function TrainingCompliancePage() {
   if (!canViewTraining(user)) {
     return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
   }
-  const canManage = canManageTraining(user);
+  const canManage = canManageTrainingCompliance(user);
   const now = new Date();
 
   const [cases, certificateRows, licenceRows, riskRows, recentEvents] = await Promise.all([

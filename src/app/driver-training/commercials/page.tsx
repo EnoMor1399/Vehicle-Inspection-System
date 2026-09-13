@@ -6,7 +6,7 @@ import { trainingQuotationItems, trainingQuotations } from "@/db/training-commer
 import { trainingRequests } from "@/db/training-request-schema";
 import { Badge, Button, Card, EmptyState, PageHeader, StatCard, TextArea, TextInput as Input } from "@/components/ui";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canManageTrainingCommercials, canViewTraining } from "@/lib/training-access";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import {
   addTrainingQuotationItem,
@@ -23,7 +23,7 @@ export default async function TrainingCommercialsPage() {
   if (!canViewTraining(user)) {
     return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
   }
-  const canManage = canManageTraining(user);
+  const canManage = canManageTrainingCommercials(user);
 
   const [requests, quotations, items] = await Promise.all([
     db.select().from(trainingRequests).orderBy(desc(trainingRequests.createdAt)).limit(500),

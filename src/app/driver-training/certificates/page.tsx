@@ -5,7 +5,7 @@ import { trainingCertificates, trainingParticipants, trainingSessions } from "@/
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, TextInput } from "@/components/ui";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
 import { requireInternalUser } from "@/lib/require-auth";
-import { canManageTraining, canViewTraining } from "@/lib/training-access";
+import { canManageTrainingCertificates, canViewTraining } from "@/lib/training-access";
 import { effectiveTrainingCertificateStatus } from "@/lib/training-policy";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
@@ -18,7 +18,7 @@ const serviceNames = new Map(DRIVER_TRAINING_SERVICES.map((service) => [service.
 export default async function TrainingCertificatesPage() {
   const user = await requireInternalUser();
   if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to this module.</div>;
-  const canManage = canManageTraining(user);
+  const canManage = canManageTrainingCertificates(user);
   const now = new Date();
 
   const [eligibleParticipants, certificates] = await Promise.all([

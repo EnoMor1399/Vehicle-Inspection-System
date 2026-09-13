@@ -11,7 +11,7 @@ import {
 import { trainingSessions } from "@/db/training-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTrainingGovernance } from "@/lib/training-access";
 import {
   evaluateTrainingRegulatoryCompliance,
   trainingAccreditationDecisionSchema,
@@ -36,7 +36,7 @@ function refreshAccreditationPaths() {
 
 async function requireTrainingManager() {
   const user = await getCurrentUser();
-  if (!canManageTraining(user)) throw new Error("You do not have permission to manage Driver Training accreditation records");
+  if (!canManageTrainingGovernance(user)) throw new Error("You do not have permission to manage Driver Training accreditation records");
   return user;
 }
 

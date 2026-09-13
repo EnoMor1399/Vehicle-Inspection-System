@@ -8,7 +8,7 @@ import { trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { trainingQualityEvents, trainingQualityFindings, trainingSessionFeedback } from "@/db/training-quality-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTrainingGovernance } from "@/lib/training-access";
 import {
   canTransitionTrainingQualityFinding,
   feedbackQualitySignal,
@@ -38,7 +38,7 @@ function refreshQualityPaths(participantId?: string) {
 
 async function requireTrainingManager() {
   const user = await getCurrentUser();
-  if (!canManageTraining(user)) {
+  if (!canManageTrainingGovernance(user)) {
     throw new Error("You do not have permission to manage Driver Training quality records");
   }
   return user;

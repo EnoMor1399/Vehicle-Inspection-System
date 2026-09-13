@@ -7,7 +7,7 @@ import { trainingQuotationItems, trainingQuotations } from "@/db/training-commer
 import { trainingRequests } from "@/db/training-request-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTrainingCommercials } from "@/lib/training-access";
 import {
   calculateQuotationTotals,
   canTransitionTrainingQuotation,
@@ -35,7 +35,7 @@ function refreshCommercialPaths() {
 
 async function requireTrainingManager() {
   const user = await getCurrentUser();
-  if (!canManageTraining(user)) throw new Error("You do not have permission to manage Driver Training commercial records");
+  if (!canManageTrainingCommercials(user)) throw new Error("You do not have permission to manage Driver Training commercial records");
   return user;
 }
 

@@ -14,7 +14,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { DRIVER_TRAINING_SERVICES } from "@/lib/driver-training";
-import { canManageTraining } from "@/lib/training-access";
+import { canManageTrainingCompliance } from "@/lib/training-access";
 import {
   buildTrainingComplianceReminder,
   canTransitionTrainingComplianceCase,
@@ -45,7 +45,7 @@ function refreshCompliancePaths(participantId?: string) {
 
 async function requireComplianceManager() {
   const user = await getCurrentUser();
-  if (!canManageTraining(user)) {
+  if (!canManageTrainingCompliance(user)) {
     throw new Error("You do not have permission to manage Driver Training compliance records");
   }
   return user;

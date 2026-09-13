@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { locations, sessions, transporters, users } from "@/db/schema";
+import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
 import { and, count, eq, sql } from "drizzle-orm";
 import { getCurrentUser, canManageUsers } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { canManageTrainingUsers } from "@/lib/training-access";
+import { canManageTrainingUsers, trainingPermissionsForRole } from "@/lib/training-access";
 import {
   canAccessDriverTraining,
   canAccessVehicleInspection,
@@ -14,6 +15,7 @@ import {
   VEHICLE_INSPECTION_ACCESS_KEY,
 } from "@/lib/system-access";
 import { isUserRole, validateDelegatedRoleChange } from "@/lib/user-access-policy";
+import { newId } from "@/lib/utils";
 
 export async function updateUserAccess(input: {
   userId: string;
@@ -133,8 +135,14 @@ export async function updateUserAccess(input: {
     const currentPermissions = target.permissions && typeof target.permissions === "object"
       ? target.permissions
       : {};
+    const roleOrTrainingAssignmentChanged =
+      targetRole !== requestedRole || currentDriverTrainingAccess !== driverTrainingAccess;
+    const scopedTrainingPermissions = roleOrTrainingAssignmentChanged
+      ? trainingPermissionsForRole(driverTrainingAccess ? requestedRole : "__no_training_access__")
+      : {};
     const permissions = {
       ...currentPermissions,
+      ...scopedTrainingPermissions,
       [VEHICLE_INSPECTION_ACCESS_KEY]: vehicleInspectionAccess,
       [DRIVER_TRAINING_ACCESS_KEY]: driverTrainingAccess,
     };
@@ -162,6 +170,40 @@ export async function updateUserAccess(input: {
 
     if (!updated) return { ok: false as const, error: "User account update did not complete" };
 
+    let instructorProfileId: string | null = null;
+    let instructorProfileEnsured = false;
+    if (requestedRole === "instructor" && driverTrainingAccess && input.isActive) {
+      const [profile] = await tx
+        .select()
+        .from(trainingInstructorProfiles)
+        .where(eq(trainingInstructorProfiles.userId, target.id))
+        .limit(1);
+
+      if (profile) {
+        instructorProfileId = profile.id;
+        if (profile.status !== "active") {
+          await tx
+            .update(trainingInstructorProfiles)
+            .set({ status: "active", updatedAt: new Date() })
+            .where(eq(trainingInstructorProfiles.id, profile.id));
+          instructorProfileEnsured = true;
+        }
+      } else {
+        const profileId = newId();
+        const instructorCode = `DTI-${new Date().getUTCFullYear()}-${profileId.slice(0, 8).toUpperCase()}`;
+        await tx.insert(trainingInstructorProfiles).values({
+          id: profileId,
+          userId: target.id,
+          instructorCode,
+          status: "active",
+          specialties: [],
+          createdBy: actor.id,
+        });
+        instructorProfileId = profileId;
+        instructorProfileEnsured = true;
+      }
+    }
+
     if (securitySensitiveChange) {
       await tx
         .update(sessions)
@@ -178,6 +220,8 @@ export async function updateUserAccess(input: {
       currentDriverTrainingAccess,
       vehicleInspectionAccess,
       driverTrainingAccess,
+      instructorProfileId,
+      instructorProfileEnsured,
     };
   });
 
@@ -207,10 +251,14 @@ export async function updateUserAccess(input: {
       vehicleInspectionAccess: result.vehicleInspectionAccess,
       driverTrainingAccess: result.driverTrainingAccess,
       sessionsRevoked: result.securitySensitiveChange,
+      instructorProfileId: result.instructorProfileId,
+      instructorProfileEnsured: result.instructorProfileEnsured,
     },
   });
 
   revalidatePath("/users");
   revalidatePath("/driver-training/users");
+  revalidatePath("/driver-training/instructors");
+  revalidatePath("/driver-training/sessions");
   return { ok: true };
 }
