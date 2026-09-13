@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { inspections, vehicles, transporters } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { calculateFleetReadiness } from "@/lib/metrics";
 
 export interface DashboardStats {
@@ -34,53 +34,59 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
   const in30 = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
   const in60 = new Date(now.getTime() + 60 * 24 * 3600 * 1000);
 
-  const [vehicleStats] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      active: sql<number>`count(*) filter (where ${vehicles.status} = 'active')::int`,
-      passed: sql<number>`count(*) filter (where ${vehicles.status} = 'passed')::int`,
-      suspended: sql<number>`count(*) filter (where ${vehicles.status} = 'suspended')::int`,
-      failed: sql<number>`count(*) filter (where ${vehicles.status} = 'failed')::int`,
-      decommissioned: sql<number>`count(*) filter (where ${vehicles.status} = 'decommissioned')::int`,
-    })
-    .from(vehicles);
+  // All dashboard aggregates are independent. Run them concurrently so the
+  // reporting page pays for the slowest database round-trip instead of the
+  // sum of five sequential round-trips.
+  const [vehicleRows, transporterRows, inspectionRows, expiryRows, dueRows] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        active: sql<number>`count(*) filter (where ${vehicles.status} = 'active')::int`,
+        passed: sql<number>`count(*) filter (where ${vehicles.status} = 'passed')::int`,
+        suspended: sql<number>`count(*) filter (where ${vehicles.status} = 'suspended')::int`,
+        failed: sql<number>`count(*) filter (where ${vehicles.status} = 'failed')::int`,
+        decommissioned: sql<number>`count(*) filter (where ${vehicles.status} = 'decommissioned')::int`,
+      })
+      .from(vehicles),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(transporters)
+      .where(sql`${transporters.deletedAt} is null`),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pass: sql<number>`count(*) filter (where ${inspections.overallResult} = 'pass')::int`,
+        fail: sql<number>`count(*) filter (where ${inspections.overallResult} = 'fail')::int`,
+        conditional: sql<number>`count(*) filter (where ${inspections.overallResult} in ('conditional_pass','reinspection_required'))::int`,
+        month: sql<number>`count(*) filter (where ${inspections.inspectionDate} >= ${startOfMonth})::int`,
+        today: sql<number>`count(*) filter (where ${inspections.inspectionDate} >= ${startOfDay})::int`,
+        pendingReinsp: sql<number>`count(*) filter (where ${inspections.reinspectionDate} is not null and ${inspections.reinspectionDate} >= CURRENT_DATE)::int`,
+      })
+      .from(inspections),
+    db
+      .select({
+        insurance: sql<number>`count(*) filter (where ${vehicles.insuranceExpiry} between CURRENT_DATE and ${in30})::int`,
+        roadworthy: sql<number>`count(*) filter (where ${vehicles.roadworthyExpiry} between CURRENT_DATE and ${in30})::int`,
+        roadFund: sql<number>`count(*) filter (where ${vehicles.roadFundExpiry} between CURRENT_DATE and ${in30})::int`,
+      })
+      .from(vehicles),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(vehicles)
+      .where(
+        sql`(
+          select max(${inspections.nextInspectionDate})
+          from ${inspections}
+          where ${inspections.vehicleId} = ${vehicles.id}
+        ) between CURRENT_DATE and ${in60}`
+      ),
+  ]);
 
-  const [transporterStats] = await db
-    .select({ total: sql<number>`count(*)::int` })
-    .from(transporters)
-    .where(sql`${transporters.deletedAt} is null`);
-
-  const [inspectionStats] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      pass: sql<number>`count(*) filter (where ${inspections.overallResult} = 'pass')::int`,
-      fail: sql<number>`count(*) filter (where ${inspections.overallResult} = 'fail')::int`,
-      conditional: sql<number>`count(*) filter (where ${inspections.overallResult} in ('conditional_pass','reinspection_required'))::int`,
-      month: sql<number>`count(*) filter (where ${inspections.inspectionDate} >= ${startOfMonth})::int`,
-      today: sql<number>`count(*) filter (where ${inspections.inspectionDate} >= ${startOfDay})::int`,
-      pendingReinsp: sql<number>`count(*) filter (where ${inspections.reinspectionDate} is not null and ${inspections.reinspectionDate} >= CURRENT_DATE)::int`,
-    })
-    .from(inspections);
-
-  const [expiryStats] = await db
-    .select({
-      insurance: sql<number>`count(*) filter (where ${vehicles.insuranceExpiry} between CURRENT_DATE and ${in30})::int`,
-      roadworthy: sql<number>`count(*) filter (where ${vehicles.roadworthyExpiry} between CURRENT_DATE and ${in30})::int`,
-      roadFund: sql<number>`count(*) filter (where ${vehicles.roadFundExpiry} between CURRENT_DATE and ${in30})::int`,
-    })
-    .from(vehicles);
-
-  const [dueStats] = await db
-    .select({ count: sql<number>`count(distinct ${vehicles.id})::int` })
-    .from(vehicles)
-    .leftJoin(inspections, eq(inspections.vehicleId, vehicles.id))
-    .where(
-      sql`(
-        select max(${inspections.nextInspectionDate})
-        from ${inspections}
-        where ${inspections.vehicleId} = ${vehicles.id}
-      ) between CURRENT_DATE and ${in60}`
-    );
+  const [vehicleStats] = vehicleRows;
+  const [transporterStats] = transporterRows;
+  const [inspectionStats] = inspectionRows;
+  const [expiryStats] = expiryRows;
+  const [dueStats] = dueRows;
 
   const total = inspectionStats.total || 0;
   const passRate = total ? Math.round((inspectionStats.pass / total) * 100) : 0;
