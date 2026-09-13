@@ -70,23 +70,23 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
         roadFund: sql<number>`count(*) filter (where ${vehicles.roadFundExpiry} between CURRENT_DATE and ${in30})::int`,
       })
       .from(vehicles),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(vehicles)
-      .where(
-        sql`(
-          select max(${inspections.nextInspectionDate})
-          from ${inspections}
-          where ${inspections.vehicleId} = ${vehicles.id}
-        ) between CURRENT_DATE and ${in60}`
-      ),
+    db.execute<{ count: number }>(sql`
+      select count(*)::int as count
+      from (
+        select ${inspections.vehicleId} as vehicle_id,
+               max(${inspections.nextInspectionDate}) as due_date
+        from ${inspections}
+        group by ${inspections.vehicleId}
+      ) latest
+      where latest.due_date between CURRENT_DATE and ${in60}
+    `),
   ]);
 
   const [vehicleStats] = vehicleRows;
   const [transporterStats] = transporterRows;
   const [inspectionStats] = inspectionRows;
   const [expiryStats] = expiryRows;
-  const [dueStats] = dueRows;
+  const [dueStats] = dueRows.rows;
 
   const total = inspectionStats.total || 0;
   const passRate = total ? Math.round((inspectionStats.pass / total) * 100) : 0;
@@ -115,7 +115,7 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
     conditionalCount: inspectionStats.conditional,
     pendingReinspections: inspectionStats.pendingReinsp,
     expiringCertificates: expiryStats.insurance + expiryStats.roadworthy + expiryStats.roadFund,
-    dueInspections: dueStats.count,
+    dueInspections: dueStats?.count || 0,
     passRate,
     failRate,
     complianceRate: readiness.fleetReadinessRate,
