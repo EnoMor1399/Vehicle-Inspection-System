@@ -6,6 +6,9 @@ import pg from "pg";
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
+const expectedDatabaseName =
+  process.env.EXPECTED_DATABASE_NAME?.trim() || "Vehicle-Inspection-Enterprise";
+
 function normalizePostgresSslMode(value) {
   try {
     const url = new URL(value);
@@ -55,6 +58,16 @@ const client = new pg.Client({
 
 await client.connect();
 try {
+  const target = await client.query("SELECT current_database() AS database_name");
+  const actualDatabaseName = target.rows[0]?.database_name;
+  if (actualDatabaseName !== expectedDatabaseName) {
+    throw new Error(
+      `Refusing to apply VIMS migrations: expected database "${expectedDatabaseName}" but connected to "${actualDatabaseName || "unknown"}".`,
+    );
+  }
+
+  console.log(`Verified migration target database: ${expectedDatabaseName}`);
+
   for (const migrationPath of migrationPaths) {
     const sql = await readFile(resolve(migrationPath), "utf8");
     await client.query(sql);

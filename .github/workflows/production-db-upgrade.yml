@@ -62,8 +62,10 @@ jobs:
         run: npm run db:upgrade
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EXPECTED_DATABASE_NAME: Vehicle-Inspection-Enterprise
 
       - name: Verify upgraded database directly
         run: npm run db:verify
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EXPECTED_DATABASE_NAME: Vehicle-Inspection-Enterprise

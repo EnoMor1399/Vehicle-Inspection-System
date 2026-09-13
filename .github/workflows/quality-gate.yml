@@ -15,6 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  main-lineage-policy:
+    name: Main branch PR lineage policy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out production history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+
+      - name: Require a merge commit on main
+        shell: bash
+        run: |
+          parent_count="$(git rev-list --parents -n 1 "$GITHUB_SHA" | awk '{print NF-1}')"
+          if [[ "$parent_count" -lt 2 ]]; then
+            echo "Direct or squash pushes to main are not permitted by VIMS production policy. Merge a reviewed pull request instead."
+            exit 1
+          fi
+          echo "Verified PR merge lineage with $parent_count parents."
+
   security-policy:
     name: Secret and workflow policy scan
     runs-on: ubuntu-latest
