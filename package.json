@@ -14,7 +14,8 @@
     "security:maintenance": "node scripts/maintenance-workflow-guard.mjs",
     "verify": "npm run security:secrets && npm run security:maintenance && npm run typecheck && npm run lint && npm test && npm run build",
     "db:upgrade": "node scripts/apply-enterprise-upgrade.mjs",
-    "db:verify": "node scripts/verify-enterprise-upgrade.mjs",
+    "db:target": "node scripts/verify-database-target.mjs",
+    "db:verify": "npm run db:target && node scripts/verify-enterprise-upgrade.mjs",
     "release:smoke": "node scripts/post-deploy-smoke.mjs",
     "api-key:create": "tsx scripts/create-api-key.ts"
   },
