@@ -6,16 +6,18 @@ import { canCreateDriverTrainingUsers, canManageTrainingUsers } from "../src/lib
 test("only authorized Driver Training Super Administrators and Administrators can provision accounts", () => {
   assert.equal(canCreateDriverTrainingUsers({ role: "super_admin", permissions: { "*": true } }), true);
   assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true } }), true);
-  assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true, training_manage: false } }), false);
-  assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: false } }), false);
-  assert.equal(canCreateDriverTrainingUsers({ role: "operations_manager", permissions: { training: true } }), false);
-  assert.equal(canCreateDriverTrainingUsers({ role: "instructor", permissions: { training: true, training_manage: true } }), false);
+  assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true, training_manage: false, training_user_admin: true } }), true);
+  assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: true, training_user_admin: false } }), false);
+  assert.equal(canCreateDriverTrainingUsers({ role: "admin", permissions: { training: false, training_user_admin: true } }), false);
+  assert.equal(canCreateDriverTrainingUsers({ role: "operations_manager", permissions: { training: true, training_user_admin: true } }), false);
+  assert.equal(canCreateDriverTrainingUsers({ role: "instructor", permissions: { training: true, training_user_admin: true } }), false);
 });
 
-test("Instructor Accounts cannot administer Driver Training users", () => {
-  assert.equal(canManageTrainingUsers({ role: "instructor", permissions: { training: true, training_manage: true } }), false);
+test("Instructor and Operations Manager accounts cannot administer Driver Training users", () => {
+  assert.equal(canManageTrainingUsers({ role: "instructor", permissions: { training: true, training_user_admin: true } }), false);
   assert.equal(canManageTrainingUsers({ role: "admin", permissions: { training: true } }), true);
-  assert.equal(canManageTrainingUsers({ role: "operations_manager", permissions: { training: true } }), true);
+  assert.equal(canManageTrainingUsers({ role: "operations_manager", permissions: { training: true } }), false);
+  assert.equal(canManageTrainingUsers({ role: "operations_manager", permissions: { training: true, training_user_admin: true } }), false);
 });
 
 test("Driver Training provisioning enforces scoped access, uniqueness and password security", () => {
@@ -27,7 +29,7 @@ test("Driver Training provisioning enforces scoped access, uniqueness and passwo
   assert.match(source, /lower\(\$\{users\.email\}\) = \$\{email\}/);
   assert.match(source, /\[VEHICLE_INSPECTION_ACCESS_KEY\]: false/);
   assert.match(source, /\[DRIVER_TRAINING_ACCESS_KEY\]: true/);
-  assert.match(source, /training_assessment_review: TRAINING_REVIEW_ROLES\.has\(role\)/);
+  assert.match(source, /trainingPermissionsForRole\(role\)/);
   assert.doesNotMatch(source, /passwordHash: result\.account/);
 });
 
