@@ -53,7 +53,7 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
   // round trip. This matters because the reports page executes several other
   // analytics queries concurrently and the serverless pool is intentionally
   // small.
-  const result = await db.execute<DashboardAggregateRow>(sql`
+  const result = await db.execute<DashboardAggregateRow & Record<string, unknown>>(sql`
     with vehicle_stats as (
       select
         count(*)::int as total_vehicles,
