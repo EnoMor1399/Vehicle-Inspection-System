@@ -1,27 +1,12 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { normalizePostgresConnectionString } from "@/lib/database-url";
 
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
-
-function normalizePostgresSslMode(value: string) {
-  try {
-    const url = new URL(value);
-    // pg currently treats sslmode=require as verify-full, but pg v9 will adopt
-    // weaker libpq semantics. Preserve today's certificate verification explicitly.
-    if (url.searchParams.get("sslmode")?.toLowerCase() === "require") {
-      url.searchParams.set("sslmode", "verify-full");
-    }
-    return url.toString();
-  } catch {
-    return value;
-  }
-}
-
-const connectionString = normalizePostgresSslMode(databaseUrl);
 
 function boundedInteger(value: string | undefined, fallback: number, min: number, max: number) {
   const parsed = Number.parseInt(value || "", 10);
@@ -30,13 +15,24 @@ function boundedInteger(value: string | undefined, fallback: number, min: number
 }
 
 const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const preferNeonPooler =
+  isServerless && process.env.DB_USE_NEON_POOLER?.trim().toLowerCase() !== "false";
+const connectionString = normalizePostgresConnectionString(databaseUrl, {
+  preferNeonPooler,
+});
+
 const poolMax = boundedInteger(
   process.env.DB_POOL_MAX || process.env.DATABASE_POOL_SIZE,
   isServerless ? 5 : 10,
   1,
   20
 );
-const idleTimeoutMillis = boundedInteger(process.env.DB_POOL_IDLE_TIMEOUT_MS, 10_000, 1_000, 120_000);
+const idleTimeoutMillis = boundedInteger(
+  process.env.DB_POOL_IDLE_TIMEOUT_MS,
+  isServerless ? 30_000 : 10_000,
+  1_000,
+  120_000
+);
 const connectionTimeoutMillis = boundedInteger(process.env.DB_POOL_CONNECTION_TIMEOUT_MS, 10_000, 1_000, 30_000);
 const statementTimeoutMillis = boundedInteger(process.env.DB_STATEMENT_TIMEOUT_MS, 30_000, 1_000, 120_000);
 const queryTimeoutMillis = boundedInteger(
@@ -59,6 +55,7 @@ function createPool() {
     statement_timeout: statementTimeoutMillis,
     query_timeout: queryTimeoutMillis,
     keepAlive: true,
+    keepAliveInitialDelayMillis: 5_000,
     allowExitOnIdle: true,
     application_name: "vims-web",
   });
