@@ -84,9 +84,8 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
         if (recentData.length > 0) {
-          const safeRows = spreadsheetSafeRows(recentData);
-          const inspWs = XLSX.utils.json_to_sheet(safeRows);
-          inspWs["!cols"] = Object.keys(safeRows[0] || {}).map((header) => ({
+          const inspWs = XLSX.utils.json_to_sheet(spreadsheetSafeRows(recentData));
+          inspWs["!cols"] = Object.keys(recentData[0] || {}).map((header) => ({
             wch: Math.min(32, Math.max(12, header.length + 4)),
           }));
           XLSX.utils.book_append_sheet(wb, inspWs, "Recent Inspections");
