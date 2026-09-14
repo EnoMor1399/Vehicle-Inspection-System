@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { inspections, vehicles, transporters } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { calculateFleetReadiness } from "@/lib/metrics";
 
 export interface DashboardStats {
@@ -27,89 +27,151 @@ export interface DashboardStats {
   complianceRate: number;
 }
 
+interface DashboardAggregateRow {
+  total_vehicles: number;
+  active_vehicles: number;
+  passed_vehicles: number;
+  suspended_vehicles: number;
+  failed_vehicles: number;
+  decommissioned_vehicles: number;
+  insurance_expiring: number;
+  roadworthy_expiring: number;
+  road_fund_expiring: number;
+  total_transporters: number;
+  total_inspections: number;
+  pass_count: number;
+  fail_count: number;
+  conditional_count: number;
+  monthly_inspections: number;
+  today_inspections: number;
+  pending_reinspections: number;
+  due_inspections: number;
+}
+
 export async function computeDashboardStats(): Promise<DashboardStats> {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const in30 = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
-  const in60 = new Date(now.getTime() + 60 * 24 * 3600 * 1000);
-
-  const [vehicleStats] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      active: sql<number>`count(*) filter (where ${vehicles.status} = 'active')::int`,
-      passed: sql<number>`count(*) filter (where ${vehicles.status} = 'passed')::int`,
-      suspended: sql<number>`count(*) filter (where ${vehicles.status} = 'suspended')::int`,
-      failed: sql<number>`count(*) filter (where ${vehicles.status} = 'failed')::int`,
-      decommissioned: sql<number>`count(*) filter (where ${vehicles.status} = 'decommissioned')::int`,
-    })
-    .from(vehicles);
-
-  const [transporterStats] = await db
-    .select({ total: sql<number>`count(*)::int` })
-    .from(transporters)
-    .where(sql`${transporters.deletedAt} is null`);
-
-  const [inspectionStats] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      pass: sql<number>`count(*) filter (where ${inspections.overallResult} = 'pass')::int`,
-      fail: sql<number>`count(*) filter (where ${inspections.overallResult} = 'fail')::int`,
-      conditional: sql<number>`count(*) filter (where ${inspections.overallResult} in ('conditional_pass','reinspection_required'))::int`,
-      month: sql<number>`count(*) filter (where ${inspections.inspectionDate} >= ${startOfMonth})::int`,
-      today: sql<number>`count(*) filter (where ${inspections.inspectionDate} >= ${startOfDay})::int`,
-      pendingReinsp: sql<number>`count(*) filter (where ${inspections.reinspectionDate} is not null and ${inspections.reinspectionDate} >= CURRENT_DATE)::int`,
-    })
-    .from(inspections);
-
-  const [expiryStats] = await db
-    .select({
-      insurance: sql<number>`count(*) filter (where ${vehicles.insuranceExpiry} between CURRENT_DATE and ${in30})::int`,
-      roadworthy: sql<number>`count(*) filter (where ${vehicles.roadworthyExpiry} between CURRENT_DATE and ${in30})::int`,
-      roadFund: sql<number>`count(*) filter (where ${vehicles.roadFundExpiry} between CURRENT_DATE and ${in30})::int`,
-    })
-    .from(vehicles);
-
-  const [dueStats] = await db
-    .select({ count: sql<number>`count(distinct ${vehicles.id})::int` })
-    .from(vehicles)
-    .leftJoin(inspections, eq(inspections.vehicleId, vehicles.id))
-    .where(
-      sql`(
-        select max(${inspections.nextInspectionDate})
+  // Keep the dashboard snapshot internally consistent and use one database
+  // round trip. This matters because the reports page executes several other
+  // analytics queries concurrently and the serverless pool is intentionally
+  // small.
+  const result = await db.execute<DashboardAggregateRow & Record<string, unknown>>(sql`
+    with vehicle_stats as (
+      select
+        count(*)::int as total_vehicles,
+        count(*) filter (where ${vehicles.status} = 'active')::int as active_vehicles,
+        count(*) filter (where ${vehicles.status} = 'passed')::int as passed_vehicles,
+        count(*) filter (where ${vehicles.status} = 'suspended')::int as suspended_vehicles,
+        count(*) filter (where ${vehicles.status} = 'failed')::int as failed_vehicles,
+        count(*) filter (where ${vehicles.status} = 'decommissioned')::int as decommissioned_vehicles,
+        count(*) filter (
+          where ${vehicles.insuranceExpiry}
+            between CURRENT_DATE and CURRENT_DATE + interval '30 days'
+        )::int as insurance_expiring,
+        count(*) filter (
+          where ${vehicles.roadworthyExpiry}
+            between CURRENT_DATE and CURRENT_DATE + interval '30 days'
+        )::int as roadworthy_expiring,
+        count(*) filter (
+          where ${vehicles.roadFundExpiry}
+            between CURRENT_DATE and CURRENT_DATE + interval '30 days'
+        )::int as road_fund_expiring
+      from ${vehicles}
+    ),
+    transporter_stats as (
+      select count(*)::int as total_transporters
+      from ${transporters}
+      where ${transporters.deletedAt} is null
+    ),
+    inspection_stats as (
+      select
+        count(*)::int as total_inspections,
+        count(*) filter (where ${inspections.overallResult} = 'pass')::int as pass_count,
+        count(*) filter (where ${inspections.overallResult} = 'fail')::int as fail_count,
+        count(*) filter (
+          where ${inspections.overallResult} in ('conditional_pass', 'reinspection_required')
+        )::int as conditional_count,
+        count(*) filter (
+          where ${inspections.inspectionDate} >= date_trunc('month', CURRENT_DATE)
+        )::int as monthly_inspections,
+        count(*) filter (
+          where ${inspections.inspectionDate} >= CURRENT_DATE
+        )::int as today_inspections,
+        count(*) filter (
+          where ${inspections.reinspectionDate} is not null
+            and ${inspections.reinspectionDate} >= CURRENT_DATE
+        )::int as pending_reinspections
+      from ${inspections}
+    ),
+    due_stats as (
+      select count(*)::int as due_inspections
+      from (
+        select
+          ${inspections.vehicleId} as vehicle_id,
+          max(${inspections.nextInspectionDate}) as due_date
         from ${inspections}
-        where ${inspections.vehicleId} = ${vehicles.id}
-      ) between CURRENT_DATE and ${in60}`
-    );
+        group by ${inspections.vehicleId}
+      ) latest
+      where latest.due_date
+        between CURRENT_DATE and CURRENT_DATE + interval '60 days'
+    )
+    select
+      v.total_vehicles,
+      v.active_vehicles,
+      v.passed_vehicles,
+      v.suspended_vehicles,
+      v.failed_vehicles,
+      v.decommissioned_vehicles,
+      v.insurance_expiring,
+      v.roadworthy_expiring,
+      v.road_fund_expiring,
+      t.total_transporters,
+      i.total_inspections,
+      i.pass_count,
+      i.fail_count,
+      i.conditional_count,
+      i.monthly_inspections,
+      i.today_inspections,
+      i.pending_reinspections,
+      d.due_inspections
+    from vehicle_stats v
+    cross join transporter_stats t
+    cross join inspection_stats i
+    cross join due_stats d
+  `);
 
-  const total = inspectionStats.total || 0;
-  const passRate = total ? Math.round((inspectionStats.pass / total) * 100) : 0;
-  const failRate = total ? Math.round((inspectionStats.fail / total) * 100) : 0;
+  const stats = result.rows[0];
+  if (!stats) {
+    throw new Error("Dashboard aggregate query returned no row");
+  }
+
+  const total = stats.total_inspections || 0;
+  const passRate = total ? Math.round((stats.pass_count / total) * 100) : 0;
+  const failRate = total ? Math.round((stats.fail_count / total) * 100) : 0;
   const readiness = calculateFleetReadiness({
-    total: vehicleStats.total,
-    active: vehicleStats.active,
-    passed: vehicleStats.passed,
-    decommissioned: vehicleStats.decommissioned,
+    total: stats.total_vehicles,
+    active: stats.active_vehicles,
+    passed: stats.passed_vehicles,
+    decommissioned: stats.decommissioned_vehicles,
   });
 
   return {
-    totalVehicles: vehicleStats.total,
-    totalTransporters: transporterStats.total,
-    activeVehicles: vehicleStats.active,
-    suspendedVehicles: vehicleStats.suspended,
-    failedVehicles: vehicleStats.failed,
+    totalVehicles: stats.total_vehicles,
+    totalTransporters: stats.total_transporters,
+    activeVehicles: stats.active_vehicles,
+    suspendedVehicles: stats.suspended_vehicles,
+    failedVehicles: stats.failed_vehicles,
     readyVehicles: readiness.readyVehicles,
     eligibleVehicles: readiness.eligibleVehicles,
     fleetReadinessRate: readiness.fleetReadinessRate,
     totalInspections: total,
-    monthlyInspections: inspectionStats.month,
-    todayInspections: inspectionStats.today,
-    passCount: inspectionStats.pass,
-    failCount: inspectionStats.fail,
-    conditionalCount: inspectionStats.conditional,
-    pendingReinspections: inspectionStats.pendingReinsp,
-    expiringCertificates: expiryStats.insurance + expiryStats.roadworthy + expiryStats.roadFund,
-    dueInspections: dueStats.count,
+    monthlyInspections: stats.monthly_inspections,
+    todayInspections: stats.today_inspections,
+    passCount: stats.pass_count,
+    failCount: stats.fail_count,
+    conditionalCount: stats.conditional_count,
+    pendingReinspections: stats.pending_reinspections,
+    expiringCertificates:
+      stats.insurance_expiring + stats.roadworthy_expiring + stats.road_fund_expiring,
+    dueInspections: stats.due_inspections,
     passRate,
     failRate,
     complianceRate: readiness.fleetReadinessRate,

@@ -1,4 +1,4 @@
-import { RELEASE_VERSION } from "@/lib/version";
+import { RELEASE_COMMIT, RELEASE_ID, RELEASE_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,10 @@ export async function GET() {
       status: "alive",
       timestamp: new Date().toISOString(),
       version: RELEASE_VERSION,
+      release: {
+        id: RELEASE_ID,
+        commit: RELEASE_COMMIT,
+      },
       responseTimeMs,
     },
     {
@@ -19,6 +23,7 @@ export async function GET() {
         "Cache-Control": "no-store",
         "Server-Timing": `app;dur=${responseTimeMs}`,
         "X-VIMS-Version": RELEASE_VERSION,
+        "X-VIMS-Release": RELEASE_ID,
       },
     }
   );

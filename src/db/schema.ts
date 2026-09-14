@@ -11,7 +11,7 @@ import {
   pgEnum,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ============ ENUMS ============
 export const userRoleEnum = pgEnum("user_role", [
@@ -159,6 +159,12 @@ export const dailyInspections = pgTable(
     dateIdx: index("daily_insp_date_idx").on(t.inspectionDate),
     driverIdx: index("daily_insp_driver_idx").on(t.driverId),
     statusIdx: index("daily_insp_status_idx").on(t.status),
+    vehicleDateIdx: index("daily_insp_vehicle_date_idx").on(t.vehicleId, t.inspectionDate.desc()),
+    vehicleClearanceDateIdx: index("daily_insp_vehicle_clearance_date_idx").on(
+      t.vehicleId,
+      t.clearedForTrip,
+      t.inspectionDate.desc(),
+    ),
   })
 );
 
@@ -335,6 +341,7 @@ export const transporters = pgTable(
   (t) => ({
     companyIdx: index("transporter_company_idx").on(t.companyName),
     deletedIdx: index("transporter_deleted_idx").on(t.deletedAt),
+    regionDeletedIdx: index("transporter_region_deleted_idx").on(t.region, t.deletedAt),
   })
 );
 
@@ -381,6 +388,7 @@ export const vehicles = pgTable(
     regIdx: index("vehicle_reg_idx").on(t.registrationNumber),
     transporterIdx: index("vehicle_transporter_idx").on(t.transporterId),
     statusIdx: index("vehicle_status_idx").on(t.status),
+    transporterStatusIdx: index("vehicle_transporter_status_idx").on(t.transporterId, t.status),
   })
 );
 
@@ -454,6 +462,14 @@ export const inspections = pgTable(
     dateIdx: index("inspection_date_idx").on(t.inspectionDate),
     locationIdx: index("inspection_location_idx").on(t.locationId),
     workflowIdx: index("inspection_workflow_idx").on(t.workflowStatus),
+    vehicleDateIdx: index("inspection_vehicle_date_idx").on(t.vehicleId, t.inspectionDate.desc()),
+    vehicleResultDateIdx: index("inspection_vehicle_result_date_idx").on(
+      t.vehicleId,
+      t.overallResult,
+      t.inspectionDate.desc(),
+    ),
+    locationDateIdx: index("inspection_location_date_idx").on(t.locationId, t.inspectionDate.desc()),
+    resultDateIdx: index("inspection_result_date_idx").on(t.overallResult, t.inspectionDate.desc()),
   })
 );
 
@@ -506,6 +522,7 @@ export const documents = pgTable(
   (t) => ({
     ownerIdx: index("doc_owner_idx").on(t.ownerType, t.ownerId),
     expiryIdx: index("doc_expiry_idx").on(t.expiryDate),
+    ownerExpiryIdx: index("doc_owner_expiry_idx").on(t.ownerType, t.ownerId, t.expiryDate),
   })
 );
 
@@ -530,6 +547,8 @@ export const auditLogs = pgTable(
     entityIdx: index("audit_entity_idx").on(t.entityType, t.entityId),
     userIdx: index("audit_user_idx").on(t.userId),
     createdIdx: index("audit_created_idx").on(t.createdAt),
+    entityCreatedIdx: index("audit_entity_created_idx").on(t.entityType, t.entityId, t.createdAt.desc()),
+    userCreatedIdx: index("audit_user_created_idx").on(t.userId, t.createdAt.desc()),
   })
 );
 
@@ -554,6 +573,9 @@ export const notifications = pgTable(
     userIdx: index("notif_user_idx").on(t.userId),
     typeIdx: index("notif_type_idx").on(t.type),
     dueIdx: index("notif_due_idx").on(t.dueDate),
+    userUnreadCreatedIdx: index("notification_user_unread_created_idx")
+      .on(t.userId, t.createdAt.desc())
+      .where(sql`${t.readAt} is null`),
   })
 );
 
@@ -600,7 +622,6 @@ export const apiKeys = pgTable(
   },
   (t) => ({
     userHashIdx: index("api_key_user_idx").on(t.userId),
-    hashIdx: index("api_key_hash_idx").on(t.keyHash),
   })
 );
 
@@ -648,8 +669,11 @@ export const sessions = pgTable(
   },
   (t) => ({
     userSessionIdx: index("session_user_idx").on(t.userId),
-    tokenIdx: index("session_token_idx").on(t.token),
     activeIdx: index("session_active_idx").on(t.isActive),
+    userActiveExpiryIdx: index("session_user_active_expiry_idx").on(t.userId, t.isActive, t.expiresAt),
+    userActiveActivityIdx: index("session_user_active_activity_idx")
+      .on(t.userId, t.lastActivityAt.desc())
+      .where(sql`${t.isActive} = true`),
   })
 );
 
@@ -674,6 +698,7 @@ export const securityEvents = pgTable(
     eventTypeIdx: index("security_event_type_idx").on(t.eventType),
     severityIdx: index("security_event_severity_idx").on(t.severity),
     createdIdx: index("security_event_created_idx").on(t.createdAt),
+    severityCreatedIdx: index("security_event_severity_created_idx").on(t.severity, t.createdAt.desc()),
   })
 );
 
@@ -693,6 +718,14 @@ export const loginAttempts = pgTable(
     emailIdx: index("login_attempt_email_idx").on(t.email),
     ipIdx: index("login_attempt_ip_idx").on(t.ipAddress),
     createdIdx: index("login_attempt_created_idx").on(t.createdAt),
+    emailCreatedIdx: index("login_attempt_email_created_idx").on(t.email, t.createdAt.desc()),
+    ipCreatedIdx: index("login_attempt_ip_created_idx").on(t.ipAddress, t.createdAt.desc()),
+    emailFailedCreatedIdx: index("login_attempt_email_failed_created_idx")
+      .on(t.email, t.createdAt.desc())
+      .where(sql`${t.success} = false`),
+    ipFailedCreatedIdx: index("login_attempt_ip_failed_created_idx")
+      .on(t.ipAddress, t.createdAt.desc())
+      .where(sql`${t.success} = false`),
   })
 );
 

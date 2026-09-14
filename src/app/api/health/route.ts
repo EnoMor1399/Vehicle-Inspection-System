@@ -1,6 +1,6 @@
 import { pool } from "@/db";
 import { expectedApplicationDatabase } from "@/lib/database-contract";
-import { RELEASE_VERSION } from "@/lib/version";
+import { RELEASE_COMMIT, RELEASE_ID, RELEASE_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +24,14 @@ function responseHeaders(dbLatencyMs: number, totalLatencyMs: number) {
     "Cache-Control": "no-store",
     "Server-Timing": `db;dur=${dbLatencyMs}, total;dur=${totalLatencyMs}`,
     "X-VIMS-Version": RELEASE_VERSION,
+    "X-VIMS-Release": RELEASE_ID,
+  };
+}
+
+function releaseMetadata() {
+  return {
+    id: RELEASE_ID,
+    commit: RELEASE_COMMIT,
   };
 }
 
@@ -78,6 +86,7 @@ export async function GET() {
         status,
         timestamp: new Date().toISOString(),
         version: RELEASE_VERSION,
+        release: releaseMetadata(),
         responseTimeMs: totalLatencyMs,
         checks: {
           database: {
@@ -111,6 +120,7 @@ export async function GET() {
         status: "unhealthy",
         timestamp: new Date().toISOString(),
         version: RELEASE_VERSION,
+        release: releaseMetadata(),
         responseTimeMs: totalLatencyMs,
         checks: {
           database: {
