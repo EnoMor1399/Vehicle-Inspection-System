@@ -20,6 +20,11 @@ const maintenanceScripts = [
   "scripts/verify-enterprise-upgrade.mjs",
 ];
 
+const APPROVED_ACTION_REFS = new Map([
+  ["actions/checkout", "3d3c42e5aac5ba805825da76410c181273ba90b1"],
+  ["actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020"],
+]);
+
 const issues = [];
 
 function read(path) {
@@ -48,6 +53,15 @@ for (const path of allWorkflows) {
     if (actionRef.startsWith("./")) continue;
     if (!/@[0-9a-f]{40}$/.test(actionRef)) {
       issues.push(`${path}: action reference must be pinned to a full 40-character commit SHA (${actionRef})`);
+      continue;
+    }
+
+    const atIndex = actionRef.lastIndexOf("@");
+    const actionName = actionRef.slice(0, atIndex);
+    const actionSha = actionRef.slice(atIndex + 1);
+    const approvedSha = APPROVED_ACTION_REFS.get(actionName);
+    if (approvedSha && actionSha !== approvedSha) {
+      issues.push(`${path}: ${actionName} must use approved v7 SHA ${approvedSha}, found ${actionSha}`);
     }
   }
 }

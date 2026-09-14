@@ -4,13 +4,14 @@ import { useMemo, useState, useTransition } from "react";
 import { createInspection, type InspectionFormData } from "./server";
 import { useRouter, useSearchParams } from "next/navigation";
 import { buildDefaultSectionData, summarizeSection } from "@/lib/sections";
+import { getAdjacentInspectionStep, getInspectionStepOrder } from "@/lib/inspection-steps";
 import { getInspectionDecisionGuidance } from "@/lib/inspection-decision";
 import { SignaturePad } from "@/components/SignaturePad";
 import { PhotoCapture, DocumentUpload, type Photo } from "@/components/PhotoCapture";
 import { GpsCapture } from "@/components/GpsCapture";
 import type { InspectionSectionData, InspectionDocument, InspectionPhoto } from "@/db/schema";
 import { Badge, Button, Card, Field, Select, TextArea, TextInput } from "@/components/ui";
-import { Check, CheckCircle2, XCircle, AlertTriangle, Minus, ChevronRight } from "lucide-react";
+import { Check, CheckCircle2, XCircle, AlertTriangle, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 
 type SectionForm = {
   section: string;
@@ -114,6 +115,19 @@ export function InspectionForm({
     );
   }
 
+  function navigateToSection(sectionCode: string) {
+    setActiveSection(sectionCode);
+    setError(null);
+    window.setTimeout(() => {
+      document.getElementById("inspection-step-content")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
+  function moveToAdjacentSection(direction: -1 | 1) {
+    const nextSection = getAdjacentInspectionStep(activeSection, direction);
+    if (nextSection) navigateToSection(nextSection);
+  }
+
   function showFinalDecisionError(message: string) {
     setActiveSection("P");
     setError(message);
@@ -186,17 +200,31 @@ export function InspectionForm({
   // included in the B-O checklist data. Guard the lookup before summarizing.
   const active = sections.find((s) => s.section === activeSection);
   const activeSummary = active ? summarizeSection(active) : null;
+  const stepOrder = getInspectionStepOrder();
+  const activeStepIndex = Math.max(0, stepOrder.indexOf(activeSection));
+  const activeStepPosition = activeStepIndex + 1;
+  const progressPercent = Math.round((activeStepPosition / stepOrder.length) * 100);
+  const hasPreviousStep = getAdjacentInspectionStep(activeSection, -1) !== null;
+  const hasNextStep = getAdjacentInspectionStep(activeSection, 1) !== null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-      {/* Section nav */}
       <aside>
-        <Card className="p-2">
-          <p className="px-3 py-2 text-xs uppercase tracking-wider text-slate-500 font-semibold">Checklist Sections</p>
+        <Card className="p-2 lg:sticky lg:top-4">
+          <div className="px-3 pb-3 pt-2">
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Inspection Steps</p>
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+              <span>Step {activeStepPosition} of {stepOrder.length}</span>
+              <span className="font-semibold text-slate-700">{progressPercent}%</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-label={`Inspection progress ${progressPercent}%`}>
+              <div className="h-full rounded-full bg-slate-900 transition-all" style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
           <div className="space-y-0.5">
             <button
               type="button"
-              onClick={() => setActiveSection("A")}
+              onClick={() => navigateToSection("A")}
               aria-current={activeSection === "A" ? "step" : undefined}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${activeSection === "A" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
@@ -210,7 +238,7 @@ export function InspectionForm({
                 <button
                   key={s.section}
                   type="button"
-                  onClick={() => setActiveSection(s.section)}
+                  onClick={() => navigateToSection(s.section)}
                   aria-current={isActive ? "step" : undefined}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${isActive ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
                 >
@@ -229,7 +257,7 @@ export function InspectionForm({
             })}
             <button
               type="button"
-              onClick={() => setActiveSection("P")}
+              onClick={() => navigateToSection("P")}
               aria-current={activeSection === "P" ? "step" : undefined}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${activeSection === "P" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
@@ -240,8 +268,7 @@ export function InspectionForm({
         </Card>
       </aside>
 
-      {/* Main form */}
-      <div className="space-y-6">
+      <div id="inspection-step-content" className="space-y-6 scroll-mt-4">
         {activeSection === "A" && (
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-slate-950 mb-4">Section A · Vehicle Identification</h2>
@@ -430,7 +457,7 @@ export function InspectionForm({
                     <button
                       key={`${item.section}-${item.itemIndex}`}
                       type="button"
-                      onClick={() => setActiveSection(item.section)}
+                      onClick={() => navigateToSection(item.section)}
                       className="flex w-full items-center justify-between gap-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-left text-sm transition hover:border-red-300 hover:bg-red-50"
                     >
                       <span>
@@ -447,7 +474,7 @@ export function InspectionForm({
                   {smokeTest === "fail" && (
                     <button
                       type="button"
-                      onClick={() => setActiveSection("O")}
+                      onClick={() => navigateToSection("O")}
                       className="flex w-full items-center justify-between gap-3 rounded-lg border border-red-100 bg-white px-3 py-2 text-left text-sm transition hover:border-red-300 hover:bg-red-50"
                     >
                       <span>
@@ -514,22 +541,34 @@ export function InspectionForm({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 sticky bottom-4 bg-white rounded-2xl p-4 shadow-lg ring-1 ring-slate-200">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-            <span>
-              <span className="font-medium text-slate-900">{totals.pass}</span> pass ·{" "}
-              <span className="font-medium text-red-600">{totals.fail}</span> fail ·{" "}
-              <span className="font-medium">{totals.na}</span> n/a
-            </span>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${decisionGuidance.passAllowed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
-              Decision: {formatOverallResult(effectiveOverallResult)}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => router.push("/inspections")}>Cancel</Button>
-            <Button onClick={submit} disabled={pending || !vehicleId}>
-              {pending ? "Submitting..." : "Submit Inspection"}
-            </Button>
+        <div className="sticky bottom-4 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-slate-200">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+              <span>
+                <span className="font-medium text-slate-900">{totals.pass}</span> pass ·{" "}
+                <span className="font-medium text-red-600">{totals.fail}</span> fail ·{" "}
+                <span className="font-medium">{totals.na}</span> n/a
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${decisionGuidance.passAllowed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
+                Decision: {formatOverallResult(effectiveOverallResult)}
+              </span>
+              <span className="text-xs font-medium text-slate-500">Step {activeStepPosition}/{stepOrder.length}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => router.push("/inspections")}>Cancel</Button>
+              <Button variant="secondary" onClick={() => moveToAdjacentSection(-1)} disabled={!hasPreviousStep}>
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </Button>
+              {hasNextStep ? (
+                <Button onClick={() => moveToAdjacentSection(1)}>
+                  Next Section <ChevronRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button onClick={submit} disabled={pending || !vehicleId}>
+                  {pending ? "Submitting..." : "Submit Inspection"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

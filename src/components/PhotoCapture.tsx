@@ -29,12 +29,29 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraFacingMode, setCameraFacingMode] = useState<"environment" | "user">("environment");
+  const [availableCameraCount, setAvailableCameraCount] = useState(0);
 
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
+
+  useEffect(() => {
+    if (!cameraOpen && !preview) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (preview) {
+        setPreview(null);
+        return;
+      }
+      closeCamera();
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [cameraOpen, preview]);
 
   function handleFiles(files: FileList | null) {
     if (!files) return;
@@ -47,7 +64,6 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
           new Promise<Photo>((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => {
-              // Compress if larger than 500KB
               const img = new Image();
               img.onload = () => {
                 const canvas = document.createElement("canvas");
@@ -67,14 +83,14 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
                 ctx.drawImage(img, 0, 0, width, height);
                 const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
                 resolve({
-                  id: Math.random().toString(36).slice(2),
+                  id: globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2),
                   dataUrl,
                   takenAt: new Date().toISOString(),
                 });
               };
               img.onerror = () => {
                 resolve({
-                  id: Math.random().toString(36).slice(2),
+                  id: globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2),
                   dataUrl: e.target?.result as string,
                   takenAt: new Date().toISOString(),
                 });
@@ -104,6 +120,11 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
     setCameraError(null);
   }
 
+  function openNativeCamera() {
+    closeCamera();
+    requestAnimationFrame(() => cameraInputRef.current?.click());
+  }
+
   function getCameraErrorMessage(error: unknown) {
     if (error instanceof DOMException) {
       if (error.name === "NotAllowedError" || error.name === "SecurityError") {
@@ -119,11 +140,20 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
     return "The camera could not be started. Check your browser permission and try again.";
   }
 
+  async function refreshCameraCount() {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAvailableCameraCount(devices.filter((device) => device.kind === "videoinput").length);
+    } catch {
+      setAvailableCameraCount(0);
+    }
+  }
+
   async function startCamera(facingMode: "environment" | "user" = cameraFacingMode) {
     setShowMenu(false);
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      // Older mobile browsers can still open their native camera via capture input.
       cameraInputRef.current?.click();
       return;
     }
@@ -145,6 +175,7 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
       });
 
       streamRef.current = stream;
+      await refreshCameraCount();
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
       const video = videoRef.current;
@@ -170,6 +201,11 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
   }
 
   function capturePhoto() {
+    if (value.length >= maxPhotos) {
+      closeCamera();
+      return;
+    }
+
     const video = videoRef.current;
     if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
       setCameraError("The camera is still preparing. Wait a moment and try again.");
@@ -216,44 +252,45 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
         </p>
       )}
 
-      {/* Photo grid */}
       {value.length > 0 && (
-        <div className="grid grid-cols-4 gap-2 mb-2">
+        <div className="grid grid-cols-3 gap-2 mb-2 sm:grid-cols-4">
           {value.map((photo) => (
             <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden ring-1 ring-slate-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={photo.dataUrl}
-                alt="Evidence"
+                alt="Inspection evidence"
                 className="w-full h-full object-cover cursor-pointer"
                 onClick={() => setPreview(photo)}
               />
               <button
                 type="button"
                 onClick={() => removePhoto(photo.id)}
-                className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full bg-red-600 text-white grid place-items-center opacity-0 group-hover:opacity-100 transition"
+                aria-label="Remove evidence photo"
+                className="absolute top-1 right-1 h-7 w-7 rounded-full bg-red-600 text-white grid place-items-center opacity-100 transition sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => setPreview(photo)}
-                className="absolute bottom-0.5 right-0.5 h-5 w-5 rounded-full bg-black/50 text-white grid place-items-center opacity-0 group-hover:opacity-100 transition"
+                aria-label="Preview evidence photo"
+                className="absolute bottom-1 right-1 h-7 w-7 rounded-full bg-black/55 text-white grid place-items-center opacity-100 transition sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
               >
-                <ZoomIn className="h-3 w-3" />
+                <ZoomIn className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Add photo button */}
       {canAdd && (
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowMenu(!showMenu)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-xs text-slate-600 hover:border-[var(--brand-color)] hover:text-[var(--brand-accent)] hover:bg-emerald-50/40 transition"
+            aria-expanded={showMenu}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-slate-300 text-xs font-medium text-slate-600 hover:border-[var(--brand-color)] hover:text-[var(--brand-accent)] hover:bg-emerald-50/40 transition"
           >
             <Camera className="h-3.5 w-3.5" />
             Add Photo ({value.length}/{maxPhotos})
@@ -262,7 +299,7 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
           {showMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute z-20 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-slate-200 p-1">
+              <div className="absolute z-20 mt-1 w-52 rounded-lg bg-white shadow-lg ring-1 ring-slate-200 p-1">
                 <button
                   type="button"
                   onClick={() => void startCamera()}
@@ -273,7 +310,21 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
                 </button>
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    setShowMenu(false);
+                    cameraInputRef.current?.click();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded"
+                >
+                  <Camera className="h-4 w-4 text-emerald-600" />
+                  Open Device Camera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    fileInputRef.current?.click();
+                  }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded"
                 >
                   <Upload className="h-4 w-4 text-blue-600" />
@@ -285,14 +336,16 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
         </div>
       )}
 
-      {/* Hidden file inputs */}
       <input
         ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.currentTarget.value = "";
+        }}
       />
       <input
         ref={fileInputRef}
@@ -300,13 +353,15 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
         accept="image/*"
         multiple
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.currentTarget.value = "";
+        }}
       />
 
-      {/* Live device camera */}
       {cameraOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/90 grid place-items-center p-4"
+          className="fixed inset-0 z-50 bg-slate-950/90 grid place-items-center p-3 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="camera-dialog-title"
@@ -347,27 +402,45 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
                   <div className="max-w-md">
                     <Camera className="mx-auto mb-3 h-10 w-10 text-amber-400" />
                     <p className="text-sm text-white">{cameraError}</p>
-                    <button
-                      type="button"
-                      onClick={() => void startCamera()}
-                      className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-                    >
-                      Try Again
-                    </button>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void startCamera()}
+                        className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
+                      >
+                        Try Again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openNativeCamera}
+                        className="rounded-lg border border-white/30 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+                      >
+                        Open Device Camera
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {availableCameraCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={switchCamera}
+                    disabled={cameraLoading}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Switch Camera
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={switchCamera}
-                  disabled={cameraLoading}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  onClick={openNativeCamera}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Switch Camera
+                  Device Camera
                 </button>
                 <button
                   type="button"
@@ -394,14 +467,18 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
         </div>
       )}
 
-      {/* Lightbox preview */}
       {preview && (
         <div
           className="fixed inset-0 z-50 bg-black/80 grid place-items-center p-4"
           onClick={() => setPreview(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Evidence photo preview"
         >
           <button
+            type="button"
             onClick={() => setPreview(null)}
+            aria-label="Close evidence preview"
             className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white grid place-items-center"
           >
             <X className="h-5 w-5" />
@@ -409,7 +486,7 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={preview.dataUrl}
-            alt="Evidence"
+            alt="Inspection evidence preview"
             className="max-w-full max-h-full rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
@@ -422,7 +499,6 @@ export function PhotoCapture({ value, onChange, maxPhotos = 5, label }: PhotoCap
   );
 }
 
-// Document upload component
 interface DocumentUploadProps {
   value: { id: string; name: string; dataUrl: string; type: string; size: number }[];
   onChange: (docs: { id: string; name: string; dataUrl: string; type: string; size: number }[]) => void;
@@ -444,7 +520,7 @@ export function DocumentUpload({ value, onChange, maxDocs = 10 }: DocumentUpload
             const reader = new FileReader();
             reader.onload = (e) => {
               resolve({
-                id: Math.random().toString(36).slice(2),
+                id: globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2),
                 name: file.name,
                 dataUrl: e.target?.result as string,
                 type: file.type,
@@ -485,6 +561,7 @@ export function DocumentUpload({ value, onChange, maxDocs = 10 }: DocumentUpload
               <button
                 type="button"
                 onClick={() => removeDoc(doc.id)}
+                aria-label={`Remove ${doc.name}`}
                 className="p-1 rounded hover:bg-slate-200 text-slate-500"
               >
                 <X className="h-3.5 w-3.5" />
@@ -511,7 +588,10 @@ export function DocumentUpload({ value, onChange, maxDocs = 10 }: DocumentUpload
         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx,.xls"
         multiple
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.currentTarget.value = "";
+        }}
       />
     </div>
   );

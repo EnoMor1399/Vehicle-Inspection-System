@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Search, Menu, X, ChevronRight, Lightbulb, AlertTriangle, ListOrdered, User } from "lucide-react";
-import { GUIDE_SECTIONS } from "./data";
+import { GUIDE_SECTIONS } from "./current-data";
 
 export function GuideContent() {
   const [searchQuery, setSearchQuery] = useState("");

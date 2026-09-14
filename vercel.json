@@ -9,7 +9,8 @@
       "source-only-driver-training-robustness": false,
       "source-only-driver-assessment-template": false,
       "source-only-driver-assessment-governance": false,
-      "source-only-driver-training-formal-ui": false
+      "source-only-driver-training-formal-ui": false,
+      "pre-vercel-upgrade-batch-2026-09-14": false
     }
   }
 }

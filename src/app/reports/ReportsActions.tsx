@@ -35,24 +35,38 @@ function spreadsheetSafeRows(rows: Record<string, unknown>[]): Record<string, st
 
 export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
   const [action, setAction] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("");
 
   function handleExport(format: "pdf" | "excel" | "csv") {
     setAction(format);
+    setStatusMessage(`Preparing ${format.toUpperCase()} report…`);
     const exportTimestamp = new Date().toISOString().replace(/[:.]/g, "-");
     try {
       if (format === "csv") {
-        const headers = Object.keys(recentData[0] || {});
-        const csvContent = [
-          headers.map(csvCell).join(","),
-          ...recentData.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
-        ].join("\n");
+        let csvContent: string;
+        if (recentData.length > 0) {
+          const headers = Object.keys(recentData[0]);
+          csvContent = [
+            headers.map(csvCell).join(","),
+            ...recentData.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
+          ].join("\n");
+        } else {
+          csvContent = [
+            ["Metric", "Value"].map(csvCell).join(","),
+            ["Total Vehicles", stats.totalVehicles].map(csvCell).join(","),
+            ["Total Transporters", stats.totalTransporters].map(csvCell).join(","),
+            ["Total Inspections", stats.totalInspections].map(csvCell).join(","),
+            ["Pass Rate", `${stats.passRate}%`].map(csvCell).join(","),
+            ["Fail Rate", `${stats.failRate}%`].map(csvCell).join(","),
+            ["Fleet Compliance", `${stats.complianceRate}%`].map(csvCell).join(","),
+          ].join("\n");
+        }
 
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const blob = new Blob(["\uFEFF", csvContent], { type: "text/csv;charset=utf-8;" });
         downloadBlob(blob, `rsl-report-${exportTimestamp}.csv`);
       } else if (format === "excel") {
         const wb = XLSX.utils.book_new();
 
-        // Summary sheet contains only application-generated labels and numeric metrics.
         const summaryData = [
           ["Road Safety Limited - Executive Report"],
           [`Generated: ${new Date().toLocaleString()}`],
@@ -69,9 +83,11 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
         summaryWs["!cols"] = [{ wch: 30 }, { wch: 20 }];
         XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
-        // Database-backed text must be neutralized before it reaches a spreadsheet cell.
         if (recentData.length > 0) {
           const inspWs = XLSX.utils.json_to_sheet(spreadsheetSafeRows(recentData));
+          inspWs["!cols"] = Object.keys(recentData[0] || {}).map((header) => ({
+            wch: Math.min(32, Math.max(12, header.length + 4)),
+          }));
           XLSX.utils.book_append_sheet(wb, inspWs, "Recent Inspections");
         }
 
@@ -120,8 +136,10 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
 
         doc.save(`rsl-report-${exportTimestamp}.pdf`);
       }
+      setStatusMessage(`${format.toUpperCase()} report created.`);
     } catch (err) {
       console.error(`Export ${format} failed:`, err);
+      setStatusMessage(`Failed to export ${format.toUpperCase()} report.`);
       alert(`Failed to export ${format.toUpperCase()}`);
     } finally {
       setAction(null);
@@ -130,12 +148,17 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
 
   function handlePrint() {
     setAction("print");
+    setStatusMessage("Opening print dialog…");
     window.print();
-    setTimeout(() => setAction(null), 1000);
+    setTimeout(() => {
+      setAction(null);
+      setStatusMessage("Print dialog opened.");
+    }, 1000);
   }
 
   function handleEmail() {
     setAction("email");
+    setStatusMessage("Preparing email summary…");
     const subject = encodeURIComponent("RSL Executive Report");
     const body = encodeURIComponent(
       `Road Safety Limited - Executive Report Summary\n\n` +
@@ -150,7 +173,10 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
       `For the full report with charts and detailed analysis, please visit the Reports & Analytics page.`
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
-    setTimeout(() => setAction(null), 1000);
+    setTimeout(() => {
+      setAction(null);
+      setStatusMessage("Email summary prepared.");
+    }, 1000);
   }
 
   function downloadBlob(blob: Blob, filename: string) {
@@ -165,47 +191,60 @@ export function ReportsActions({ recentData, stats }: ReportsActionsProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 no-print">
-      <button
-        onClick={() => handleExport("pdf")}
-        disabled={!!action}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
-      >
-        {action === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        PDF
-      </button>
-      <button
-        onClick={() => handleExport("excel")}
-        disabled={!!action}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
-      >
-        {action === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        Excel
-      </button>
-      <button
-        onClick={() => handleExport("csv")}
-        disabled={!!action}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
-      >
-        {action === "csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        CSV
-      </button>
-      <button
-        onClick={handlePrint}
-        disabled={!!action}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
-      >
-        {action === "print" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-        Print
-      </button>
-      <button
-        onClick={handleEmail}
-        disabled={!!action}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-50"
-      >
-        {action === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-        Email Report
-      </button>
+    <div className="no-print w-full">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        <button
+          type="button"
+          onClick={() => handleExport("pdf")}
+          disabled={!!action}
+          aria-busy={action === "pdf"}
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
+        >
+          {action === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => handleExport("excel")}
+          disabled={!!action}
+          aria-busy={action === "excel"}
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
+        >
+          {action === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Excel
+        </button>
+        <button
+          type="button"
+          onClick={() => handleExport("csv")}
+          disabled={!!action}
+          aria-busy={action === "csv"}
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
+        >
+          {action === "csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          CSV
+        </button>
+        <button
+          type="button"
+          onClick={handlePrint}
+          disabled={!!action}
+          aria-busy={action === "print"}
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50"
+        >
+          {action === "print" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+          Print
+        </button>
+        <button
+          type="button"
+          onClick={handleEmail}
+          disabled={!!action}
+          aria-busy={action === "email"}
+          className="col-span-2 inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-50 sm:col-auto"
+        >
+          {action === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+          Email Report
+        </button>
+      </div>
+      <p className="sr-only" aria-live="polite">{statusMessage}</p>
     </div>
   );
 }
