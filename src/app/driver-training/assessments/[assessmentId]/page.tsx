@@ -81,7 +81,7 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
   const improvementAreas = Array.isArray(assessment.improvementAreas) ? assessment.improvementAreas : [];
 
   return (
-    <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
+    <div className="assessment-print-root mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 print:max-w-none print:p-0">
       <div className="print:hidden">
         <PageHeader
           title="Driver Assessment Record"
