@@ -408,6 +408,31 @@ html.dark {
     box-shadow: none !important;
   }
 
+  /* Assessment records opt in to printing independently of certificates. */
+  .assessment-print-root,
+  .assessment-print-root * {
+    visibility: visible;
+  }
+
+  .assessment-print-root {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-height: 100%;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #0f172a !important;
+  }
+
+  .assessment-print-root [class*="overflow-x-auto"] {
+    overflow: visible !important;
+  }
+
+  .assessment-print-root table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
   .no-print {
     display: none !important;
   }
