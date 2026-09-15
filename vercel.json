@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["pdx1"],
-  "functionFailoverRegions": ["sfo1"],
   "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ] && [ \"$(git rev-list --parents -n 1 HEAD | awk '{print NF}')\" -lt 3 ]; then echo 'Ignoring direct non-merge push to main'; exit 0; fi; exit 1",
   "git": {
     "deploymentEnabled": {
