@@ -409,9 +409,31 @@ html.dark {
   }
 
   /* Assessment records opt in to printing independently of certificates. */
+  /* Keep the application shell visible: visibility:hidden on an ancestor
+     suppresses descendants even when the assessment itself is made visible. */
+  body *,
+  [data-app-shell],
+  [data-app-shell] > div,
+  .app-shell,
+  .app-shell-content {
+    visibility: visible;
+  }
+
+  [data-app-shell] > aside,
+  [data-app-shell] > div > header,
+  .print\\:hidden,
+  .no-print {
+    display: none !important;
+  }
+
+  .app-shell-content > :not(.assessment-print-root),
+  .assessment-print-root ~ * {
+    display: none !important;
+  }
+
   .assessment-print-root,
   .assessment-print-root * {
-    visibility: visible;
+    visibility: visible !important;
   }
 
   .assessment-print-root {
