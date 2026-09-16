@@ -1,6 +1,10 @@
 export const API_SMALL_JSON_BODY_LIMIT = 64 * 1024;
 export const API_AI_JSON_BODY_LIMIT = 1024 * 1024;
 export const API_INSPECTION_JSON_BODY_LIMIT = 16 * 1024 * 1024;
+// Vercel Functions accept request bodies up to roughly 4.5 MB. Keep the
+// multipart envelope at that ceiling while the upload route applies a stricter
+// 4 MB limit to the file itself.
+export const API_DOCUMENT_UPLOAD_BODY_LIMIT = 4_500_000;
 
 type JsonBodySuccess = { ok: true; value: unknown; bytes: number };
 type JsonBodyFailure = { ok: false; status: 400 | 413; message: string };
