@@ -29,7 +29,7 @@ test("written exam document names are bounded, recognizable and preserve a safe 
   assert.match(writtenExamOriginalFilename(name), /Amas-Script-Final\.pdf/);
 });
 
-test("written exam upload endpoint enforces training authorization, record lineage and certificate lock", () => {
+test("written exam upload endpoint enforces training authorization, OIDC storage context, record lineage and certificate lock", () => {
   const route = readFileSync("src/app/api/driver-training/written-exams/upload/route.ts", "utf8");
   assert.match(route, /canManageTraining/);
   assert.match(route, /isPrivateBlobStorageConfigured/);
@@ -38,14 +38,16 @@ test("written exam upload endpoint enforces training authorization, record linea
   assert.match(route, /latest assessment/);
   assert.match(route, /active certificate/);
   assert.match(route, /putPrivateBlob/);
+  assert.match(route, /x-vercel-oidc-token/);
   assert.match(route, /WRITTEN_EXAM_OWNER_TYPE/);
   assert.match(route, /training_written_exam_document/);
 });
 
-test("written exam private delivery endpoint requires training access and disables unsafe sniffing/cache", () => {
+test("written exam private delivery endpoint requires training access, forwards OIDC context and disables unsafe sniffing/cache", () => {
   const route = readFileSync("src/app/api/driver-training/written-exams/files/[documentId]/route.ts", "utf8");
   assert.match(route, /canViewTraining/);
   assert.match(route, /fetchPrivateBlob/);
+  assert.match(route, /x-vercel-oidc-token/);
   assert.match(route, /isWrittenExamDocumentName/);
   assert.match(route, /X-Content-Type-Options/);
   assert.match(route, /nosniff/);
@@ -64,7 +66,7 @@ test("written exam workspace exposes upload, evidence register, view and downloa
   assert.match(upload, /Upload written exam evidence/);
   assert.match(upload, /application\/pdf/);
   assert.match(upload, /Maximum: 4 MB per file/);
-  assert.match(upload, /BLOB_READ_WRITE_TOKEN/);
+  assert.match(upload, /Vercel OIDC credentials automatically/);
 });
 
 test("proxy gives written exam upload the standard API origin, rate and body-size protections", () => {

@@ -98,7 +98,9 @@ export async function POST(request: Request) {
   const pathname = writtenExamBlobPath(assessment.id, evidenceType, fileValue.name);
   let blob;
   try {
-    blob = await putPrivateBlob(pathname, fileValue, fileValue.type);
+    blob = await putPrivateBlob(pathname, fileValue, fileValue.type, {
+      oidcToken: request.headers.get("x-vercel-oidc-token"),
+    });
   } catch (error) {
     console.error("[written-exams] private upload failed", error);
     return failure("The written exam file could not be stored securely. Please try again.", 502);

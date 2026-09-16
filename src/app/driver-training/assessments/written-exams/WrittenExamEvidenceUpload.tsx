@@ -90,7 +90,7 @@ export function WrittenExamEvidenceUpload({ assessments, storageConfigured }: Pr
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p className="font-semibold">Private document storage needs configuration</p>
           <p className="mt-1 text-xs leading-5 text-amber-800">
-            Connect a private Vercel Blob store to this VIMS project and provide BLOB_READ_WRITE_TOKEN before uploads can be accepted.
+            Connect a private Vercel Blob store to this VIMS project. Production uses the connected store&apos;s Vercel OIDC credentials automatically; a read-write token is only needed for off-platform/local use.
           </p>
         </div>
       ) : assessments.length === 0 ? (
