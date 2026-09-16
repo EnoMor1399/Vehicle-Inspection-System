@@ -5,9 +5,12 @@ import { buildContentSecurityPolicy } from "@/lib/csp";
 import { clientIpFromHeaders, normalizeRequestId } from "@/lib/request-context";
 import {
   API_AI_JSON_BODY_LIMIT,
+  API_DOCUMENT_UPLOAD_BODY_LIMIT,
   API_INSPECTION_JSON_BODY_LIMIT,
   API_SMALL_JSON_BODY_LIMIT,
 } from "@/lib/request-body";
+
+const WRITTEN_EXAM_API_PREFIX = "/api/driver-training/written-exams";
 
 async function apiRateIdentity(request: NextRequest, ip: string): Promise<string> {
   const authorization = request.headers.get("authorization") || "";
@@ -42,6 +45,7 @@ function allowedOrigins(request: NextRequest): Set<string> {
 function apiMutationBodyLimit(pathname: string): number {
   if (pathname === "/api/v1/inspections") return API_INSPECTION_JSON_BODY_LIMIT;
   if (pathname === "/api/v1/ai/detect-defects") return API_AI_JSON_BODY_LIMIT;
+  if (pathname === `${WRITTEN_EXAM_API_PREFIX}/upload`) return API_DOCUMENT_UPLOAD_BODY_LIMIT;
   return API_SMALL_JSON_BODY_LIMIT;
 }
 
@@ -84,7 +88,8 @@ export async function proxy(request: NextRequest) {
   const csp = buildContentSecurityPolicy(nonce, process.env.NODE_ENV === "production");
   let appliedRateLimit: Awaited<ReturnType<typeof rateLimit>> | null = null;
 
-  if (pathname.startsWith("/api/v1/")) {
+  const protectedApi = pathname.startsWith("/api/v1/") || pathname.startsWith(WRITTEN_EXAM_API_PREFIX);
+  if (protectedApi) {
     const identity = await apiRateIdentity(request, ip);
     const result = await rateLimit("api", identity);
     appliedRateLimit = result;
