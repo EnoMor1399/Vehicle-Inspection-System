@@ -202,7 +202,7 @@ export const trainingComplianceEvents = pgTable(
     caseId: varchar("case_id", { length: 36 })
       .notNull()
       .references(() => trainingComplianceCases.id, { onDelete: "cascade" }),
-    eventType: varchar("event_type", { length: 30 }),
+    eventType: varchar("event_type", { length: 30 }).notNull(),
     channel: varchar("channel", { length: 20 }),
     summary: text("summary").notNull(),
     createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
