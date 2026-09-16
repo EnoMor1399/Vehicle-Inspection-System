@@ -47,12 +47,17 @@ test("assessment governance migration adds reviewer controls and indexes", () =>
   assert.match(verify, /training_assessment_reviewer_idx/);
 });
 
-test("trainer submission cannot unlock certification before independent review", () => {
+test("trainer submission cannot unlock certification before written exams and final review", () => {
   const action = readFileSync("src/app/driver-training/assessments/actions.ts", "utf8");
   assert.match(action, /reviewStatus: "pending_review"/);
   assert.match(action, /assessmentStatus: "assessed"/);
   assert.match(action, /certificateEligible: false/);
-  assert.match(action, /submitted for independent review/);
+  assert.match(action, /theoryScore: null/);
+  assert.match(action, /roadSignScore: null/);
+  assert.match(action, /overallScore: null/);
+  assert.match(action, /written exam scores required before final review and certification/);
+  assert.match(action, /writtenScoresComplete/);
+  assert.match(action, /Record the Theory and Road Signs paper scores and calculate Total Performance before approving this assessment/);
   assert.match(action, /redirect\(`\/driver-training\/assessments\/\$\{id\}`\)/);
 });
 
