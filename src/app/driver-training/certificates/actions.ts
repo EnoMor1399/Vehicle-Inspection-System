@@ -12,6 +12,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { canManageTrainingCertificates } from "@/lib/training-access";
+import { calculateTrainingCompositeScore } from "@/lib/training-composite-score";
 import {
   effectiveTrainingCertificateStatus,
   trainingCertificateRevocationSchema,
@@ -39,6 +40,7 @@ function refreshCertificatePaths() {
   revalidatePath("/driver-training");
   revalidatePath("/driver-training/certificates");
   revalidatePath("/driver-training/analytics");
+  revalidatePath("/driver-training/assessments/written-exams");
 }
 
 export async function issueAssuredTrainingCertificate(formData: FormData) {
@@ -86,7 +88,16 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     }
 
     const [passingAssessment] = await tx
-      .select({ id: trainingAssessments.id, result: trainingAssessments.result, assessedAt: trainingAssessments.assessedAt })
+      .select({
+        id: trainingAssessments.id,
+        result: trainingAssessments.result,
+        reviewStatus: trainingAssessments.reviewStatus,
+        theoryScore: trainingAssessments.theoryScore,
+        roadSignScore: trainingAssessments.roadSignScore,
+        practicalScore: trainingAssessments.practicalScore,
+        overallScore: trainingAssessments.overallScore,
+        assessedAt: trainingAssessments.assessedAt,
+      })
       .from(trainingAssessments)
       .where(and(
         eq(trainingAssessments.participantId, participant.id),
@@ -96,6 +107,41 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
       .limit(1);
     if (!passingAssessment) {
       return { ok: false as const, error: "A passing or competent assessment is required before certificate issuance" };
+    }
+    if (passingAssessment.reviewStatus !== "approved") {
+      return { ok: false as const, error: "The latest passing assessment must be independently approved before certificate issuance" };
+    }
+
+    const theoryScore = Number(passingAssessment.theoryScore);
+    const roadSignScore = Number(passingAssessment.roadSignScore);
+    const assessmentPerformanceScore = Number(passingAssessment.practicalScore);
+    const storedTotalPerformance = Number(passingAssessment.overallScore);
+    if (
+      passingAssessment.theoryScore === null
+      || passingAssessment.roadSignScore === null
+      || passingAssessment.practicalScore === null
+      || passingAssessment.overallScore === null
+      || !Number.isFinite(theoryScore)
+      || !Number.isFinite(roadSignScore)
+      || !Number.isFinite(assessmentPerformanceScore)
+      || !Number.isFinite(storedTotalPerformance)
+    ) {
+      return {
+        ok: false as const,
+        error: "Theory, Road Signs and Assessment Performance scores must be recorded and combined before certificate issuance",
+      };
+    }
+
+    const calculatedTotalPerformance = calculateTrainingCompositeScore({
+      theoryScore,
+      roadSignScore,
+      assessmentPerformanceScore,
+    });
+    if (Math.abs(calculatedTotalPerformance - storedTotalPerformance) > 0.01) {
+      return {
+        ok: false as const,
+        error: "The stored Total Performance score is inconsistent. Re-save the written examination scores before issuing the certificate",
+      };
     }
 
     const [latestRevoked] = await tx
@@ -116,11 +162,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     }
 
     const activeCertificates = await tx
-      .select({
-        id: trainingCertificates.id,
-        certificateNumber: trainingCertificates.certificateNumber,
-        expiryDate: trainingCertificates.expiryDate,
-      })
+      .select({ id: trainingCertificates.id, certificateNumber: trainingCertificates.certificateNumber, expiryDate: trainingCertificates.expiryDate })
       .from(trainingCertificates)
       .where(and(
         eq(trainingCertificates.participantId, participant.id),
@@ -131,9 +173,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     const stillActive = activeCertificates.find((certificate) =>
       effectiveTrainingCertificateStatus("active", certificate.expiryDate, issuedAt) === "active"
     );
-    if (stillActive) {
-      return { ok: false as const, error: `An active certificate already exists: ${stillActive.certificateNumber}` };
-    }
+    if (stillActive) return { ok: false as const, error: `An active certificate already exists: ${stillActive.certificateNumber}` };
 
     const expiredIds = activeCertificates
       .filter((certificate) => effectiveTrainingCertificateStatus("active", certificate.expiryDate, issuedAt) === "expired")
@@ -156,7 +196,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
       issuedAt,
     } as const;
     await tx.insert(trainingCertificates).values(certificate);
-    return { ok: true as const, participant, session, certificate, expiredIds };
+    return { ok: true as const, participant, session, certificate, expiredIds, calculatedTotalPerformance };
   });
 
   if (!result.ok) throw new Error(result.error);
@@ -169,10 +209,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     entityId: id,
     entityLabel: certificateNumber,
     summary: `Issued training certificate to ${result.participant.fullName}`,
-    after: {
-      ...result.certificate,
-      priorExpiredCertificatesNormalized: result.expiredIds,
-    },
+    after: { ...result.certificate, totalPerformanceScore: result.calculatedTotalPerformance, priorExpiredCertificatesNormalized: result.expiredIds },
   });
 
   refreshCertificatePaths();
@@ -180,47 +217,22 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
 
 export async function revokeTrainingCertificate(formData: FormData) {
   const user = await requireTrainingCertificateManager();
-  const parsed = trainingCertificateRevocationSchema.safeParse({
-    certificateId: field(formData, "certificateId"),
-    reason: field(formData, "reason"),
-  });
+  const parsed = trainingCertificateRevocationSchema.safeParse({ certificateId: field(formData, "certificateId"), reason: field(formData, "reason") });
   if (!parsed.success) throw new Error(trainingValidationMessage(parsed.error));
   const data = parsed.data;
 
   const result = await db.transaction(async (tx) => {
     const [certificate] = await tx
-      .select({
-        id: trainingCertificates.id,
-        certificateNumber: trainingCertificates.certificateNumber,
-        status: trainingCertificates.status,
-        participantId: trainingCertificates.participantId,
-        revokedAt: trainingCertificates.revokedAt,
-        revocationReason: trainingCertificates.revocationReason,
-      })
+      .select({ id: trainingCertificates.id, certificateNumber: trainingCertificates.certificateNumber, status: trainingCertificates.status, participantId: trainingCertificates.participantId, revokedAt: trainingCertificates.revokedAt, revocationReason: trainingCertificates.revocationReason })
       .from(trainingCertificates)
       .where(eq(trainingCertificates.id, data.certificateId))
       .limit(1);
     if (!certificate) return { ok: false as const, error: "Training certificate not found" };
-    if (certificate.status === "revoked") {
-      return { ok: false as const, error: "Training certificate is already revoked" };
-    }
+    if (certificate.status === "revoked") return { ok: false as const, error: "Training certificate is already revoked" };
 
-    const [participant] = await tx
-      .select({ fullName: trainingParticipants.fullName })
-      .from(trainingParticipants)
-      .where(eq(trainingParticipants.id, certificate.participantId))
-      .limit(1);
-
+    const [participant] = await tx.select({ fullName: trainingParticipants.fullName }).from(trainingParticipants).where(eq(trainingParticipants.id, certificate.participantId)).limit(1);
     const revokedAt = new Date();
-    await tx
-      .update(trainingCertificates)
-      .set({
-        status: "revoked",
-        revokedAt,
-        revocationReason: data.reason,
-      })
-      .where(eq(trainingCertificates.id, certificate.id));
-
+    await tx.update(trainingCertificates).set({ status: "revoked", revokedAt, revocationReason: data.reason }).where(eq(trainingCertificates.id, certificate.id));
     return { ok: true as const, certificate, participant, revokedAt };
   });
 
@@ -234,17 +246,8 @@ export async function revokeTrainingCertificate(formData: FormData) {
     entityId: result.certificate.id,
     entityLabel: result.certificate.certificateNumber,
     summary: `Revoked training certificate ${result.certificate.certificateNumber}`,
-    before: {
-      status: result.certificate.status,
-      revokedAt: result.certificate.revokedAt,
-      revocationReason: result.certificate.revocationReason,
-    },
-    after: {
-      status: "revoked",
-      revokedAt: result.revokedAt,
-      revocationReason: data.reason,
-      participant: result.participant?.fullName || null,
-    },
+    before: { status: result.certificate.status, revokedAt: result.certificate.revokedAt, revocationReason: result.certificate.revocationReason },
+    after: { status: "revoked", revokedAt: result.revokedAt, revocationReason: data.reason, participant: result.participant?.fullName || null },
   });
 
   refreshCertificatePaths();
