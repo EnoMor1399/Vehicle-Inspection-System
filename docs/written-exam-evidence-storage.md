@@ -5,9 +5,11 @@ VIMS stores written examination file metadata in the existing `documents` regist
 ## Production setup
 
 1. In the Vercel project for `vehicle-inspection-system`, connect or create a Blob store with **private** access.
-2. Make sure Vercel provides `BLOB_READ_WRITE_TOKEN` to the environments where written exam uploads are required.
-3. Redeploy the application after the storage environment variable is available.
+2. Confirm the connected store exposes `BLOB_STORE_ID` to the Production environment. VIMS uses Vercel OIDC (`VERCEL_OIDC_TOKEN`) automatically at runtime and does not require a long-lived Blob token in production.
+3. Redeploy the application after the Blob store is connected so the deployment receives the storage connection metadata.
 4. Open **Driver Training → Assessments → Written Exams**. The page reports whether private storage is connected.
+
+`BLOB_READ_WRITE_TOKEN` remains supported only as a fallback for local/off-platform execution where Vercel OIDC is not available.
 
 ## Upload policy
 
