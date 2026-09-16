@@ -61,7 +61,9 @@ export async function GET(
 
   let upstream: Response;
   try {
-    upstream = await fetchPrivateBlob(document.url);
+    upstream = await fetchPrivateBlob(document.url, {
+      oidcToken: request.headers.get("x-vercel-oidc-token"),
+    });
   } catch (error) {
     console.error("[written-exams] private document retrieval failed", error);
     return failure("The written exam document is temporarily unavailable", 502);
