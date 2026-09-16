@@ -9,23 +9,11 @@ import {
 test("assessment review permission requires Driver Training assignment and an independent supervisory role", () => {
   assert.equal(canReviewTrainingAssessments({ role: "super_admin" }), true, "Super Administrator keeps cross-system oversight");
   for (const role of ["admin", "operations_manager", "supervisor"]) {
-    assert.equal(
-      canReviewTrainingAssessments({ role, permissions: { training: true } }),
-      true,
-      `${role} assigned to Driver Training should review assessments`,
-    );
-    assert.equal(
-      canReviewTrainingAssessments({ role, permissions: { training: false } }),
-      false,
-      `${role} assigned only to Vehicle Inspection should not review assessments`,
-    );
+    assert.equal(canReviewTrainingAssessments({ role, permissions: { training: true } }), true, `${role} assigned to Driver Training should review assessments`);
+    assert.equal(canReviewTrainingAssessments({ role, permissions: { training: false } }), false, `${role} assigned only to Vehicle Inspection should not review assessments`);
   }
   for (const role of ["inspector", "data_entry", "auditor", "compliance_officer", "viewer"]) {
-    assert.equal(
-      canReviewTrainingAssessments({ role, permissions: { training: true } }),
-      false,
-      `${role} should not review by default even when assigned to Driver Training`,
-    );
+    assert.equal(canReviewTrainingAssessments({ role, permissions: { training: true } }), false, `${role} should not review by default even when assigned to Driver Training`);
   }
   assert.equal(canReviewTrainingAssessments({ role: "inspector", permissions: { training: true, training_assessment_review: true } }), true);
   assert.equal(canReviewTrainingAssessments({ role: "supervisor", permissions: { training: true, training_assessment_review: false } }), false);
@@ -33,42 +21,25 @@ test("assessment review permission requires Driver Training assignment and an in
 
 test("administrative self-review override is restricted to authorized administrators", () => {
   assert.equal(canAdministrativelySelfReviewTrainingAssessment({ role: "super_admin" }), true);
-  assert.equal(
-    canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: true } }),
-    true,
-  );
-  assert.equal(
-    canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: false } }),
-    false,
-  );
-  assert.equal(
-    canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: true, training_assessment_review: false } }),
-    false,
-  );
+  assert.equal(canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: true } }), true);
+  assert.equal(canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: false } }), false);
+  assert.equal(canAdministrativelySelfReviewTrainingAssessment({ role: "admin", permissions: { training: true, training_assessment_review: false } }), false);
   for (const role of ["operations_manager", "supervisor", "instructor", "inspector", "data_entry"]) {
-    assert.equal(
-      canAdministrativelySelfReviewTrainingAssessment({ role, permissions: { training: true, training_assessment_review: true } }),
-      false,
-      `${role} must not self-review assessments`,
-    );
+    assert.equal(canAdministrativelySelfReviewTrainingAssessment({ role, permissions: { training: true, training_assessment_review: true } }), false, `${role} must not self-review assessments`);
   }
 });
 
 test("assessment governance migration adds reviewer controls and indexes", () => {
   const migration = readFileSync("migrations/20260912_driver_training_assessment_governance.sql", "utf8");
-  for (const field of ["review_status", "reviewer_id", "review_comments", "reviewed_at"]) {
-    assert.match(migration, new RegExp(field));
-  }
+  for (const field of ["review_status", "reviewer_id", "review_comments", "reviewed_at"]) assert.match(migration, new RegExp(field));
   assert.match(migration, /pending_review/);
   assert.match(migration, /approved/);
   assert.match(migration, /returned/);
   assert.match(migration, /training_assessment_review_status_chk/);
   assert.match(migration, /training_assessment_review_status_idx/);
   assert.match(migration, /training_assessment_reviewer_idx/);
-
   const apply = readFileSync("scripts/apply-enterprise-upgrade.mjs", "utf8");
   assert.match(apply, /20260912_driver_training_assessment_governance\.sql/);
-
   const verify = readFileSync("scripts/verify-enterprise-upgrade.mjs", "utf8");
   assert.match(verify, /"review_status"/);
   assert.match(verify, /"reviewer_id"/);
@@ -76,12 +47,17 @@ test("assessment governance migration adds reviewer controls and indexes", () =>
   assert.match(verify, /training_assessment_reviewer_idx/);
 });
 
-test("trainer submission cannot unlock certification before independent review", () => {
+test("trainer submission cannot unlock certification before written exams and final review", () => {
   const action = readFileSync("src/app/driver-training/assessments/actions.ts", "utf8");
   assert.match(action, /reviewStatus: "pending_review"/);
   assert.match(action, /assessmentStatus: "assessed"/);
   assert.match(action, /certificateEligible: false/);
-  assert.match(action, /submitted for independent review/);
+  assert.match(action, /theoryScore: null/);
+  assert.match(action, /roadSignScore: null/);
+  assert.match(action, /overallScore: null/);
+  assert.match(action, /written exam scores required before final review and certification/);
+  assert.match(action, /writtenScoresComplete/);
+  assert.match(action, /Record the Theory and Road Signs paper scores and calculate Total Performance before approving this assessment/);
   assert.match(action, /redirect\(`\/driver-training\/assessments\/\$\{id\}`\)/);
 });
 
@@ -129,8 +105,11 @@ test("assessment record exposes evidence, printing and controlled administrator 
   assert.match(page, /required=\{usesAdministrativeOverride\}/);
 
   const printButton = readFileSync("src/app/driver-training/assessments/[assessmentId]/PrintAssessmentButton.tsx", "utf8");
-  assert.match(printButton, /window\.print\(\)/);
+  const autoPrint = readFileSync("src/app/driver-training/assessments/[assessmentId]/print/AutoPrint.tsx", "utf8");
+  assert.match(printButton, /\$\{pathname\}\/print/);
+  assert.match(printButton, /window\.open/);
   assert.match(printButton, /print:hidden/);
+  assert.match(autoPrint, /window\.print\(\)/);
 });
 
 test("review queue is discoverable from the compact Driver Training navigation", () => {

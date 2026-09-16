@@ -46,26 +46,15 @@ function parseDevelopmentPlan(formData: FormData) {
   return items;
 }
 
-function calculatePracticalPercentage(ratings: Record<string, number>) {
-  let score = 0;
-  let maximum = 0;
-  for (const section of DRIVER_ASSESSMENT_SECTIONS) {
-    if (section.id === "traffic_regulations") continue;
-    for (const criterion of section.criteria) {
-      const value = ratings[criterion.id];
-      if (!value) continue;
-      score += value;
-      maximum += 5;
-    }
-  }
-  return maximum > 0 ? Math.round((score / maximum) * 10_000) / 100 : null;
-}
-
 function refreshAssessmentPaths(assessmentId?: string) {
   revalidatePath("/driver-training");
   revalidatePath("/driver-training/assessments");
+  revalidatePath("/driver-training/assessments/written-exams");
   revalidatePath("/driver-training/assessments/review");
-  if (assessmentId) revalidatePath(`/driver-training/assessments/${assessmentId}`);
+  if (assessmentId) {
+    revalidatePath(`/driver-training/assessments/${assessmentId}`);
+    revalidatePath(`/driver-training/assessments/${assessmentId}/print`);
+  }
   revalidatePath("/driver-training/participants");
   revalidatePath("/driver-training/certificates");
   revalidatePath("/driver-training/analytics");
@@ -103,16 +92,14 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
   if (calculated.ratedCriteria < minimumRequired || calculated.percentage === null || calculated.classification === null) {
     throw new Error(`Complete at least ${minimumRequired} of ${DRIVER_ASSESSMENT_TOTAL_CRITERIA} assessment criteria before submitting`);
   }
-  const overallPercentage = calculated.percentage;
+  const assessmentPerformanceScore = calculated.percentage;
   const classification = calculated.classification;
 
   const criticalViolations = formData
     .getAll("criticalViolations")
     .filter((value): value is string => typeof value === "string" && VALID_CRITICAL_VIOLATIONS.has(value));
 
-  const outcome = deriveDriverAssessmentOutcome(overallPercentage, criticalViolations.length);
-  const trafficScore = calculated.sectionScores.traffic_regulations?.percentage ?? null;
-  const practicalScore = calculatePracticalPercentage(ratings);
+  const provisionalOutcome = deriveDriverAssessmentOutcome(assessmentPerformanceScore, criticalViolations.length);
   const strengths = text(formData, "strengths");
   const improvementText = text(formData, "improvementAreas");
   const improvementAreas = improvementText
@@ -148,22 +135,23 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       sessionId: participant.sessionId,
       assessorId: user.id,
       assessmentType,
-      assessmentVersion: "driver-v1",
-      theoryScore: trafficScore === null ? null : trafficScore.toFixed(2),
-      practicalScore: practicalScore === null ? null : practicalScore.toFixed(2),
-      overallScore: overallPercentage.toFixed(2),
+      assessmentVersion: "driver-v2",
+      theoryScore: null,
+      roadSignScore: null,
+      practicalScore: assessmentPerformanceScore.toFixed(2),
+      overallScore: null,
       scoredPoints: calculated.score,
       maximumPoints: calculated.maximum,
       classification,
-      result: outcome.result,
-      riskLevel: outcome.riskLevel,
+      result: provisionalOutcome.result,
+      riskLevel: provisionalOutcome.riskLevel,
       criteriaRatings: ratings,
       criteriaComments: sectionNotes,
       sectionScores: calculated.sectionScores,
       criticalViolations,
       qualitativeFeedback,
       developmentPlan,
-      finalRecommendation: outcome.finalRecommendation,
+      finalRecommendation: provisionalOutcome.finalRecommendation,
       strengths: strengths || null,
       improvementAreas,
       remarks: text(formData, "remarks") || null,
@@ -179,7 +167,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
         attendanceStatus: participant.attendanceStatus === "registered" ? "attended" : participant.attendanceStatus,
         assessmentStatus: "assessed",
         certificateEligible: false,
-        riskLevel: outcome.riskLevel,
+        riskLevel: provisionalOutcome.riskLevel,
         updatedAt: new Date(),
       })
       .where(eq(trainingParticipants.id, participant.id));
@@ -196,15 +184,18 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     entityType: "training_assessment",
     entityId: id,
     entityLabel: result.participant.fullName,
-    summary: `Comprehensive driver assessment submitted for independent review: ${outcome.result} at ${overallPercentage}%`,
+    summary: `Driving assessment recorded at ${assessmentPerformanceScore}%; written exam scores required before final review and certification`,
     after: {
       assessmentType,
-      overallScore: overallPercentage,
-      classification,
-      result: outcome.result,
-      riskLevel: outcome.riskLevel,
+      assessmentPerformanceScore,
+      theoryScore: null,
+      roadSignScore: null,
+      totalPerformanceScore: null,
+      provisionalClassification: classification,
+      provisionalResult: provisionalOutcome.result,
+      riskLevel: provisionalOutcome.riskLevel,
       criticalViolations,
-      finalRecommendation: outcome.finalRecommendation,
+      finalRecommendation: provisionalOutcome.finalRecommendation,
       reviewStatus: "pending_review",
     },
   });
@@ -255,10 +246,26 @@ export async function reviewDriverAssessment(formData: FormData) {
     const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, assessment.participantId)).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
 
+    const writtenScoresComplete = assessment.theoryScore !== null
+      && assessment.roadSignScore !== null
+      && assessment.practicalScore !== null
+      && assessment.overallScore !== null;
+    if (decision === "approved" && assessment.assessmentType !== "pre_training" && !writtenScoresComplete) {
+      return {
+        ok: false as const,
+        error: "Record the Theory and Road Signs paper scores and calculate Total Performance before approving this assessment",
+      };
+    }
+
     const criticalCount = Array.isArray(assessment.criticalViolations) ? assessment.criticalViolations.length : 0;
     const passed = assessment.result === "competent" || assessment.result === "pass";
     const isBaseline = assessment.assessmentType === "pre_training";
-    const certificateEligible = decision === "approved" && !isBaseline && passed && criticalCount === 0 && assessment.riskLevel !== "critical";
+    const certificateEligible = decision === "approved"
+      && !isBaseline
+      && writtenScoresComplete
+      && passed
+      && criticalCount === 0
+      && assessment.riskLevel !== "critical";
     const participantAssessmentStatus = decision === "returned" || isBaseline
       ? "assessed"
       : passed

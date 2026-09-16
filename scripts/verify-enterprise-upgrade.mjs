@@ -55,6 +55,10 @@ const requiredTables = [
 
 const requiredAssessmentColumns = [
   "assessment_version",
+  "theory_score",
+  "road_sign_score",
+  "practical_score",
+  "overall_score",
   "criteria_ratings",
   "criteria_comments",
   "section_scores",
