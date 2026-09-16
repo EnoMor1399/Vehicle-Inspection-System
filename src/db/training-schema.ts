@@ -91,6 +91,7 @@ export const trainingAssessments = pgTable(
     assessmentType: varchar("assessment_type", { length: 40 }).notNull(),
     assessmentVersion: varchar("assessment_version", { length: 20 }).notNull().default("driver-v1"),
     theoryScore: numeric("theory_score", { precision: 5, scale: 2 }),
+    roadSignScore: numeric("road_sign_score", { precision: 5, scale: 2 }),
     practicalScore: numeric("practical_score", { precision: 5, scale: 2 }),
     overallScore: numeric("overall_score", { precision: 5, scale: 2 }),
     scoredPoints: integer("scored_points"),
@@ -201,7 +202,7 @@ export const trainingComplianceEvents = pgTable(
     caseId: varchar("case_id", { length: 36 })
       .notNull()
       .references(() => trainingComplianceCases.id, { onDelete: "cascade" }),
-    eventType: varchar("event_type", { length: 30 }).notNull(),
+    eventType: varchar("event_type", { length: 30 }),
     channel: varchar("channel", { length: 20 }),
     summary: text("summary").notNull(),
     createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
