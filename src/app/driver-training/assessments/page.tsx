@@ -16,6 +16,7 @@ import { requireInternalUser } from "@/lib/require-auth";
 import { canManageTraining, canViewTraining } from "@/lib/training-access";
 import { formatDateTime } from "@/lib/utils";
 import { recordComprehensiveDriverAssessment } from "./actions";
+import { AssessmentSignatureField } from "./AssessmentSignatureField";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +232,23 @@ export default async function DriverAssessmentsPage() {
                 <Field label="Driver comments"><TextArea name="driverComments" maxLength={4000} className="min-h-[80px]" /></Field>
               </div>
             </details>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="border-b border-[var(--vims-line)] px-5 py-4 sm:px-6">
+              <h2 className="font-semibold text-[var(--vims-ink)]">Assessor Authorization</h2>
+              <p className="mt-1 text-sm text-[var(--vims-ink-muted)]">
+                Sign the completed assessment before submission. Reviewer/supervisor approval and signature are captured on the assessment review screen.
+              </p>
+            </div>
+            <div className="p-5 sm:p-6">
+              <AssessmentSignatureField
+                name="assessorSignature"
+                label="Assessor Digital Signature"
+                required
+                hint="Your signature is linked to your authenticated account and stored with this assessment."
+              />
+            </div>
           </Card>
 
           <div className="sticky bottom-3 z-20 flex flex-col gap-3 rounded-xl border border-[var(--vims-line-strong)] bg-[var(--vims-panel-solid)]/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
