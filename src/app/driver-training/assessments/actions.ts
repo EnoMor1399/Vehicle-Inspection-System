@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { MAX_SIGNATURE_DATA_URL_CHARS, validateSignatureDataUrl } from "@/lib/inspection-evidence";
 import {
   calculateDriverAssessment,
   deriveDriverAssessmentOutcome,
@@ -69,6 +70,10 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
   const assessmentType = text(formData, "assessmentType", 40);
   if (!participantId) throw new Error("Select a participant to assess");
   if (!VALID_ASSESSMENT_TYPES.has(assessmentType)) throw new Error("Select a valid assessment type");
+
+  const assessorSignature = text(formData, "assessorSignature", MAX_SIGNATURE_DATA_URL_CHARS + 1);
+  if (!assessorSignature) throw new Error("Assessor digital signature is required before submission");
+  validateSignatureDataUrl(assessorSignature, "Assessor signature");
 
   const ratings: Record<string, number> = {};
   const sectionNotes: Record<string, string> = {};
@@ -134,6 +139,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       participantId: participant.id,
       sessionId: participant.sessionId,
       assessorId: user.id,
+      assessorSignature,
       assessmentType,
       assessmentVersion: "driver-v2",
       theoryScore: null,
@@ -197,6 +203,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       criticalViolations,
       finalRecommendation: provisionalOutcome.finalRecommendation,
       reviewStatus: "pending_review",
+      assessorSignatureCaptured: true,
     },
   });
 
@@ -211,9 +218,12 @@ export async function reviewDriverAssessment(formData: FormData) {
   const assessmentId = text(formData, "assessmentId", 36);
   const decision = text(formData, "decision", 24);
   const reviewComments = text(formData, "reviewComments", 4000);
+  const reviewerSignature = text(formData, "reviewerSignature", MAX_SIGNATURE_DATA_URL_CHARS + 1);
   if (!assessmentId) throw new Error("Assessment reference is required");
   if (!VALID_REVIEW_DECISIONS.has(decision)) throw new Error("Select a valid assessment review decision");
   if (decision === "returned" && reviewComments.length < 5) throw new Error("Explain what the trainer must correct before reassessment");
+  if (reviewerSignature) validateSignatureDataUrl(reviewerSignature, "Reviewer signature");
+  if (decision === "approved" && !reviewerSignature) throw new Error("Reviewer digital signature is required before approval");
 
   const result = await db.transaction(async (tx) => {
     const [initial] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
@@ -223,6 +233,9 @@ export async function reviewDriverAssessment(formData: FormData) {
     const [assessment] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
     if (!assessment) return { ok: false as const, error: "Driver assessment not found" };
     if (assessment.reviewStatus !== "pending_review") return { ok: false as const, error: "This assessment has already been reviewed" };
+    if (decision === "approved" && !assessment.assessorSignature) {
+      return { ok: false as const, error: "Assessor digital signature is required before this assessment can be approved" };
+    }
 
     const isSelfReview = Boolean(assessment.assessorId && assessment.assessorId === user.id);
     const administrativeSelfReviewOverride = isSelfReview && canAdministrativelySelfReviewTrainingAssessment(user);
@@ -278,6 +291,7 @@ export async function reviewDriverAssessment(formData: FormData) {
       .set({
         reviewStatus: decision,
         reviewerId: user.id,
+        reviewerSignature: reviewerSignature || null,
         reviewComments: reviewComments || null,
         reviewedAt,
       })
@@ -318,6 +332,7 @@ export async function reviewDriverAssessment(formData: FormData) {
       certificateEligible: result.certificateEligible,
       reviewComments: reviewComments || undefined,
       administrativeSelfReviewOverride: result.administrativeSelfReviewOverride,
+      reviewerSignatureCaptured: Boolean(reviewerSignature),
     },
   });
 
