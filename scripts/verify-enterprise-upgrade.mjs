@@ -73,6 +73,8 @@ const requiredAssessmentColumns = [
   "driver_comments",
   "review_status",
   "reviewer_id",
+  "assessor_signature",
+  "reviewer_signature",
   "review_comments",
   "reviewed_at",
 ];
