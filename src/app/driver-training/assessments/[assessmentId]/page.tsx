@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/training-access";
 import { formatDateTime } from "@/lib/utils";
 import { reviewDriverAssessment } from "../actions";
+import { AssessmentSignatureField } from "../AssessmentSignatureField";
 import PrintAssessmentButton from "./PrintAssessmentButton";
 
 export const dynamic = "force-dynamic";
@@ -204,6 +206,14 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
       </div>
 
       <Card className="mt-5 p-5 sm:p-6">
+        <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[var(--brand-color)]" /><h2 className="font-semibold text-[var(--vims-ink)]">Digital Signatures</h2></div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <SignaturePreview label="Assessor" signerName={assessor?.name || "Assessor"} value={assessment.assessorSignature} />
+          <SignaturePreview label="Reviewer / Supervisor" signerName={reviewer?.name || "Pending review"} value={assessment.reviewerSignature} />
+        </div>
+      </Card>
+
+      <Card className="mt-5 p-5 sm:p-6">
         <div className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-[var(--brand-color)]" /><h2 className="font-semibold text-[var(--vims-ink)]">Review Decision</h2></div>
         {assessment.reviewStatus !== "pending_review" ? (
           <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4"><div className="flex flex-wrap items-center gap-2"><Badge tone={reviewTone(assessment.reviewStatus)}>{assessment.reviewStatus.replaceAll("_", " ")}</Badge>{reviewer && <span className="text-sm text-[var(--vims-ink-soft)]">by {reviewer.name}</span>}</div><p className="mt-2 text-sm text-[var(--vims-ink-soft)]">{assessment.reviewComments || "No review comments."}</p></div>
@@ -217,6 +227,13 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
               </div>
             )}
             <label className="block"><span className="mb-1.5 block text-sm font-semibold text-[var(--vims-ink-soft)]">Review comments{usesAdministrativeOverride ? " (required)" : ""}</span><TextArea name="reviewComments" required={usesAdministrativeOverride} minLength={usesAdministrativeOverride ? 5 : undefined} maxLength={4000} className="min-h-[110px]" placeholder={usesAdministrativeOverride ? "Document the reason for this administrative review decision." : "Enter approval notes or required corrections."} /></label>
+            <div className="mt-5">
+              <AssessmentSignatureField
+                name="reviewerSignature"
+                label="Reviewer / Supervisor Digital Signature"
+                hint="Required for approval. The signature is linked to the authenticated reviewer and preserved with the assessment."
+              />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button type="submit" name="decision" value="returned" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><AlertTriangle className="h-4 w-4" /> Return for Correction</button>
               <button type="submit" name="decision" value="approved" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2"><ShieldCheck className="h-4 w-4" /> Approve Assessment</button>
@@ -228,6 +245,22 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
           <div className="mt-4 rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4 text-sm text-[var(--vims-ink-muted)]"><ClipboardCheck className="mr-2 inline h-4 w-4" />Awaiting authorized review.</div>
         )}
       </Card>
+    </div>
+  );
+}
+
+function SignaturePreview({ label, signerName, value }: { label: string; signerName: string; value?: string | null }) {
+  return (
+    <div className="rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-[var(--vims-ink-muted)]">{label}</p>
+      <div className="mt-3 flex min-h-28 items-center justify-center rounded-lg border border-dashed border-[var(--vims-line-strong)] bg-white p-2">
+        {value ? (
+          <Image src={value} alt={`${label} digital signature`} width={400} height={120} unoptimized className="max-h-24 w-full object-contain" />
+        ) : (
+          <span className="text-sm text-[var(--vims-ink-muted)]">Not captured</span>
+        )}
+      </div>
+      <p className="mt-2 text-xs font-semibold text-[var(--vims-ink-soft)]">{signerName}</p>
     </div>
   );
 }

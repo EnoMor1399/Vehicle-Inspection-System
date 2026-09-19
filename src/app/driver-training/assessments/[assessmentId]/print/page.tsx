@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -203,7 +204,20 @@ export default async function LegacyDriverAssessmentPrintPage({ params }: { para
         </div>
 
         <div className="company-footer">Road Safety Limited. PMB, Tema. Email: info@rslghana.com Tel: +233 (0) 303 976 777</div>
-        <div className="signature-footer"><div><strong>Assessor Sign:</strong><span /></div><div><strong>Mgr Sign:</strong><span /></div></div>
+        <div className="signature-footer">
+          <div>
+            <strong>Assessor Sign:</strong>
+            <span className="signature-slot">
+              {assessment.assessorSignature ? <Image src={assessment.assessorSignature} alt="Assessor digital signature" width={400} height={120} unoptimized /> : null}
+            </span>
+          </div>
+          <div>
+            <strong>Mgr Sign:</strong>
+            <span className="signature-slot">
+              {assessment.reviewerSignature ? <Image src={assessment.reviewerSignature} alt="Reviewer digital signature" width={400} height={120} unoptimized /> : null}
+            </span>
+          </div>
+        </div>
         <div className="system-footnote">VIMS assessment record {session.referenceNumber} · Total Performance = (Theory + Road Signs + Assessment Performance) ÷ 3.</div>
       </section>
     </main>
@@ -280,7 +294,8 @@ const PRINT_CSS = `
   .company-footer { margin-top: 2.5mm; text-align: center; font-size: 8pt; font-weight: 700; }
   .signature-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; margin-top: 5mm; font-size: 8pt; }
   .signature-footer > div { display: flex; align-items: end; gap: 1.2mm; }
-  .signature-footer span { flex: 1; border-bottom: .35mm solid #000; height: 4mm; }
+  .signature-slot { flex: 1; display: flex; align-items: end; justify-content: center; border-bottom: .35mm solid #000; height: 7mm; overflow: hidden; }
+  .signature-slot img { width: 34mm; height: 6.5mm; object-fit: contain; }
   .system-footnote { margin-top: 2.2mm; text-align: center; font-size: 5.5pt; color: #333; }
   @page { size: A4 portrait; margin: 8mm; }
   @media print {
