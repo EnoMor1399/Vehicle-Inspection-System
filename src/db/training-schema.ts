@@ -88,6 +88,7 @@ export const trainingAssessments = pgTable(
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
     assessorId: varchar("assessor_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    assessorSignature: text("assessor_signature"),
     assessmentType: varchar("assessment_type", { length: 40 }).notNull(),
     assessmentVersion: varchar("assessment_version", { length: 20 }).notNull().default("driver-v1"),
     theoryScore: numeric("theory_score", { precision: 5, scale: 2 }),
@@ -119,6 +120,7 @@ export const trainingAssessments = pgTable(
     driverComments: text("driver_comments"),
     reviewStatus: varchar("review_status", { length: 24 }).notNull().default("pending_review"),
     reviewerId: varchar("reviewer_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    reviewerSignature: text("reviewer_signature"),
     reviewComments: text("review_comments"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     assessedAt: timestamp("assessed_at", { withTimezone: true }).notNull().defaultNow(),

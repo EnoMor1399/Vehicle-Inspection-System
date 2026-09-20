@@ -92,6 +92,8 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
         id: trainingAssessments.id,
         result: trainingAssessments.result,
         reviewStatus: trainingAssessments.reviewStatus,
+        assessorSignature: trainingAssessments.assessorSignature,
+        reviewerSignature: trainingAssessments.reviewerSignature,
         theoryScore: trainingAssessments.theoryScore,
         roadSignScore: trainingAssessments.roadSignScore,
         practicalScore: trainingAssessments.practicalScore,
@@ -110,6 +112,9 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     }
     if (passingAssessment.reviewStatus !== "approved") {
       return { ok: false as const, error: "The latest passing assessment must be independently approved before certificate issuance" };
+    }
+    if (!passingAssessment.assessorSignature || !passingAssessment.reviewerSignature) {
+      return { ok: false as const, error: "Assessor and reviewer digital signatures are required before certificate issuance" };
     }
 
     const theoryScore = Number(passingAssessment.theoryScore);
