@@ -14,10 +14,14 @@ export function assessmentSignaturePath(
   return `/api/driver-training/assessment-signatures/${assessmentId}/${kind}`;
 }
 
-export function decodePngSignatureDataUrl(value: string): Uint8Array | null {
+export function decodePngSignatureDataUrl(value: string): ArrayBuffer | null {
   const match = value.match(PNG_DATA_URL);
   if (!match) return null;
-  return Uint8Array.from(Buffer.from(match[1], "base64"));
+  const decoded = Buffer.from(match[1], "base64");
+  return decoded.buffer.slice(
+    decoded.byteOffset,
+    decoded.byteOffset + decoded.byteLength,
+  ) as ArrayBuffer;
 }
 
 export async function moveAssessmentSignatureToPrivateStorage(
