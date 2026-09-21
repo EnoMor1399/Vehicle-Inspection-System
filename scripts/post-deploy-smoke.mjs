@@ -7,6 +7,7 @@ const packageJson = JSON.parse(
 const rawBaseUrl = process.env.VIMS_BASE_URL || process.argv[2];
 const expectedVersion = process.env.EXPECTED_VERSION || packageJson.version;
 const allowInsecureHttp = process.env.ALLOW_INSECURE_HTTP === "1";
+const vercelProtectionBypass = (process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
 
 if (!rawBaseUrl) {
   throw new Error("VIMS_BASE_URL or the first command-line argument is required");
@@ -31,7 +32,15 @@ async function check(pathname, expectedStatus) {
     method: "GET",
     redirect: "error",
     signal: AbortSignal.timeout(10_000),
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      ...(vercelProtectionBypass
+        ? {
+            "x-vercel-protection-bypass": vercelProtectionBypass,
+            "x-vercel-set-bypass-cookie": "true",
+          }
+        : {}),
+    },
   });
 
   const body = await response.json().catch(() => null);
