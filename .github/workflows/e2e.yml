@@ -65,6 +65,7 @@ jobs:
 
       - name: Build isolated database
         run: |
+          npx drizzle-kit push --force
           npm run db:upgrade
           node scripts/seed-e2e.mjs
 
