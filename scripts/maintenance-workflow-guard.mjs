@@ -12,6 +12,7 @@ const allWorkflows = [
   ...productionWorkflows,
   ".github/workflows/quality-gate.yml",
   ".github/workflows/security-retention.yml",
+  ".github/workflows/e2e.yml",
 ];
 
 const maintenanceScripts = [
