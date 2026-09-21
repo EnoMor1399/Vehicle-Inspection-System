@@ -11,6 +11,7 @@ const productionWorkflows = [
 const allWorkflows = [
   ...productionWorkflows,
   ".github/workflows/quality-gate.yml",
+  ".github/workflows/security-retention.yml",
 ];
 
 const maintenanceScripts = [
@@ -116,6 +117,11 @@ requireText(".github/workflows/production-db-upgrade.yml", dbUpgrade, "DATABASE_
 if (/vercel\.app/i.test(dbUpgrade)) {
   issues.push(".github/workflows/production-db-upgrade.yml: database upgrade must not depend on a Vercel runtime URL");
 }
+
+const retention = read(".github/workflows/security-retention.yml");
+requireText(".github/workflows/security-retention.yml", retention, "environment: production", "security retention must use the production environment");
+requireText(".github/workflows/security-retention.yml", retention, "RETENTION_MODE:", "security retention must make execution mode explicit");
+requireText(".github/workflows/security-retention.yml", retention, "secrets.DATABASE_URL", "security retention must use the protected production database secret");
 
 const postDeploy = read(".github/workflows/post-deploy-verification.yml");
 requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "node scripts/post-deploy-smoke.mjs", "post-deployment verification must use the source-controlled smoke verifier");
