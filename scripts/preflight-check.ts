@@ -187,11 +187,31 @@ async function checkSecurity() {
   
   const env = getEnv();
   
-  // Check rate limiting configuration
+  // Check rate limiting configuration.
   if (env.RATE_LIMIT_MAX_REQUESTS && env.RATE_LIMIT_WINDOW_MS) {
     log("pass", "Rate limiting is configured");
   } else {
     log("warn", "Rate limiting not configured");
+  }
+
+  if (env.NODE_ENV === "production") {
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      log("pass", "Distributed rate limiting is configured for production");
+    } else {
+      log("fail", "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for production authentication/API rate limiting");
+    }
+
+    if (process.env.ALLOW_PUBLIC_SIGNUP === "true") {
+      log("warn", "Public account creation is enabled in production");
+    } else {
+      log("pass", "Public account creation is disabled in production");
+    }
+
+    if (process.env.PRIVILEGED_2FA_ENFORCEMENT?.toLowerCase() === "off") {
+      log("fail", "Privileged 2FA enforcement is disabled in production");
+    } else {
+      log("pass", "Privileged 2FA enrollment enforcement is enabled");
+    }
   }
   
   // Check session timeout
