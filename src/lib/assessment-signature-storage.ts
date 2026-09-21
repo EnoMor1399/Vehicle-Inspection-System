@@ -34,7 +34,7 @@ export async function moveAssessmentSignatureToPrivateStorage(
   }
 
   const bytes = decodePngSignatureDataUrl(currentValue);
-  if (!bytes?.length) return { value: currentValue, storage: "database_data_url" };
+  if (!bytes?.byteLength) return { value: currentValue, storage: "database_data_url" };
 
   try {
     const pathname = [
