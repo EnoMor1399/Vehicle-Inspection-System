@@ -125,7 +125,9 @@ requireText(".github/workflows/security-retention.yml", retention, "secrets.DATA
 
 const postDeploy = read(".github/workflows/post-deploy-verification.yml");
 requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "node scripts/post-deploy-smoke.mjs", "post-deployment verification must use the source-controlled smoke verifier");
-requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "VIMS_BASE_URL: ${{ inputs.base_url }}", "post-deployment verification must receive an explicit target URL");
+requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "deployment_status:", "post-deployment verification must run from deployment status events");
+requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "environment_url", "post-deployment verification must use the deployed environment URL");
+requireText(".github/workflows/post-deploy-verification.yml", postDeploy, "VERCEL_AUTOMATION_BYPASS_SECRET", "post-deployment verification must support protected Vercel deployments");
 
 const smokeVerifier = read("scripts/post-deploy-smoke.mjs");
 requireText("scripts/post-deploy-smoke.mjs", smokeVerifier, 'check("/api/health/live", "alive")', "release verifier must test application liveness");
