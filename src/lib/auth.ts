@@ -145,15 +145,17 @@ export async function login(
   }
 
   const privileged2FARequired = process.env.REQUIRE_PRIVILEGED_2FA === "true"
-    && ["super_admin", "admin", "supervisor"].includes(user.role);
+    && ["super_admin", "admin", "operations_manager", "supervisor"].includes(user.role);
   if (privileged2FARequired && (!user.twoFactorEnabled || !user.twoFactorSecret)) {
+    // Do not reject valid primary credentials here: the authenticated user
+    // needs a revocable session to reach the mandatory enrollment screen.
+    // requireAuth() blocks all operational pages until enrollment completes.
     await logSecurityEvent("2fa_enrollment_required", "warning", {
       userId: user.id,
       ipAddress,
       userAgent,
-      description: "Privileged account blocked because organization policy requires 2FA enrollment",
+      description: "Privileged account authenticated with primary credentials and must complete 2FA enrollment before workspace access",
     });
-    return { success: false, error: "Two-factor authentication enrollment is required by organization policy. Contact an administrator if you cannot enroll." };
   }
 
   if (user.twoFactorEnabled && user.twoFactorSecret) {
