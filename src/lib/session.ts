@@ -95,6 +95,10 @@ export async function signUp(input: {
   confirmPassword: string;
   phone?: string;
 }): Promise<AuthResult> {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PUBLIC_SIGNUP !== "true") {
+    return { ok: false, error: "Public account creation is disabled. Contact a system administrator for access." };
+  }
+
   const { name, email, password, confirmPassword, phone } = input;
   const normalized = email.trim().toLowerCase();
   const normalizedName = name.trim();
