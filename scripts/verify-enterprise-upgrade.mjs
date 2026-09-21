@@ -53,6 +53,11 @@ const requiredTables = [
   "training_communication_events",
 ];
 
+const requiredAuditColumns = [
+  "previous_hash",
+  "event_hash",
+];
+
 const requiredAssessmentColumns = [
   "assessment_version",
   "theory_score",
@@ -85,6 +90,7 @@ const requiredIndexes = [
   "session_user_active_activity_idx",
   "audit_entity_created_idx",
   "audit_user_created_idx",
+  "audit_event_hash_idx",
   "notification_user_unread_created_idx",
   "training_session_reference_uidx",
   "training_session_status_start_idx",
@@ -241,6 +247,17 @@ try {
   const presentAssessmentColumns = new Set(assessmentColumnResult.rows.map((row) => row.column_name));
   const missingAssessmentColumns = requiredAssessmentColumns.filter((name) => !presentAssessmentColumns.has(name));
 
+  const auditColumnResult = await client.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'audit_logs'
+        AND column_name = ANY($1::text[])`,
+    [requiredAuditColumns],
+  );
+  const presentAuditColumns = new Set(auditColumnResult.rows.map((row) => row.column_name));
+  const missingAuditColumns = requiredAuditColumns.filter((name) => !presentAuditColumns.has(name));
+
   const { rows } = await client.query(
     `SELECT indexname
        FROM pg_indexes
@@ -262,15 +279,18 @@ try {
       requiredTablesExpected: requiredTables.length,
       assessmentColumnsVerified: requiredAssessmentColumns.length - missingAssessmentColumns.length,
       assessmentColumnsExpected: requiredAssessmentColumns.length,
+      auditColumnsVerified: requiredAuditColumns.length - missingAuditColumns.length,
+      auditColumnsExpected: requiredAuditColumns.length,
       requiredIndexesVerified: requiredIndexes.length - missing.length,
       requiredIndexesExpected: requiredIndexes.length,
       redundantIndexesRemaining: redundantStillPresent.length,
     }),
   );
 
-  if (missingTables.length > 0 || missingAssessmentColumns.length > 0 || missing.length > 0 || redundantStillPresent.length > 0) {
+  if (missingTables.length > 0 || missingAssessmentColumns.length > 0 || missingAuditColumns.length > 0 || missing.length > 0 || redundantStillPresent.length > 0) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
+    if (missingAuditColumns.length > 0) console.error(`Missing audit integrity columns: ${missingAuditColumns.join(", ")}`);
     if (missing.length > 0) console.error(`Missing required indexes: ${missing.join(", ")}`);
     if (redundantStillPresent.length > 0) console.error(`Redundant indexes still present: ${redundantStillPresent.join(", ")}`);
     process.exitCode = 1;
