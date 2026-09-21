@@ -40,9 +40,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DEPLOYMENT_REF: ${{ github.event.deployment.ref }}
         run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "Production verification may run only from refs/heads/main."
-            exit 1
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+              echo "Production verification may run only from refs/heads/main."
+              exit 1
+            fi
           fi
           if [[ "$EVENT_NAME" == "deployment_status" && "$DEPLOYMENT_REF" != "main" ]]; then
             echo "Ignoring a non-main deployment."
