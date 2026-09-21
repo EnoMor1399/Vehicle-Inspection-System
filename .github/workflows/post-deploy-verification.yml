@@ -1,6 +1,7 @@
 name: Post-deployment verification
 
 on:
+  deployment_status:
   workflow_dispatch:
     inputs:
       base_url:
@@ -23,15 +24,28 @@ concurrency:
 jobs:
   verify:
     name: Verify VIMS liveness and readiness
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production' &&
+       github.event.deployment.ref == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     environment: production
     steps:
       - name: Require main ref
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOYMENT_REF: ${{ github.event.deployment.ref }}
         run: |
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
             echo "Production verification may run only from refs/heads/main."
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "deployment_status" && "$DEPLOYMENT_REF" != "main" ]]; then
+            echo "Ignoring a non-main deployment."
             exit 1
           fi
 
@@ -46,5 +60,6 @@ jobs:
       - name: Verify deployed release without changing it
         run: node scripts/post-deploy-smoke.mjs
         env:
-          VIMS_BASE_URL: ${{ inputs.base_url }}
+          VIMS_BASE_URL: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.environment_url || inputs.base_url }}
           EXPECTED_VERSION: ${{ inputs.expected_version }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
