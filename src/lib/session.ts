@@ -2,7 +2,8 @@
 
 import { cookies, headers } from "next/headers";
 import { db } from "@/db";
-import { users, auditLogs } from "@/db/schema";
+import { users } from "@/db/schema";
+import { logAudit } from "@/lib/audit";
 import { eq, sql } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { hashPassword, validatePasswordStrength, validateEmail } from "@/lib/password";
@@ -177,17 +178,6 @@ export async function signUp(input: {
       isActive: true,
     });
 
-    await tx.insert(auditLogs).values({
-      id: newId(),
-      userId: id,
-      userName: normalizedName,
-      action: "create",
-      entityType: "user",
-      entityId: id,
-      entityLabel: normalized,
-      summary: `New account created: ${normalizedName} (${normalized})`,
-    });
-
     return { ok: true as const, role };
   });
 
@@ -204,8 +194,16 @@ export async function signUp(input: {
     maxAge: 60 * 60 * 8,
   });
 
-  await db.insert(auditLogs).values({
-    id: newId(),
+  await logAudit({
+    userId: id,
+    userName: normalizedName,
+    action: "create",
+    entityType: "user",
+    entityId: id,
+    entityLabel: normalized,
+    summary: `New account created: ${normalizedName} (${normalized})`,
+  });
+  await logAudit({
     userId: id,
     userName: normalizedName,
     action: "login",
