@@ -9,7 +9,7 @@ async function signIn(page: import("@playwright/test").Page) {
   await expect(page.getByRole("button", { name: "Create Account" })).toHaveCount(0);
   await page.getByLabel("Email Address").fill(email);
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await page.locator('form button[type="submit"]').click();
   await page.waitForURL(`${baseURL}/`);
   await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
 }
