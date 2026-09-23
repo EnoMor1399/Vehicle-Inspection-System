@@ -11,7 +11,7 @@ test("legacy evidence storage is measurable and new training signatures have a p
   assert.match(audit, /daily_inspections_with_embedded_photos/);
   assert.match(audit, /private\.blob\.vercel-storage\.com/);
   assert.match(storage, /moveAssessmentSignatureToPrivateStorage/);
-  assert.match(nav, /Workflow/);
-  assert.match(nav, /Assess & Certify/);
+  assert.match(nav, /Operations/);
+  assert.match(nav, /Assessments/);
   assert.match(nav, /Admin & Assurance/);
 });
