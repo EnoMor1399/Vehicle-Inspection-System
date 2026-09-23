@@ -72,14 +72,20 @@ jobs:
       - name: Build production application
         run: npm run build
 
-      - name: Start VIMS
+      - name: Start VIMS standalone artifact
         shell: bash
         run: |
-          nohup npm start > /tmp/vims-e2e.log 2>&1 &
+          cp -R public .next/standalone/public
+          mkdir -p .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+          HOSTNAME=127.0.0.1 PORT=3000 nohup node .next/standalone/server.js > /tmp/vims-e2e.log 2>&1 &
           echo $! > /tmp/vims-e2e.pid
           for attempt in $(seq 1 45); do
             if curl --fail --silent http://127.0.0.1:3000/api/health/live >/dev/null; then
-              exit 0
+              login_html="$(curl --fail --silent http://127.0.0.1:3000/login || true)"
+              if grep -q 'id="email"' <<< "$login_html"; then
+                exit 0
+              fi
             fi
             sleep 2
           done
