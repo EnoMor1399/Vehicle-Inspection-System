@@ -140,9 +140,7 @@ export function AuthForm({ allowSignUp = false }: { allowSignUp?: boolean }) {
         )}
 
         <div>
-          <label className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
-            Email Address
-          </label>
+          <label htmlFor="email" className="block text-sm sm:text-base font-medium text-slate-700 mb-2">\n            Email Address\n          </label>
           <div className="relative">
             <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
             <input
