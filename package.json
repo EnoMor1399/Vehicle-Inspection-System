@@ -19,7 +19,8 @@
     "db:target": "node scripts/verify-database-target.mjs",
     "db:verify": "npm run db:target && node scripts/verify-enterprise-upgrade.mjs",
     "release:smoke": "node scripts/post-deploy-smoke.mjs",
-    "api-key:create": "tsx scripts/create-api-key.ts"
+    "api-key:create": "tsx scripts/create-api-key.ts",
+    "audit:verify": "tsx scripts/verify-audit-chain.ts"
   },
   "dependencies": {
     "@e965/xlsx": "0.20.3",

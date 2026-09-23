@@ -6,6 +6,8 @@ test("new audit events are tamper-evident and serialized", () => {
   const audit = readFileSync("src/lib/audit.ts", "utf8");
   const schema = readFileSync("src/db/schema.ts", "utf8");
   const migration = readFileSync("migrations/20260921_audit_hash_chain.sql", "utf8");
+  const verifier = readFileSync("scripts/verify-audit-chain.ts", "utf8");
+  const packageJson = readFileSync("package.json", "utf8");
 
   assert.match(audit, /createHash\("sha256"\)/);
   assert.match(audit, /pg_advisory_xact_lock\(78654229\)/);
@@ -15,4 +17,8 @@ test("new audit events are tamper-evident and serialized", () => {
   assert.match(schema, /eventHash: varchar\("event_hash"/);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS previous_hash/);
   assert.match(migration, /audit_event_hash_idx/);
+  assert.match(verifier, /Previous hash mismatch/);
+  assert.match(verifier, /Event hash mismatch/);
+  assert.match(verifier, /Unchained audit event after chain start/);
+  assert.match(packageJson, /"audit:verify"/);
 });
