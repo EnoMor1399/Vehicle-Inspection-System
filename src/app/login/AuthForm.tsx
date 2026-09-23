@@ -146,6 +146,8 @@ export function AuthForm({ allowSignUp = false }: { allowSignUp?: boolean }) {
           <div className="relative">
             <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
             <input
+              id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setRequires2FA(false); setTwoFactorToken(""); }}
@@ -179,12 +181,14 @@ export function AuthForm({ allowSignUp = false }: { allowSignUp?: boolean }) {
         )}
 
         <div>
-          <label className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
+          <label htmlFor="password" className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
             Password
           </label>
           <div className="relative">
             <Lock className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
             <input
+              id="password"
+              name="password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setRequires2FA(false); setTwoFactorToken(""); }}
