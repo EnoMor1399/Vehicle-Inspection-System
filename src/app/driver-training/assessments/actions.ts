@@ -8,6 +8,7 @@ import { trainingAssessments, trainingParticipants, trainingSessions } from "@/d
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { MAX_SIGNATURE_DATA_URL_CHARS, validateSignatureDataUrl } from "@/lib/inspection-evidence";
+import { moveAssessmentSignatureToPrivateStorage } from "@/lib/assessment-signature-storage";
 import {
   calculateDriverAssessment,
   deriveDriverAssessmentOutcome,
@@ -183,6 +184,18 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
 
+  const storedAssessorSignature = await moveAssessmentSignatureToPrivateStorage(
+    id,
+    "assessor",
+    assessorSignature,
+  );
+  if (storedAssessorSignature.value !== assessorSignature) {
+    await db
+      .update(trainingAssessments)
+      .set({ assessorSignature: storedAssessorSignature.value })
+      .where(eq(trainingAssessments.id, id));
+  }
+
   await logAudit({
     userId: user.id,
     userName: user.name,
@@ -204,6 +217,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
       finalRecommendation: provisionalOutcome.finalRecommendation,
       reviewStatus: "pending_review",
       assessorSignatureCaptured: true,
+      assessorSignatureStorage: storedAssessorSignature.storage,
     },
   });
 
@@ -312,6 +326,16 @@ export async function reviewDriverAssessment(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
 
+  const storedReviewerSignature = reviewerSignature
+    ? await moveAssessmentSignatureToPrivateStorage(assessmentId, "reviewer", reviewerSignature)
+    : null;
+  if (storedReviewerSignature && storedReviewerSignature.value !== reviewerSignature) {
+    await db
+      .update(trainingAssessments)
+      .set({ reviewerSignature: storedReviewerSignature.value })
+      .where(eq(trainingAssessments.id, assessmentId));
+  }
+
   await logAudit({
     userId: user.id,
     userName: user.name,
@@ -333,6 +357,7 @@ export async function reviewDriverAssessment(formData: FormData) {
       reviewComments: reviewComments || undefined,
       administrativeSelfReviewOverride: result.administrativeSelfReviewOverride,
       reviewerSignatureCaptured: Boolean(reviewerSignature),
+      reviewerSignatureStorage: storedReviewerSignature?.storage || null,
     },
   });
 

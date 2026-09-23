@@ -1,6 +1,7 @@
 import { pool } from "@/db";
 import { expectedApplicationDatabase } from "@/lib/database-contract";
 import { RELEASE_COMMIT, RELEASE_ID, RELEASE_VERSION } from "@/lib/version";
+import { distributedRateLimitConfigured, distributedRateLimitRequired } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -63,8 +64,13 @@ export async function GET() {
     const missingTables = row?.missing_tables || [];
     const databaseTargetHealthy = !expectedDatabase || actualDatabase === expectedDatabase;
     const schemaHealthy = missingTables.length === 0;
+    const rateLimitHealthy = !distributedRateLimitRequired() || distributedRateLimitConfigured();
     const unhealthy = !databaseTargetHealthy || !schemaHealthy;
-    const degraded = !unhealthy && (dbLatencyMs >= degradedThresholdMs || pool.waitingCount > 0);
+    const degraded = !unhealthy && (
+      dbLatencyMs >= degradedThresholdMs
+      || pool.waitingCount > 0
+      || !rateLimitHealthy
+    );
     const status = unhealthy ? "unhealthy" : degraded ? "degraded" : "healthy";
 
     if (!databaseTargetHealthy) {
@@ -102,6 +108,11 @@ export async function GET() {
             criticalTablesChecked: criticalTables.length,
             missingCriticalTables: missingTables.length,
           },
+          distributedRateLimit: {
+            status: rateLimitHealthy ? "healthy" : "degraded",
+            required: distributedRateLimitRequired(),
+            configured: distributedRateLimitConfigured(),
+          },
         },
       },
       {
@@ -135,6 +146,11 @@ export async function GET() {
             status: "unknown",
             criticalTablesChecked: criticalTables.length,
             missingCriticalTables: null,
+          },
+          distributedRateLimit: {
+            status: distributedRateLimitConfigured() ? "healthy" : "unknown",
+            required: distributedRateLimitRequired(),
+            configured: distributedRateLimitConfigured(),
           },
         },
       },

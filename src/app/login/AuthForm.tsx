@@ -7,7 +7,7 @@ import { Eye, EyeOff, Mail, Lock, User, Shield, Phone, AlertCircle, Loader2, Key
 
 type Mode = "login" | "signup";
 
-export function AuthForm() {
+export function AuthForm({ allowSignUp = false }: { allowSignUp?: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +51,11 @@ export function AuthForm() {
           router.push("/");
           router.refresh();
         } else {
+          if (!allowSignUp) {
+            setMode("login");
+            setError("Public account creation is disabled. Contact a system administrator for access.");
+            return;
+          }
           const res = await signUp({ name, email, password, confirmPassword, phone });
           if (!res.ok) {
             setError(res.error);
@@ -79,15 +84,17 @@ export function AuthForm() {
         >
           Sign In
         </button>
-        <button
-          type="button"
-          onClick={() => { setMode("signup"); setError(null); setFieldError(null); }}
-          className={`flex-1 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-md sm:rounded-xl transition ${
-            mode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          Create Account
-        </button>
+        {allowSignUp && (
+          <button
+            type="button"
+            onClick={() => { setMode("signup"); setError(null); setFieldError(null); }}
+            className={`flex-1 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-md sm:rounded-xl transition ${
+              mode === "signup" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Create Account
+          </button>
+        )}
       </div>
 
       <div className="mb-5 sm:mb-6">
@@ -133,12 +140,14 @@ export function AuthForm() {
         )}
 
         <div>
-          <label className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
+          <label htmlFor="email" className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
             Email Address
           </label>
           <div className="relative">
             <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
             <input
+              id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setRequires2FA(false); setTwoFactorToken(""); }}
@@ -172,12 +181,14 @@ export function AuthForm() {
         )}
 
         <div>
-          <label className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
+          <label htmlFor="password" className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
             Password
           </label>
           <div className="relative">
             <Lock className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
             <input
+              id="password"
+              name="password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setRequires2FA(false); setTwoFactorToken(""); }}

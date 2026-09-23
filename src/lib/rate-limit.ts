@@ -39,6 +39,15 @@ const url = process.env.UPSTASH_REDIS_REST_URL;
 const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis = url && token ? new Redis({ url, token, enableTelemetry: false }) : null;
 
+export function distributedRateLimitConfigured(): boolean {
+  return Boolean(redis);
+}
+
+export function distributedRateLimitRequired(): boolean {
+  return process.env.NODE_ENV === "production"
+    && process.env.REQUIRE_DISTRIBUTED_RATE_LIMIT?.trim().toLowerCase() !== "false";
+}
+
 const distributed: Partial<Record<Policy, Ratelimit>> = redis
   ? Object.fromEntries(
       (Object.keys(policyConfig) as Policy[]).map((policy) => [

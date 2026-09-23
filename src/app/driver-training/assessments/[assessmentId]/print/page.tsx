@@ -208,13 +208,13 @@ export default async function LegacyDriverAssessmentPrintPage({ params }: { para
           <div>
             <strong>Assessor Sign:</strong>
             <span className="signature-slot">
-              {assessment.assessorSignature ? <Image src={assessment.assessorSignature} alt="Assessor digital signature" width={400} height={120} unoptimized /> : null}
+              {assessment.assessorSignature ? <Image src={`/api/driver-training/assessment-signatures/${assessment.id}/assessor`} alt="Assessor digital signature" width={400} height={120} unoptimized /> : null}
             </span>
           </div>
           <div>
             <strong>Mgr Sign:</strong>
             <span className="signature-slot">
-              {assessment.reviewerSignature ? <Image src={assessment.reviewerSignature} alt="Reviewer digital signature" width={400} height={120} unoptimized /> : null}
+              {assessment.reviewerSignature ? <Image src={`/api/driver-training/assessment-signatures/${assessment.id}/reviewer`} alt="Reviewer digital signature" width={400} height={120} unoptimized /> : null}
             </span>
           </div>
         </div>
