@@ -18,7 +18,18 @@ export const ROLE_LABEL: Record<string, string> = {
   transporter_user: "Transporter Portal User",
 };
 
-export async function getCurrentUser() {
+const PRIVILEGED_2FA_ROLES = new Set(["super_admin", "admin", "operations_manager", "supervisor"]);
+
+type CurrentUserOptions = {
+  allowPendingPrivileged2FA?: boolean;
+};
+
+function privileged2FAEnrollmentEnforced() {
+  return process.env.NODE_ENV === "production"
+    && process.env.PRIVILEGED_2FA_ENFORCEMENT?.trim().toLowerCase() !== "off";
+}
+
+export async function getCurrentUser(options: CurrentUserOptions = {}) {
   const jar = await cookies();
   const sessionToken = jar.get("rsl_session_token")?.value;
 
@@ -28,6 +39,15 @@ export async function getCurrentUser() {
   const session = await validateSession(sessionToken);
   if (!session.valid || !session.userId || !session.user?.isActive) {
     throw new Error("Authentication required");
+  }
+
+  if (
+    privileged2FAEnrollmentEnforced()
+    && PRIVILEGED_2FA_ROLES.has(session.user.role)
+    && !session.user.twoFactorEnabled
+    && !options.allowPendingPrivileged2FA
+  ) {
+    throw new Error("Two-factor enrollment required");
   }
 
   return session.user;
