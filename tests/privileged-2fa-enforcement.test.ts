@@ -6,11 +6,16 @@ test("privileged users can authenticate only to reach mandatory enrollment", () 
   const auth = readFileSync("src/lib/auth.ts", "utf8");
   const boundary = readFileSync("src/lib/require-auth.ts", "utf8");
   const setupPage = readFileSync("src/app/security/setup-2fa/page.tsx", "utf8");
+  const setupActions = readFileSync("src/app/security/setup-2fa/setup-actions.ts", "utf8");
 
   assert.match(auth, /operations_manager/);
   assert.match(auth, /2fa_enrollment_required/);
+  assert.match(auth, /PRIVILEGED_2FA_ROLES/);
+  assert.match(auth, /Two-factor enrollment required/);
+  assert.match(auth, /allowPendingPrivileged2FA/);
   assert.doesNotMatch(auth, /return \{ success: false, error: "Two-factor authentication enrollment is required by organization policy/);
   assert.match(boundary, /PRIVILEGED_2FA_ROLES/);
   assert.match(boundary, /redirect\("\/security\/setup-2fa\?required=1"\)/);
   assert.match(setupPage, /allowPendingPrivileged2FA: true/);
+  assert.match(setupActions, /getCurrentUser\(\{ allowPendingPrivileged2FA: true \}\)/);
 });
