@@ -4,12 +4,17 @@ import { readFileSync } from "node:fs";
 
 test("new audit events are tamper-evident and serialized", () => {
   const audit = readFileSync("src/lib/audit.ts", "utf8");
+  const chain = readFileSync("src/lib/audit-chain.ts", "utf8");
   const schema = readFileSync("src/db/schema.ts", "utf8");
   const migration = readFileSync("migrations/20260921_audit_hash_chain.sql", "utf8");
   const verifier = readFileSync("scripts/verify-audit-chain.ts", "utf8");
   const packageJson = readFileSync("package.json", "utf8");
 
-  assert.match(audit, /createHash\("sha256"\)/);
+  assert.match(chain, /createHash\("sha256"\)/);
+  assert.match(chain, /Object\.entries\(value as Record<string, unknown>\)/);
+  assert.match(audit, /hashAuditPayload/);
+  assert.match(audit, /isNotNull\(auditLogs\.eventHash\)/);
+  assert.match(audit, /previousTime \+ 1/);
   assert.match(audit, /pg_advisory_xact_lock\(78654229\)/);
   assert.match(audit, /previousHash/);
   assert.match(audit, /eventHash/);
