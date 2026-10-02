@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: production-post-deploy-verification
@@ -164,9 +165,47 @@ jobs:
         with:
           node-version: 22
 
+      - name: Request GitHub OIDC token for Vercel trusted-source access
+        id: vercel_oidc
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          (async () => {
+            const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || "";
+            const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || "";
+            if (!requestUrl || !requestToken) {
+              throw new Error("GitHub OIDC token endpoint is unavailable");
+            }
+
+            const response = await fetch(requestUrl, {
+              headers: {
+                Authorization: `Bearer ${requestToken}`,
+              },
+            });
+            if (!response.ok) {
+              throw new Error(`GitHub OIDC token request failed with HTTP ${response.status}`);
+            }
+
+            const body = await response.json();
+            const token = String(body?.value || "");
+            if (!token) {
+              throw new Error("GitHub OIDC token response did not contain a token");
+            }
+
+            console.log(`::add-mask::${token}`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `token=${token}\n`);
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
       - name: Verify deployed release without changing it
         run: node scripts/post-deploy-smoke.mjs
         env:
           VIMS_BASE_URL: ${{ needs.scope.outputs.base_url }}
           EXPECTED_VERSION: ${{ inputs.expected_version }}
+          VERCEL_TRUSTED_OIDC_IDP_TOKEN: ${{ steps.vercel_oidc.outputs.token }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
