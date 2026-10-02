@@ -23,11 +23,16 @@ test("production deployment verification resolves the actual event before enteri
   assert.match(workflow, /VIMS_BASE_URL: \$\{\{ needs\.scope\.outputs\.base_url \}\}/);
   assert.match(workflow, /if \[\[ "\$GITHUB_REF" != "refs\/heads\/main" \]\]/);
   assert.match(workflow, /environment: production/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
+  assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_TOKEN/);
+  assert.match(workflow, /VERCEL_TRUSTED_OIDC_IDP_TOKEN/);
   assert.match(workflow, /VERCEL_AUTOMATION_BYPASS_SECRET/);
 
   assert.doesNotMatch(workflow, /deployment\.environment == 'Production'/);
   assert.doesNotMatch(workflow, /deployment\.ref == 'main'/);
 
+  assert.match(smoke, /x-vercel-trusted-oidc-idp-token/);
   assert.match(smoke, /x-vercel-protection-bypass/);
   assert.match(smoke, /x-vercel-set-bypass-cookie/);
   assert.match(smoke, /\/api\/health\/live/);
