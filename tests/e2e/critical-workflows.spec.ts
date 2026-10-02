@@ -30,7 +30,14 @@ test("authenticated inspection and training workspaces load from a real database
 
   await page.goto(`${baseURL}/driver-training/assessments`);
   await expect(page.getByRole("heading", { name: "Driver Performance Assessment" })).toBeVisible();
-  await expect(page.getByText(/E2E Driver/)).toBeVisible();
+
+  const driverSelect = page.locator('select[name="participantId"]');
+  const e2eDriverOption = driverSelect.locator("option").filter({ hasText: "E2E Driver" });
+  await expect(e2eDriverOption).toHaveCount(1);
+  const e2eDriverId = await e2eDriverOption.getAttribute("value");
+  expect(e2eDriverId).toBeTruthy();
+  await driverSelect.selectOption(e2eDriverId!);
+  await expect(driverSelect).toHaveValue(e2eDriverId!);
 });
 
 test("mobile authenticated pages do not introduce horizontal document overflow", async ({ page }) => {
