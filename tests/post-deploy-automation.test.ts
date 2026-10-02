@@ -13,7 +13,9 @@ test("production deployment verification resolves the actual event before enteri
   assert.match(workflow, /deployment_status\?\.environment_url/);
   assert.match(workflow, /deployment_status\?\.target_url/);
   assert.match(workflow, /should_verify=\$\{shouldVerify\}/);
+  assert.match(workflow, /is_main=\$\{isMain\}/);
   assert.match(workflow, /needs: scope/);
+  assert.match(workflow, /RESOLVED_MAIN: \$\{\{ needs\.scope\.outputs\.is_main \}\}/);
   assert.match(workflow, /if: needs\.scope\.outputs\.should_verify == 'true'/);
   assert.match(workflow, /VIMS_BASE_URL: \$\{\{ needs\.scope\.outputs\.base_url \}\}/);
   assert.match(workflow, /if \[\[ "\$GITHUB_REF" != "refs\/heads\/main" \]\]/);
