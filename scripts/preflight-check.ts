@@ -50,7 +50,7 @@ async function checkDatabase() {
     }
     
     // Check for critical tables
-    const criticalTables = ["users", "vehicles", "inspections", "transporters"];
+    const criticalTables = ["users", "vehicles", "inspections", "transporters", "rate_limit_buckets"];
     for (const table of criticalTables) {
       const existsResult = await db.execute(sql`
         SELECT EXISTS (
@@ -196,9 +196,11 @@ async function checkSecurity() {
 
   if (env.NODE_ENV === "production") {
     if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-      log("pass", "Distributed rate limiting is configured for production");
+      log("pass", "Distributed rate limiting uses Upstash Redis");
+    } else if (env.DATABASE_URL) {
+      log("pass", "Distributed rate limiting uses the PostgreSQL shared fallback");
     } else {
-      log("fail", "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for production authentication/API rate limiting");
+      log("fail", "A distributed rate-limit backend is required in production");
     }
 
     if (process.env.ALLOW_PUBLIC_SIGNUP === "true") {
