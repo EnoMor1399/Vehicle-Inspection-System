@@ -1,6 +1,5 @@
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
-import { pool } from "@/db";
 
 type Policy = "login" | "signup" | "twoFactor" | "api" | "verify" | "error";
 type Window = `${number} ${"s" | "m" | "h" | "d"}`;
@@ -126,6 +125,7 @@ async function applyPostgresRateLimit(
   config: MemoryPolicyConfig,
   now = Date.now(),
 ): Promise<LimitResult> {
+  const { pool } = await import("@/db");
   const bucketKey = `${policy}:${identifier}`;
   const nextReset = new Date(now + config.windowMs);
 
