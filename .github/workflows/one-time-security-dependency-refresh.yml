@@ -33,7 +33,11 @@ jobs:
           npm install --save-dev --save-exact eslint-config-next@16.3.8
 
       - name: Apply non-breaking transitive security fixes
-        run: npm audit fix
+        shell: bash
+        run: |
+          # npm audit fix exits non-zero when lower-severity findings remain.
+          # The next step is the release gate and still blocks high/critical findings.
+          npm audit fix || true
 
       - name: Require no high or critical dependency findings
         run: npm audit --audit-level=high
