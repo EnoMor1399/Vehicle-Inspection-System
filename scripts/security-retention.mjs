@@ -52,7 +52,8 @@ try {
       (select count(*)::int from login_attempts where created_at < now() - ($2::int * interval '1 day')) as old_login_attempts,
       (select count(*)::int from security_events where resolved = true and created_at < now() - ($3::int * interval '1 day')) as old_resolved_security_events,
       (select count(*)::int from notifications where read_at is not null and created_at < now() - ($4::int * interval '1 day')) as old_read_notifications,
-      (select count(*)::int from api_keys where expires_at is not null and expires_at < now() - ($5::int * interval '1 day')) as old_expired_api_keys`,
+      (select count(*)::int from api_keys where expires_at is not null and expires_at < now() - ($5::int * interval '1 day')) as old_expired_api_keys,
+      (select count(*)::int from rate_limit_buckets where reset_at < now() - interval '1 day') as old_rate_limit_buckets`,
     [
       policy.expiredSessionDays,
       policy.loginAttemptDays,
@@ -93,6 +94,9 @@ try {
         "delete from api_keys where expires_at is not null and expires_at < now() - ($1::int * interval '1 day')",
         [policy.expiredApiKeyDays],
       );
+      const rateLimitBuckets = await client.query(
+        "delete from rate_limit_buckets where reset_at < now() - interval '1 day'",
+      );
       await client.query("commit");
 
       console.log(JSON.stringify({
@@ -105,6 +109,7 @@ try {
           resolvedSecurityEvents: securityEvents.rowCount,
           readNotifications: notifications.rowCount,
           expiredApiKeys: apiKeys.rowCount,
+          rateLimitBuckets: rateLimitBuckets.rowCount,
         },
       }, null, 2));
     } catch (error) {
