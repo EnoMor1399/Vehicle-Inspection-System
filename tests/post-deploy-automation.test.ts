@@ -14,6 +14,7 @@ test("production deployment verification resolves the actual event before enteri
   assert.match(workflow, /deployment_status\?\.target_url/);
   assert.match(workflow, /should_verify=\$\{shouldVerify\}/);
   assert.match(workflow, /is_main=\$\{isMain\}/);
+  assert.match(workflow, /deploymentState === "success"/);
   assert.match(workflow, /needs: scope/);
   assert.match(workflow, /RESOLVED_MAIN: \$\{\{ needs\.scope\.outputs\.is_main \}\}/);
   assert.match(workflow, /if: needs\.scope\.outputs\.should_verify == 'true'/);
