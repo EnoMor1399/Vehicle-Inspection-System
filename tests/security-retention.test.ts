@@ -12,6 +12,7 @@ test("security retention is bounded, target-checked and production protected", (
   assert.match(script, /delete from login_attempts/);
   assert.match(script, /resolved = true/);
   assert.match(script, /read_at is not null/);
+  assert.match(script, /rate_limit_buckets/);
   assert.match(workflow, /environment: production/);
   assert.match(workflow, /secrets\.DATABASE_URL/);
   assert.match(workflow, /schedule:/);
