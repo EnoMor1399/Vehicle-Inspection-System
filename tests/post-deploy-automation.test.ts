@@ -8,8 +8,12 @@ test("production deployment verification is automatic and protection-aware", () 
 
   assert.match(workflow, /deployment_status:/);
   assert.match(workflow, /deployment_status\.state == 'success'/);
-  assert.match(workflow, /deployment\.ref == 'main'/);
+  assert.match(workflow, /github\.ref_name == 'main'/);
+  assert.doesNotMatch(workflow, /deployment\.environment == 'Production'/);
+  assert.doesNotMatch(workflow, /deployment\.ref == 'main'/);
   assert.match(workflow, /environment_url/);
+  assert.match(workflow, /target_url/);
+  assert.match(workflow, /if \[\[ "\$GITHUB_REF" != "refs\/heads\/main" \]\]/);
   assert.match(workflow, /VERCEL_AUTOMATION_BYPASS_SECRET/);
   assert.match(smoke, /x-vercel-protection-bypass/);
   assert.match(smoke, /x-vercel-set-bypass-cookie/);
