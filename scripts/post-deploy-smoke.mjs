@@ -8,6 +8,7 @@ const rawBaseUrl = process.env.VIMS_BASE_URL || process.argv[2];
 const expectedVersion = process.env.EXPECTED_VERSION || packageJson.version;
 const allowInsecureHttp = process.env.ALLOW_INSECURE_HTTP === "1";
 const vercelProtectionBypass = (process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
+const vercelTrustedOidcToken = (process.env.VERCEL_TRUSTED_OIDC_IDP_TOKEN || "").trim();
 
 if (!rawBaseUrl) {
   throw new Error("VIMS_BASE_URL or the first command-line argument is required");
@@ -34,6 +35,11 @@ async function check(pathname, expectedStatus) {
     signal: AbortSignal.timeout(10_000),
     headers: {
       Accept: "application/json",
+      ...(vercelTrustedOidcToken
+        ? {
+            "x-vercel-trusted-oidc-idp-token": vercelTrustedOidcToken,
+          }
+        : {}),
       ...(vercelProtectionBypass
         ? {
             "x-vercel-protection-bypass": vercelProtectionBypass,
