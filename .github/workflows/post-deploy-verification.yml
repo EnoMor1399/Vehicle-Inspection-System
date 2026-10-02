@@ -31,6 +31,7 @@ jobs:
       base_url: ${{ steps.resolve.outputs.base_url }}
       deployment_ref: ${{ steps.resolve.outputs.deployment_ref }}
       deployment_state: ${{ steps.resolve.outputs.deployment_state }}
+      is_main: ${{ steps.resolve.outputs.is_main }}
     steps:
       - name: Resolve deployment event scope
         id: resolve
@@ -43,6 +44,7 @@ jobs:
           node <<'NODE'
           const fs = require("fs");
 
+          (async () => {
           const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
           const eventName = process.env.GITHUB_EVENT_NAME || "";
           const githubRef = process.env.GITHUB_REF || "";
@@ -127,6 +129,11 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `base_url=${baseUrl}\n`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `deployment_ref=${deploymentRef}\n`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `deployment_state=${deploymentState}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `is_main=${isMain}\n`);
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
           NODE
 
   verify:
@@ -140,10 +147,10 @@ jobs:
       - name: Require resolved main deployment
         shell: bash
         env:
-          RESOLVED_DEPLOYMENT_REF: ${{ needs.scope.outputs.deployment_ref }}
+          RESOLVED_MAIN: ${{ needs.scope.outputs.is_main }}
         run: |
           if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            if [[ "$RESOLVED_DEPLOYMENT_REF" != "main" ]]; then
+            if [[ "$RESOLVED_MAIN" != "true" ]]; then
               echo "Production verification may run only for a resolved main deployment."
               exit 1
             fi
