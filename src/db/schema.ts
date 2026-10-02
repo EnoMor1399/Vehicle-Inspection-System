@@ -649,6 +649,19 @@ export const signatures = pgTable(
 );
 
 // ============ SECURITY ============
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    bucketKey: varchar("bucket_key", { length: 512 }).primaryKey(),
+    count: integer("count").notNull().default(0),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    resetIdx: index("rate_limit_reset_idx").on(t.resetAt),
+  }),
+);
+
 export const sessions = pgTable(
   "sessions",
   {
