@@ -109,7 +109,7 @@ jobs:
             const environmentUrl = usableDeploymentUrl(event.deployment_status?.environment_url);
             const targetUrl = usableDeploymentUrl(event.deployment_status?.target_url);
             const fallbackUrl = usableDeploymentUrl(process.env.DEFAULT_PRODUCTION_BASE_URL);
-            baseUrl = environmentUrl || targetUrl || fallbackUrl;
+            baseUrl = fallbackUrl || environmentUrl || targetUrl;
             shouldVerify = deploymentState === "success" && isMain && Boolean(baseUrl);
           }
 

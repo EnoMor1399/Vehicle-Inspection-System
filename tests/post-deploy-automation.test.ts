@@ -15,6 +15,8 @@ test("production deployment verification resolves the actual event before enteri
   assert.match(workflow, /should_verify=\$\{shouldVerify\}/);
   assert.match(workflow, /is_main=\$\{isMain\}/);
   assert.match(workflow, /deploymentState === "success"/);
+  assert.match(workflow, /baseUrl = fallbackUrl \|\| environmentUrl \|\| targetUrl/);
+  assert.match(workflow, /DEFAULT_PRODUCTION_BASE_URL: https:\/\/vehicle-inspection-system-racoon-projects\.vercel\.app/);
   assert.match(workflow, /needs: scope/);
   assert.match(workflow, /RESOLVED_MAIN: \$\{\{ needs\.scope\.outputs\.is_main \}\}/);
   assert.match(workflow, /if: needs\.scope\.outputs\.should_verify == 'true'/);
