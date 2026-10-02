@@ -51,6 +51,7 @@ const requiredTables = [
   "training_communication_preferences",
   "training_outbound_messages",
   "training_communication_events",
+  "rate_limit_buckets",
 ];
 
 const requiredAuditColumns = [
@@ -91,6 +92,7 @@ const requiredIndexes = [
   "audit_entity_created_idx",
   "audit_user_created_idx",
   "audit_event_hash_idx",
+  "rate_limit_reset_idx",
   "notification_user_unread_created_idx",
   "training_session_reference_uidx",
   "training_session_status_start_idx",
