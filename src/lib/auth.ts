@@ -18,7 +18,18 @@ export const ROLE_LABEL: Record<string, string> = {
   transporter_user: "Transporter Portal User",
 };
 
-export async function getCurrentUser() {
+const PRIVILEGED_2FA_ROLES = new Set(["super_admin", "admin", "operations_manager", "supervisor"]);
+
+type CurrentUserOptions = {
+  allowPendingPrivileged2FA?: boolean;
+};
+
+function privileged2FAEnrollmentEnforced() {
+  return process.env.NODE_ENV === "production"
+    && process.env.PRIVILEGED_2FA_ENFORCEMENT?.trim().toLowerCase() !== "off";
+}
+
+export async function getCurrentUser(options: CurrentUserOptions = {}) {
   const jar = await cookies();
   const sessionToken = jar.get("rsl_session_token")?.value;
 
@@ -28,6 +39,15 @@ export async function getCurrentUser() {
   const session = await validateSession(sessionToken);
   if (!session.valid || !session.userId || !session.user?.isActive) {
     throw new Error("Authentication required");
+  }
+
+  if (
+    privileged2FAEnrollmentEnforced()
+    && PRIVILEGED_2FA_ROLES.has(session.user.role)
+    && !session.user.twoFactorEnabled
+    && !options.allowPendingPrivileged2FA
+  ) {
+    throw new Error("Two-factor enrollment required");
   }
 
   return session.user;
@@ -145,15 +165,17 @@ export async function login(
   }
 
   const privileged2FARequired = process.env.REQUIRE_PRIVILEGED_2FA === "true"
-    && ["super_admin", "admin", "supervisor"].includes(user.role);
+    && ["super_admin", "admin", "operations_manager", "supervisor"].includes(user.role);
   if (privileged2FARequired && (!user.twoFactorEnabled || !user.twoFactorSecret)) {
+    // Do not reject valid primary credentials here: the authenticated user
+    // needs a revocable session to reach the mandatory enrollment screen.
+    // requireAuth() blocks all operational pages until enrollment completes.
     await logSecurityEvent("2fa_enrollment_required", "warning", {
       userId: user.id,
       ipAddress,
       userAgent,
-      description: "Privileged account blocked because organization policy requires 2FA enrollment",
+      description: "Privileged account authenticated with primary credentials and must complete 2FA enrollment before workspace access",
     });
-    return { success: false, error: "Two-factor authentication enrollment is required by organization policy. Contact an administrator if you cannot enroll." };
   }
 
   if (user.twoFactorEnabled && user.twoFactorSecret) {

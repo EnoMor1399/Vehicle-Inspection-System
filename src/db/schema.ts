@@ -541,6 +541,8 @@ export const auditLogs = pgTable(
     before: jsonb("before"),
     after: jsonb("after"),
     ipAddress: varchar("ip_address", { length: 50 }),
+    previousHash: varchar("previous_hash", { length: 64 }),
+    eventHash: varchar("event_hash", { length: 64 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
@@ -549,6 +551,7 @@ export const auditLogs = pgTable(
     createdIdx: index("audit_created_idx").on(t.createdAt),
     entityCreatedIdx: index("audit_entity_created_idx").on(t.entityType, t.entityId, t.createdAt.desc()),
     userCreatedIdx: index("audit_user_created_idx").on(t.userId, t.createdAt.desc()),
+    hashIdx: index("audit_event_hash_idx").on(t.eventHash),
   })
 );
 
@@ -646,6 +649,19 @@ export const signatures = pgTable(
 );
 
 // ============ SECURITY ============
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    bucketKey: varchar("bucket_key", { length: 512 }).primaryKey(),
+    count: integer("count").notNull().default(0),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    resetIdx: index("rate_limit_reset_idx").on(t.resetAt),
+  }),
+);
+
 export const sessions = pgTable(
   "sessions",
   {

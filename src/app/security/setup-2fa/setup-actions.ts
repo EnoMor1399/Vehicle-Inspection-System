@@ -14,7 +14,7 @@ export async function setup2FAAction(): Promise<{
   uri?: string;
   error?: string;
 }> {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser({ allowPendingPrivileged2FA: true });
   if (user.twoFactorEnabled) {
     return { success: false, error: "Two-factor authentication is already enabled for this account" };
   }
@@ -53,7 +53,7 @@ export async function verify2FAAction(code: string): Promise<{
   success: boolean;
   error?: string;
 }> {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser({ allowPendingPrivileged2FA: true });
 
   if (user.twoFactorEnabled) {
     return { success: true };

@@ -1,0 +1,105 @@
+name: VIMS browser E2E
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vims-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e:
+    name: Browser workflows against PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: Vehicle-Inspection-Enterprise
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d Vehicle-Inspection-Enterprise"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/Vehicle-Inspection-Enterprise?sslmode=disable
+      EXPECTED_DATABASE_NAME: Vehicle-Inspection-Enterprise
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+      JWT_SECRET: e2e-only-jwt-secret-value-000000000000000000000000
+      SESSION_SECRET: e2e-only-session-secret-value-000000000000000000000
+      CSRF_SECRET: e2e-only-csrf-secret-value-000000000000000000000000
+      API_KEY_SALT: e2e-only-api-key-salt-value-00000000000000000000000
+      FIELD_ENCRYPTION_KEY: e2e-only-field-encryption-key-0000000000000000000000
+      CERTIFICATE_SIGNING_SECRET: e2e-only-certificate-signing-secret-000000000000000000
+      PRIVILEGED_2FA_ENFORCEMENT: off
+      REQUIRE_DISTRIBUTED_RATE_LIMIT: "false"
+      ALLOW_PUBLIC_SIGNUP: "false"
+      E2E_BASE_URL: http://127.0.0.1:3000
+      E2E_USER_EMAIL: e2e.inspector@vims.local
+      E2E_USER_PASSWORD: E2eOnly!Passw0rd2026
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build isolated database
+        run: |
+          npx drizzle-kit push --force
+          npm run db:upgrade
+          node scripts/seed-e2e.mjs
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Start VIMS standalone artifact
+        shell: bash
+        run: |
+          cp -R public .next/standalone/public
+          mkdir -p .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+          HOSTNAME=127.0.0.1 PORT=3000 nohup node .next/standalone/server.js > /tmp/vims-e2e.log 2>&1 &
+          echo $! > /tmp/vims-e2e.pid
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health/live >/dev/null; then
+              login_html="$(curl --fail --silent http://127.0.0.1:3000/login || true)"
+              if grep -q 'id="email"' <<< "$login_html"; then
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+          cat /tmp/vims-e2e.log
+          exit 1
+
+      - name: Install Playwright runner
+        run: |
+          npm install --no-save --package-lock=false @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run critical browser workflows
+        run: npx playwright test tests/e2e/critical-workflows.spec.ts --browser=chromium --reporter=line
+
+      - name: Show server logs on failure
+        if: failure()
+        run: cat /tmp/vims-e2e.log || true

@@ -1,6 +1,7 @@
 import { pool } from "@/db";
 import { expectedApplicationDatabase } from "@/lib/database-contract";
 import { RELEASE_COMMIT, RELEASE_ID, RELEASE_VERSION } from "@/lib/version";
+import { distributedRateLimitBackend, distributedRateLimitConfigured, distributedRateLimitRequired } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ const criticalTables = [
   "daily_inspections",
   "training_sessions",
   "training_assessments",
+  "rate_limit_buckets",
 ] as const;
 
 const degradedThresholdMs = (() => {
@@ -63,8 +65,11 @@ export async function GET() {
     const missingTables = row?.missing_tables || [];
     const databaseTargetHealthy = !expectedDatabase || actualDatabase === expectedDatabase;
     const schemaHealthy = missingTables.length === 0;
+    const rateLimitBackend = distributedRateLimitBackend();
+    const rateLimitHealthy = !distributedRateLimitRequired() || distributedRateLimitConfigured();
     const unhealthy = !databaseTargetHealthy || !schemaHealthy;
-    const degraded = !unhealthy && (dbLatencyMs >= degradedThresholdMs || pool.waitingCount > 0);
+    const databaseDegraded = dbLatencyMs >= degradedThresholdMs || pool.waitingCount > 0;
+    const degraded = !unhealthy && (databaseDegraded || !rateLimitHealthy);
     const status = unhealthy ? "unhealthy" : degraded ? "degraded" : "healthy";
 
     if (!databaseTargetHealthy) {
@@ -77,7 +82,7 @@ export async function GET() {
     }
     if (degraded) {
       console.warn(
-        `[health] database degraded: latency=${dbLatencyMs}ms waiting=${pool.waitingCount} total=${pool.totalCount} idle=${pool.idleCount}`,
+        `[health] readiness degraded: latency=${dbLatencyMs}ms waiting=${pool.waitingCount} rateLimit=${rateLimitBackend || "none"}`,
       );
     }
 
@@ -90,7 +95,7 @@ export async function GET() {
         responseTimeMs: totalLatencyMs,
         checks: {
           database: {
-            status: unhealthy ? "unhealthy" : degraded ? "degraded" : "healthy",
+            status: unhealthy ? "unhealthy" : databaseDegraded ? "degraded" : "healthy",
             latencyMs: dbLatencyMs,
           },
           databaseTarget: {
@@ -101,6 +106,12 @@ export async function GET() {
             status: schemaHealthy ? "healthy" : "unhealthy",
             criticalTablesChecked: criticalTables.length,
             missingCriticalTables: missingTables.length,
+          },
+          distributedRateLimit: {
+            status: rateLimitHealthy ? "healthy" : "degraded",
+            required: distributedRateLimitRequired(),
+            configured: distributedRateLimitConfigured(),
+            backend: rateLimitBackend,
           },
         },
       },
@@ -135,6 +146,12 @@ export async function GET() {
             status: "unknown",
             criticalTablesChecked: criticalTables.length,
             missingCriticalTables: null,
+          },
+          distributedRateLimit: {
+            status: distributedRateLimitConfigured() ? "healthy" : "unknown",
+            required: distributedRateLimitRequired(),
+            configured: distributedRateLimitConfigured(),
+            backend: distributedRateLimitBackend(),
           },
         },
       },

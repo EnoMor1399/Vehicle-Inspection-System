@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const settings = await getSettings();
+  const allowPublicSignup = process.env.NODE_ENV !== "production"
+    || process.env.ALLOW_PUBLIC_SIGNUP === "true";
 
   return (
     <div className="login-theme relative min-h-screen overflow-hidden bg-[var(--vims-page)] p-3 pt-16 text-[var(--vims-ink)] sm:p-6 sm:pt-20 lg:p-8 lg:pt-20">
@@ -86,7 +88,7 @@ export default async function LoginPage() {
               </div>
             </div>
 
-            <AuthForm />
+            <AuthForm allowSignUp={allowPublicSignup} />
 
             <p className="mt-7 text-center text-[11px] leading-5 text-[var(--vims-ink-muted)]">
               By signing in, you are accessing a controlled business system. Activity may be logged for security and audit purposes.

@@ -208,8 +208,8 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
       <Card className="mt-5 p-5 sm:p-6">
         <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[var(--brand-color)]" /><h2 className="font-semibold text-[var(--vims-ink)]">Digital Signatures</h2></div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <SignaturePreview label="Assessor" signerName={assessor?.name || "Assessor"} value={assessment.assessorSignature} />
-          <SignaturePreview label="Reviewer / Supervisor" signerName={reviewer?.name || "Pending review"} value={assessment.reviewerSignature} />
+          <SignaturePreview assessmentId={assessment.id} kind="assessor" label="Assessor" signerName={assessor?.name || "Assessor"} value={assessment.assessorSignature} />
+          <SignaturePreview assessmentId={assessment.id} kind="reviewer" label="Reviewer / Supervisor" signerName={reviewer?.name || "Pending review"} value={assessment.reviewerSignature} />
         </div>
       </Card>
 
@@ -249,13 +249,32 @@ export default async function DriverAssessmentRecordPage({ params }: { params: P
   );
 }
 
-function SignaturePreview({ label, signerName, value }: { label: string; signerName: string; value?: string | null }) {
+function SignaturePreview({
+  assessmentId,
+  kind,
+  label,
+  signerName,
+  value,
+}: {
+  assessmentId: string;
+  kind: "assessor" | "reviewer";
+  label: string;
+  signerName: string;
+  value?: string | null;
+}) {
   return (
     <div className="rounded-xl border border-[var(--vims-line)] bg-[var(--vims-panel-soft)] p-4">
       <p className="text-xs font-bold uppercase tracking-wide text-[var(--vims-ink-muted)]">{label}</p>
       <div className="mt-3 flex min-h-28 items-center justify-center rounded-lg border border-dashed border-[var(--vims-line-strong)] bg-white p-2">
         {value ? (
-          <Image src={value} alt={`${label} digital signature`} width={400} height={120} unoptimized className="max-h-24 w-full object-contain" />
+          <Image
+            src={`/api/driver-training/assessment-signatures/${assessmentId}/${kind}`}
+            alt={`${label} digital signature`}
+            width={400}
+            height={120}
+            unoptimized
+            className="max-h-24 w-full object-contain"
+          />
         ) : (
           <span className="text-sm text-[var(--vims-ink-muted)]">Not captured</span>
         )}

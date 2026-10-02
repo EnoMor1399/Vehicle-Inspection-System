@@ -7,8 +7,23 @@ import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { canAccessVehicleInspection } from "@/lib/system-access";
 
+const PRIVILEGED_2FA_ROLES = new Set(["super_admin", "admin", "operations_manager", "supervisor"]);
+
+type RequireAuthOptions = {
+  allowPendingPrivileged2FA?: boolean;
+};
+
+function privileged2FAEnforced() {
+  return process.env.NODE_ENV === "production"
+    && process.env.PRIVILEGED_2FA_ENFORCEMENT?.trim().toLowerCase() !== "off";
+}
+
 // Protect server-rendered pages with the same revocable session used by login.
-export async function requireAuth() {
+// Production privileged accounts must complete TOTP enrollment before entering
+// operational workspaces. Password authentication still succeeds so an
+// unenrolled administrator can reach the enrollment screen instead of being
+// locked out.
+export async function requireAuth(options: RequireAuthOptions = {}) {
   const jar = await cookies();
   const sessionToken = jar.get("rsl_session_token")?.value;
   if (!sessionToken) redirect("/login");
@@ -22,6 +37,16 @@ export async function requireAuth() {
     .where(eq(users.id, session.userId));
 
   if (!user || !user.isActive) redirect("/login");
+
+  if (
+    privileged2FAEnforced()
+    && PRIVILEGED_2FA_ROLES.has(user.role)
+    && !user.twoFactorEnabled
+    && !options.allowPendingPrivileged2FA
+  ) {
+    redirect("/security/setup-2fa?required=1");
+  }
+
   return user;
 }
 

@@ -1,0 +1,56 @@
+name: Security data retention
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run retention in preview or execute mode"
+        required: true
+        default: "preview"
+        type: choice
+        options:
+          - preview
+          - execute
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-security-retention
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    name: Maintain session and security retention
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: production
+    steps:
+      - name: Require main ref
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Production retention may run only from refs/heads/main."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply retention policy
+        run: npm run security:retention
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EXPECTED_DATABASE_NAME: Vehicle-Inspection-Enterprise
+          RETENTION_MODE: ${{ github.event_name == 'schedule' && 'execute' || inputs.mode }}

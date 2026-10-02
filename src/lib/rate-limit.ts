@@ -9,7 +9,7 @@ export type LimitResult = {
   limit: number;
   remaining: number;
   reset: number;
-  backend: "upstash" | "memory";
+  backend: "upstash" | "postgres" | "memory";
 };
 
 export type MemoryRateEntry = { count: number; reset: number };
@@ -38,6 +38,20 @@ const policyConfig: Record<Policy, { limit: number; windowMs: number; window: Wi
 const url = process.env.UPSTASH_REDIS_REST_URL;
 const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis = url && token ? new Redis({ url, token, enableTelemetry: false }) : null;
+
+export function distributedRateLimitBackend(): "upstash" | "postgres" | null {
+  if (redis) return "upstash";
+  return process.env.DATABASE_URL ? "postgres" : null;
+}
+
+export function distributedRateLimitConfigured(): boolean {
+  return distributedRateLimitBackend() !== null;
+}
+
+export function distributedRateLimitRequired(): boolean {
+  return process.env.NODE_ENV === "production"
+    && process.env.REQUIRE_DISTRIBUTED_RATE_LIMIT?.trim().toLowerCase() !== "false";
+}
 
 const distributed: Partial<Record<Policy, Ratelimit>> = redis
   ? Object.fromEntries(
@@ -102,7 +116,48 @@ function warnDistributedFallback() {
   const now = Date.now();
   if (now - lastDistributedWarningAt < 60_000) return;
   lastDistributedWarningAt = now;
-  console.warn("[rate-limit] distributed limiter unavailable; using bounded in-memory fallback");
+  console.warn("[rate-limit] shared limiter unavailable; using bounded in-memory fallback");
+}
+
+async function applyPostgresRateLimit(
+  policy: Policy,
+  identifier: string,
+  config: MemoryPolicyConfig,
+  now = Date.now(),
+): Promise<LimitResult> {
+  const { pool } = await import("@/db");
+  const bucketKey = `${policy}:${identifier}`;
+  const nextReset = new Date(now + config.windowMs);
+
+  const result = await pool.query<{ count: number | string; reset_at: Date | string }>(
+    `INSERT INTO rate_limit_buckets (bucket_key, count, reset_at, updated_at)
+     VALUES ($1, 1, $2, NOW())
+     ON CONFLICT (bucket_key) DO UPDATE
+       SET count = CASE
+             WHEN rate_limit_buckets.reset_at <= NOW() THEN 1
+             ELSE rate_limit_buckets.count + 1
+           END,
+           reset_at = CASE
+             WHEN rate_limit_buckets.reset_at <= NOW() THEN EXCLUDED.reset_at
+             ELSE rate_limit_buckets.reset_at
+           END,
+           updated_at = NOW()
+     RETURNING count, reset_at`,
+    [bucketKey, nextReset.toISOString()],
+  );
+
+  const row = result.rows[0];
+  if (!row) throw new Error("PostgreSQL rate limiter returned no row");
+
+  const count = Number(row.count);
+  const reset = new Date(row.reset_at).getTime();
+  return {
+    allowed: count <= config.limit,
+    limit: config.limit,
+    remaining: Math.max(0, config.limit - count),
+    reset,
+    backend: "postgres",
+  };
 }
 
 export async function rateLimit(policy: Policy, identifier: string): Promise<LimitResult> {
@@ -120,8 +175,14 @@ export async function rateLimit(policy: Policy, identifier: string): Promise<Lim
         backend: "upstash",
       };
     } catch {
-      // Availability must not depend on Redis being reachable. The fallback is
-      // deliberately bounded and local to the current server process.
+      // If Redis is unavailable, continue to the PostgreSQL shared fallback.
+    }
+  }
+
+  if (process.env.DATABASE_URL) {
+    try {
+      return await applyPostgresRateLimit(policy, identifier, config);
+    } catch {
       warnDistributedFallback();
     }
   }
