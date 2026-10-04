@@ -26,6 +26,8 @@ test("production deployment verification resolves the actual event before enteri
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
   assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_TOKEN/);
+  assert.match(workflow, /VERCEL_OIDC_AUDIENCE: https:\/\/github\.com\/EnoMor1399/);
+  assert.match(workflow, /searchParams\.set\("audience", audience\)/);
   assert.match(workflow, /VERCEL_TRUSTED_OIDC_IDP_TOKEN/);
   assert.match(workflow, /VERCEL_AUTOMATION_BYPASS_SECRET/);
 
