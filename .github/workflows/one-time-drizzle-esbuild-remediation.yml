@@ -39,8 +39,12 @@ jobs:
           const legacy = lock.packages?.["node_modules/@esbuild-kit/core-utils/node_modules/esbuild"]?.version || null;
           const root = lock.packages?.["node_modules/esbuild"]?.version || null;
           console.log(JSON.stringify({ legacyEsbuild: legacy, rootEsbuild: root }));
-          if (legacy && ["0.18.20"].includes(legacy)) {
-            console.error(`Vulnerable nested esbuild remains: ${legacy}`);
+          if (legacy) {
+            console.error(`Unexpected nested esbuild remains: ${legacy}`);
+            process.exit(1);
+          }
+          if (root !== "0.28.2") {
+            console.error(`Expected root esbuild 0.28.2, found ${root}`);
             process.exit(1);
           }
           NODE
