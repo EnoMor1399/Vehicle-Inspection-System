@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "preflight": "tsx scripts/preflight-check.ts",
-    "security:audit": "npm audit --audit-level=high",
+    "security:audit": "node scripts/dependency-audit.mjs",
     "security:secrets": "node scripts/secret-scan.mjs",
     "security:maintenance": "node scripts/maintenance-workflow-guard.mjs",
     "security:retention": "node scripts/security-retention.mjs",
