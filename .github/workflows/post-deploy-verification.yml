@@ -168,6 +168,8 @@ jobs:
       - name: Request GitHub OIDC token for Vercel trusted-source access
         id: vercel_oidc
         shell: bash
+        env:
+          VERCEL_OIDC_AUDIENCE: https://github.com/EnoMor1399
         run: |
           node <<'NODE'
           const fs = require("fs");
@@ -175,11 +177,15 @@ jobs:
           (async () => {
             const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || "";
             const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || "";
-            if (!requestUrl || !requestToken) {
+            const audience = process.env.VERCEL_OIDC_AUDIENCE || "";
+            if (!requestUrl || !requestToken || !audience) {
               throw new Error("GitHub OIDC token endpoint is unavailable");
             }
 
-            const response = await fetch(requestUrl, {
+            const oidcUrl = new URL(requestUrl);
+            oidcUrl.searchParams.set("audience", audience);
+
+            const response = await fetch(oidcUrl, {
               headers: {
                 Authorization: `Bearer ${requestToken}`,
               },
