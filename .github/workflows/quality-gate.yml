@@ -98,8 +98,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Block high-severity dependencies
-        run: npm audit --audit-level=high
+      - name: Block unapproved high/critical dependencies
+        run: npm run security:audit
 
   production-build:
     name: Production build
