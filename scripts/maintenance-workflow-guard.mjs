@@ -136,6 +136,7 @@ requireText("scripts/post-deploy-smoke.mjs", smokeVerifier, 'check("/api/health"
 
 const qualityGate = read(".github/workflows/quality-gate.yml");
 requireText(".github/workflows/quality-gate.yml", qualityGate, "node scripts/maintenance-workflow-guard.mjs", "quality gate must enforce maintenance workflow safeguards");
+requireText(".github/workflows/quality-gate.yml", qualityGate, "npm run security:audit", "quality gate must enforce the policy-aware dependency audit");
 
 if (issues.length) {
   console.error("Maintenance workflow safeguard check failed:");

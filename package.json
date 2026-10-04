@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "preflight": "tsx scripts/preflight-check.ts",
-    "security:audit": "npm audit --audit-level=high",
+    "security:audit": "node scripts/dependency-audit.mjs",
     "security:secrets": "node scripts/secret-scan.mjs",
     "security:maintenance": "node scripts/maintenance-workflow-guard.mjs",
     "security:retention": "node scripts/security-retention.mjs",
@@ -61,5 +61,8 @@
     "tsx": "^4.23.12",
     "typescript": "5.9.3"
   },
-  "version": "2.5.0"
+  "version": "2.5.0",
+  "overrides": {
+    "esbuild": "0.28.2"
+  }
 }
