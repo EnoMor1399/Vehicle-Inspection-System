@@ -49,8 +49,8 @@ jobs:
           }
           NODE
 
-      - name: Require clean moderate-or-higher audit
-        run: npm audit --audit-level=moderate
+      - name: Enforce VIMS dependency security policy
+        run: npm run security:audit
 
       - name: Commit lockfile refresh
         shell: bash
