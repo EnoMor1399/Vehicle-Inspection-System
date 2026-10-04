@@ -63,8 +63,10 @@
   },
   "version": "2.5.0",
   "overrides": {
-    "@esbuild-kit/core-utils": {
-      "esbuild": "0.25.12"
+    "@esbuild-kit/esm-loader": {
+      "@esbuild-kit/core-utils": {
+        "esbuild": "0.25.12"
+      }
     }
   }
 }
