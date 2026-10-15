@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { and, desc, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   AlertTriangle,
   ArrowRight,
@@ -124,7 +125,7 @@ export default async function CompliancePage() {
         registrationNumber: vehicles.registrationNumber,
       })
       .from(inspections)
-      .innerJoin(vehicles, sql`${vehicles.id} = ${inspections.vehicleId}`)
+      .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
       .where(inspectionRiskWhere)
       .orderBy(desc(inspections.inspectionDate))
       .limit(24),
@@ -323,7 +324,7 @@ function RiskPanel({
   description: string;
   href: string;
   empty: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
   return (
