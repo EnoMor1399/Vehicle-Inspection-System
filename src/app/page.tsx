@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Plus,
+  ShieldCheck,
   TrendingUp,
   Truck,
   XCircle,
@@ -154,9 +155,10 @@ export default async function DashboardPage() {
             <AttentionRow icon={<AlertTriangle className="h-4 w-4" />} label="Conditional outcomes" value={stats.conditionalCount} tone="amber" />
             <AttentionRow icon={<CalendarCheck className="h-4 w-4" />} label="Pre-trip inspections today" value={todaysDaily.length} tone="emerald" />
           </div>
-          <div className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/70 p-4">
+          <div className="grid grid-cols-1 gap-2 border-t border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-3">
             <QuickAction href="/daily-inspections/new" label="Start pre-trip" icon={<CalendarCheck className="h-4 w-4" />} />
             <QuickAction href="/vehicles" label="Vehicle register" icon={<Car className="h-4 w-4" />} />
+            <QuickAction href="/compliance" label="Compliance centre" icon={<ShieldCheck className="h-4 w-4" />} />
           </div>
         </Card>
       </section>
