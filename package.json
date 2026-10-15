@@ -63,6 +63,8 @@
   },
   "version": "2.5.0",
   "overrides": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "sharp": "0.35.5",
+    "source-map-js": "1.2.2"
   }
 }

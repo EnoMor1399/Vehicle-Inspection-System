@@ -10,6 +10,7 @@ import {
   Bell,
   BookOpen,
   CalendarCheck,
+  CalendarClock,
   Car,
   ChevronRight,
   ClipboardCheck,
@@ -68,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/transporters", label: "Transporters", icon: Truck, resource: "transporters" },
       { href: "/inspections", label: "Inspections", icon: ClipboardCheck, resource: "inspections" },
       { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck, resource: "inspections" },
+      { href: "/schedule", label: "Inspection Scheduling", icon: CalendarClock, resource: "inspections" },
       { href: "/locations", label: "Stations", icon: MapPin, resource: "locations" },
     ],
   },
@@ -81,6 +83,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Intelligence",
     items: [
       { href: "/reports", label: "Reports & Analytics", icon: FileBarChart, resource: "reports" },
+      { href: "/compliance", label: "Compliance Centre", icon: ShieldCheck, resource: "reports" },
       { href: "/predictive", label: "Maintenance Risk", icon: Activity, resource: "reports" },
       { href: "/powerbi", label: "Power BI", icon: BarChart3, resource: "reports" },
       { href: "/rfid", label: "RFID Operations", icon: Radio, resource: "vehicles" },

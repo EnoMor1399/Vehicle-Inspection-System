@@ -29,11 +29,13 @@ export function InspectionForm({
   const router = useRouter();
   const sp = useSearchParams();
   const initialVehicle = sp.get("vehicleId") || "";
+  const appointmentId = sp.get("appointmentId") || undefined;
+  const initialStation = sp.get("station") || "Accra Central Station";
 
   const [vehicleId, setVehicleId] = useState(initialVehicle);
   const [inspectionDate, setInspectionDate] = useState(() => new Date().toISOString().slice(0, 16));
   const [inspectorName, setInspectorName] = useState(currentUser.name);
-  const [station, setStation] = useState("Accra Central Station");
+  const [station, setStation] = useState(initialStation);
   const [odometer, setOdometer] = useState("");
   const [serviceBrake, setServiceBrake] = useState("");
   const [parkingBrake, setParkingBrake] = useState("");
@@ -185,6 +187,7 @@ export function InspectionForm({
       templateType,
       inspectorSignature: inspectorSig,
       attachedDocuments,
+      appointmentId,
     };
     startTransition(async () => {
       try {

@@ -51,6 +51,7 @@ const migrationPaths = [
   "migrations/20260919_driver_training_digital_signatures.sql",
   "migrations/20260921_audit_hash_chain.sql",
   "migrations/20261002_rate_limit_buckets.sql",
+  "migrations/20261015_inspection_scheduling.sql",
 ];
 
 const client = new pg.Client({
