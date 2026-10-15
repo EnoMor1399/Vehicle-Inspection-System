@@ -116,6 +116,16 @@ export const dailyInspectionStatusEnum = pgEnum("daily_inspection_status", [
   "defect_noted",
 ]);
 
+export const inspectionAppointmentStatusEnum = pgEnum("inspection_appointment_status", [
+  "scheduled",
+  "confirmed",
+  "checked_in",
+  "in_progress",
+  "completed",
+  "cancelled",
+  "no_show",
+]);
+
 // ============ DAILY PRE-TRIP INSPECTIONS ============
 // Separate from bi-annual comprehensive inspections.
 // Must be completed before each trip to confirm the vehicle is roadworthy for that day.
@@ -502,6 +512,42 @@ export interface InspectionSectionData {
   items: InspectionItem[];
 }
 
+// ============ INSPECTION APPOINTMENTS ============
+export const inspectionAppointments = pgTable(
+  "inspection_appointments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    appointmentNumber: varchar("appointment_number", { length: 50 }).notNull().unique(),
+    vehicleId: varchar("vehicle_id", { length: 36 })
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    locationId: varchar("location_id", { length: 36 })
+      .references(() => locations.id, { onDelete: "set null" }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    durationMinutes: integer("duration_minutes").notNull().default(45),
+    appointmentType: varchar("appointment_type", { length: 30 }).notNull().default("routine"),
+    priority: varchar("priority", { length: 20 }).notNull().default("normal"),
+    status: inspectionAppointmentStatusEnum("status").notNull().default("scheduled"),
+    assignedInspectorId: varchar("assigned_inspector_id", { length: 36 })
+      .references(() => users.id, { onDelete: "set null" }),
+    linkedInspectionId: varchar("linked_inspection_id", { length: 36 })
+      .references(() => inspections.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    bookedBy: varchar("booked_by", { length: 36 })
+      .references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    scheduledIdx: index("inspection_appointment_scheduled_idx").on(t.scheduledAt),
+    locationScheduledIdx: index("inspection_appointment_location_scheduled_idx").on(t.locationId, t.scheduledAt),
+    statusScheduledIdx: index("inspection_appointment_status_scheduled_idx").on(t.status, t.scheduledAt),
+    vehicleScheduledIdx: index("inspection_appointment_vehicle_scheduled_idx").on(t.vehicleId, t.scheduledAt),
+    inspectorScheduledIdx: index("inspection_appointment_inspector_scheduled_idx").on(t.assignedInspectorId, t.scheduledAt),
+    linkedInspectionIdx: index("inspection_appointment_linked_inspection_idx").on(t.linkedInspectionId),
+  }),
+);
+
 // ============ DOCUMENTS ============
 export const documents = pgTable(
   "documents",
@@ -767,6 +813,14 @@ export const vehicleRelations = relations(vehicles, ({ one, many }) => ({
     references: [transporters.id],
   }),
   inspections: many(inspections),
+}));
+
+export const inspectionAppointmentRelations = relations(inspectionAppointments, ({ one }) => ({
+  vehicle: one(vehicles, { fields: [inspectionAppointments.vehicleId], references: [vehicles.id] }),
+  location: one(locations, { fields: [inspectionAppointments.locationId], references: [locations.id] }),
+  assignedInspector: one(users, { fields: [inspectionAppointments.assignedInspectorId], references: [users.id] }),
+  linkedInspection: one(inspections, { fields: [inspectionAppointments.linkedInspectionId], references: [inspections.id] }),
+  bookedByUser: one(users, { fields: [inspectionAppointments.bookedBy], references: [users.id] }),
 }));
 
 export const inspectionRelations = relations(inspections, ({ one }) => ({
