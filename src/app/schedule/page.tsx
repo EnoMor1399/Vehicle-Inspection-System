@@ -1,4 +1,4 @@
-import { asc, eq, gte, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, ne } from "drizzle-orm";
 import {
   AlertTriangle,
   CalendarClock,
@@ -114,7 +114,7 @@ export default async function SchedulePage() {
       .select({ id: users.id, name: users.name, role: users.role })
       .from(users)
       .where(
-        inArray(users.role, [...ASSIGNABLE_ROLES]),
+        and(eq(users.isActive, true), inArray(users.role, [...ASSIGNABLE_ROLES])),
       )
       .orderBy(asc(users.name)),
   ]);
