@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Plus } from "lucide-react";
 import { Button, Card, Field, Select, TextArea, TextInput } from "@/components/ui";
@@ -33,7 +34,8 @@ export function ScheduleAppointmentForm({
     setError(null);
     setSuccess(null);
 
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const scheduledAt = String(data.get("scheduledAt") || "");
     const parsed = new Date(scheduledAt);
     if (Number.isNaN(parsed.getTime())) {
@@ -54,8 +56,8 @@ export function ScheduleAppointmentForm({
           notes: String(data.get("notes") || "") || undefined,
         });
         setSuccess(`Appointment ${result.appointmentNumber} created.`);
-        event.currentTarget.reset();
-        const dateInput = event.currentTarget.elements.namedItem("scheduledAt") as HTMLInputElement | null;
+        form.reset();
+        const dateInput = form.elements.namedItem("scheduledAt") as HTMLInputElement | null;
         if (dateInput) dateInput.value = defaultScheduledAt();
         router.refresh();
       } catch (err) {
