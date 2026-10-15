@@ -287,6 +287,27 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
         ],
       },
     },
+    append: [
+      {
+        id: "compliance-centre",
+        title: "Compliance Centre",
+        content:
+          "The Compliance Centre combines existing VIMS obligations into one action-oriented view. It surfaces vehicle insurance, roadworthy and road-fund expiries; active transporter insurance and permit expiries; controlled document expiries; and failed, conditional or re-inspection outcomes.",
+        steps: [
+          "Open Intelligence → Compliance Centre",
+          "Review the four top risk counters for vehicles, transporters, documents and inspection outcomes",
+          "Work the vehicle lifecycle queue from the earliest overdue or upcoming obligation",
+          "Review transporter insurance and business-permit obligations",
+          "Open the controlled document registry for expiring source records",
+          "Open individual inspections from the outcome queue to resolve failures, conditional outcomes or re-inspection requirements",
+        ],
+        tips: [
+          "The expiry queues use a 60-day forward horizon and prioritize the nearest recorded obligation",
+          "The module reuses existing VIMS records rather than maintaining a separate compliance database",
+          "Use Reports & Analytics for aggregate trends and Compliance Centre for action queues",
+        ],
+      },
+    ],
   },
   settings: {
     replacements: {
