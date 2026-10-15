@@ -252,6 +252,29 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
           "Only attach evidence that is relevant to the inspection record and within the system evidence limits",
         ],
       },
+      {
+        id: "inspection-scheduling",
+        title: "Inspection Scheduling & Capacity",
+        content:
+          "Operations → Inspection Scheduling manages appointment booking separately from completed inspection evidence. The workspace balances station capacity, supports inspector assignment and tracks the controlled flow from Scheduled through Confirmed, Checked In and In Progress before the A–P inspection is opened.",
+        steps: [
+          "Open Operations → Inspection Scheduling",
+          "Choose the vehicle, active inspection station, appointment date/time and expected duration",
+          "Set the appointment type and operational priority",
+          "Assign an inspector immediately or leave the booking unassigned for later operational allocation",
+          "Confirm the appointment before arrival",
+          "Mark the vehicle Checked In when it reaches the station",
+          "Choose Begin to move the appointment into active service",
+          "Open the A–P inspection from the in-progress appointment",
+          "Submit the completed inspection; VIMS links the new inspection record and closes the appointment automatically",
+        ],
+        tips: [
+          "Today’s station-capacity cards compare active bookings with each station’s configured daily capacity",
+          "VIMS prevents a second active booking for the same vehicle on the same date",
+          "Cancelled and no-show appointments do not consume station capacity",
+          "The scheduling record remains separate from the inspection result so pass/fail analytics are not distorted by future bookings",
+        ],
+      },
     ],
   },
   reports: {
