@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { inspections, vehicles, signatures } from "@/db/schema";
+import { inspectionAppointments, inspections, vehicles, signatures } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
@@ -41,6 +41,7 @@ export type InspectionFormData = {
   templateType?: string;
   inspectorSignature?: string;
   attachedDocuments?: InspectionDocument[];
+  appointmentId?: string;
 };
 
 const TEMPLATE_TYPES = new Set(["bus", "truck", "tanker", "trailer", "taxi", "private"]);
@@ -135,6 +136,25 @@ export async function createInspection(data: InspectionFormData) {
   if (!vehicle) throw new Error("Vehicle not found");
   if (vehicle.status === "decommissioned") throw new Error("A decommissioned vehicle cannot be inspected");
 
+  const [linkedAppointment] = data.appointmentId
+    ? await db
+        .select()
+        .from(inspectionAppointments)
+        .where(eq(inspectionAppointments.id, data.appointmentId))
+        .limit(1)
+    : [undefined];
+
+  if (data.appointmentId && !linkedAppointment) throw new Error("Linked appointment not found");
+  if (linkedAppointment && linkedAppointment.vehicleId !== vehicle.id) {
+    throw new Error("Linked appointment belongs to a different vehicle");
+  }
+  if (linkedAppointment && linkedAppointment.status !== "in_progress") {
+    throw new Error("Appointment must be checked in and started before completing the inspection");
+  }
+  if (linkedAppointment?.linkedInspectionId) {
+    throw new Error("Appointment is already linked to an inspection");
+  }
+
   const totals = validateSections(data.sectionData);
   validateInspectionDocuments(data.attachedDocuments || []);
   if (data.inspectorSignature) validateSignatureDataUrl(data.inspectorSignature, "Inspector signature");
@@ -196,6 +216,17 @@ export async function createInspection(data: InspectionFormData) {
       });
     }
 
+    if (linkedAppointment) {
+      await tx
+        .update(inspectionAppointments)
+        .set({
+          status: "completed",
+          linkedInspectionId: id,
+          updatedAt: new Date(),
+        })
+        .where(eq(inspectionAppointments.id, linkedAppointment.id));
+    }
+
     const awaitingApproval = settings.requireSupervisorApproval && data.overallResult !== "fail";
     const newStatus = data.overallResult === "fail"
       ? "failed"
@@ -215,7 +246,7 @@ export async function createInspection(data: InspectionFormData) {
     entityId: id,
     entityLabel: number,
     summary: `Completed inspection ${number} for ${vehicle.registrationNumber} — ${data.overallResult.toUpperCase()}`,
-    after: { result: data.overallResult, workflowStatus, vehicle: vehicle.registrationNumber, failedItems: totals.fail },
+    after: { result: data.overallResult, workflowStatus, vehicle: vehicle.registrationNumber, failedItems: totals.fail, appointmentNumber: linkedAppointment?.appointmentNumber || null },
   });
 
   const event = data.overallResult === "fail" ? "inspection.failed" : "inspection.completed";
@@ -231,6 +262,7 @@ export async function createInspection(data: InspectionFormData) {
   });
 
   revalidatePath("/inspections");
+  revalidatePath("/schedule");
   revalidatePath(`/vehicles/${data.vehicleId}`);
   revalidatePath("/vehicles");
   revalidatePath("/");
