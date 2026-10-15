@@ -81,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Intelligence",
     items: [
       { href: "/reports", label: "Reports & Analytics", icon: FileBarChart, resource: "reports" },
+      { href: "/compliance", label: "Compliance Centre", icon: ShieldCheck, resource: "reports" },
       { href: "/predictive", label: "Maintenance Risk", icon: Activity, resource: "reports" },
       { href: "/powerbi", label: "Power BI", icon: BarChart3, resource: "reports" },
       { href: "/rfid", label: "RFID Operations", icon: Radio, resource: "vehicles" },
