@@ -52,6 +52,7 @@ const requiredTables = [
   "training_outbound_messages",
   "training_communication_events",
   "rate_limit_buckets",
+  "inspection_appointments",
 ];
 
 const requiredAuditColumns = [
@@ -211,6 +212,12 @@ const requiredIndexes = [
   "training_outbound_status_idx",
   "training_outbound_queue_idx",
   "training_comm_event_message_created_idx",
+  "inspection_appointment_scheduled_idx",
+  "inspection_appointment_location_scheduled_idx",
+  "inspection_appointment_status_scheduled_idx",
+  "inspection_appointment_vehicle_scheduled_idx",
+  "inspection_appointment_inspector_scheduled_idx",
+  "inspection_appointment_linked_inspection_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
