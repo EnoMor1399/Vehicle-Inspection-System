@@ -49,6 +49,9 @@ export async function updateUserAccess(input: {
 
     const [target] = await tx.select().from(users).where(eq(users.id, input.userId)).limit(1);
     if (!target) return { ok: false as const, error: "User account not found" };
+    if (target.organizationId !== actor.organizationId) {
+      return { ok: false as const, error: "Cross-organization user administration is not permitted" };
+    }
 
     const targetRole = target.role;
     if (!isUserRole(targetRole)) return { ok: false as const, error: "Target account role is not recognized" };
