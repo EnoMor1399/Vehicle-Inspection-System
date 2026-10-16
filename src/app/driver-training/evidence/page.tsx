@@ -1,4 +1,4 @@
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { CheckCircle2, Clock3, FileCheck2, Fingerprint, LogIn, LogOut, ShieldCheck, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import { trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -54,7 +54,7 @@ export default async function TrainingEvidencePage() {
         startAt: trainingSessions.startAt,
       })
       .from(trainingSessions)
-      .where(inArray(trainingSessions.status, ["scheduled", "in_progress", "completed"]))
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), inArray(trainingSessions.status, ["scheduled", "in_progress", "completed"])))
       .orderBy(desc(trainingSessions.startAt))
       .limit(120),
     db
@@ -80,6 +80,7 @@ export default async function TrainingEvidencePage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
+      .where(eq(trainingParticipants.organizationId, user.organizationId))
       .leftJoin(
         trainingAttendanceSignoffs,
         eq(trainingAttendanceSignoffs.participantId, trainingParticipants.id),
@@ -104,6 +105,7 @@ export default async function TrainingEvidencePage() {
         participantName: trainingParticipants.fullName,
       })
       .from(trainingEvidenceRecords)
+      .where(eq(trainingEvidenceRecords.organizationId, user.organizationId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingEvidenceRecords.sessionId))
       .leftJoin(trainingParticipants, eq(trainingParticipants.id, trainingEvidenceRecords.participantId))
       .orderBy(desc(trainingEvidenceRecords.capturedAt))
@@ -113,13 +115,13 @@ export default async function TrainingEvidencePage() {
         confirmed: sql<number>`count(*) filter (where ${trainingAttendanceSignoffs.status} = 'confirmed')::int`,
         awaiting: sql<number>`count(*) filter (where ${trainingAttendanceSignoffs.status} = 'open' and ${trainingAttendanceSignoffs.checkOutAt} is not null)::int`,
       })
-      .from(trainingAttendanceSignoffs),
+      .from(trainingAttendanceSignoffs).where(eq(trainingAttendanceSignoffs.organizationId, user.organizationId)),
     db
       .select({
         pending: sql<number>`count(*) filter (where ${trainingEvidenceRecords.status} = 'pending')::int`,
         verified: sql<number>`count(*) filter (where ${trainingEvidenceRecords.status} = 'verified')::int`,
       })
-      .from(trainingEvidenceRecords),
+      .from(trainingEvidenceRecords).where(eq(trainingEvidenceRecords.organizationId, user.organizationId)),
   ]);
 
   const participantOptions = participants.slice(0, 300);
