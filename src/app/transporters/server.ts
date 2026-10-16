@@ -61,14 +61,20 @@ export async function createTransporter(data: TransporterFormData) {
   const [duplicate] = await db
     .select({ id: transporters.id })
     .from(transporters)
-    .where(and(eq(transporters.companyName, parsed.companyName), isNull(transporters.deletedAt)))
+    .where(and(
+      eq(transporters.organizationId, user.organizationId),
+      eq(transporters.organizationId, user.organizationId),
+      eq(transporters.companyName, parsed.companyName),
+      isNull(transporters.deletedAt),
+    ))
     .limit(1);
   if (duplicate) throw new Error("An active transporter already uses this company name");
 
   const id = newId();
   const values = transporterValues(parsed);
-  await db.insert(transporters).values({ id, ...values });
+  await db.insert(transporters).values({ id, organizationId: user.organizationId, ...values });
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -90,7 +96,11 @@ export async function updateTransporter(id: string, data: TransporterFormData) {
   const [before] = await db
     .select()
     .from(transporters)
-    .where(and(eq(transporters.id, id), isNull(transporters.deletedAt)))
+    .where(and(
+      eq(transporters.organizationId, user.organizationId),
+      eq(transporters.id, id),
+      isNull(transporters.deletedAt),
+    ))
     .limit(1);
   if (!before) throw new Error("Transporter not found");
 
@@ -106,8 +116,12 @@ export async function updateTransporter(id: string, data: TransporterFormData) {
   if (duplicate) throw new Error("Another active transporter already uses this company name");
 
   const values = { ...transporterValues(parsed), updatedAt: new Date() };
-  await db.update(transporters).set(values).where(eq(transporters.id, id));
+  await db
+    .update(transporters)
+    .set(values)
+    .where(and(eq(transporters.organizationId, user.organizationId), eq(transporters.id, id)));
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -135,8 +149,9 @@ export async function deleteTransporter(id: string) {
   await db
     .update(transporters)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(eq(transporters.id, id));
+    .where(and(eq(transporters.organizationId, user.organizationId), eq(transporters.id, id)));
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "delete",
@@ -159,11 +174,21 @@ export async function getTransporterDetail(id: string) {
   }
 
   const [transporter] = await db.select().from(transporters).where(
-    and(eq(transporters.id, id), isNull(transporters.deletedAt))
+    and(
+      eq(transporters.organizationId, user.organizationId),
+      eq(transporters.id, id),
+      isNull(transporters.deletedAt),
+    )
   ).limit(1);
   if (!transporter) return null;
 
-  const fleet = await db.select().from(vehicles).where(eq(vehicles.transporterId, id));
+  const fleet = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, user.organizationId),
+      eq(vehicles.transporterId, id),
+    ));
   const inspectionRows = fleet.length
     ? await db
         .select({
@@ -176,7 +201,11 @@ export async function getTransporterDetail(id: string) {
         })
         .from(inspections)
         .innerJoin(vehicles, eq(inspections.vehicleId, vehicles.id))
-        .where(eq(vehicles.transporterId, id))
+        .where(and(
+          eq(inspections.organizationId, user.organizationId),
+          eq(vehicles.organizationId, user.organizationId),
+          eq(vehicles.transporterId, id),
+        ))
     : [];
   return { transporter, fleet, inspections: inspectionRows };
 }
