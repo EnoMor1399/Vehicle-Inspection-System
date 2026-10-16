@@ -48,24 +48,32 @@ function resultLabel(result: string) {
 }
 
 export default async function CompliancePage() {
-  await requirePermission("reports");
+  const user = await requirePermission("reports");
 
   const now = new Date();
   const horizon = dateOnly(addDays(now, 60));
-  const vehicleRiskWhere = or(
+  const vehicleRiskWhere = and(
+    eq(vehicles.organizationId, user.organizationId),
+    or(
     sql`${vehicles.insuranceExpiry} is not null and ${vehicles.insuranceExpiry} <= ${horizon}`,
     sql`${vehicles.roadworthyExpiry} is not null and ${vehicles.roadworthyExpiry} <= ${horizon}`,
     sql`${vehicles.roadFundExpiry} is not null and ${vehicles.roadFundExpiry} <= ${horizon}`,
+    ),
   );
   const transporterRiskWhere = and(
+    eq(transporters.organizationId, user.organizationId),
     isNull(transporters.deletedAt),
     or(
       sql`${transporters.insuranceExpiry} is not null and ${transporters.insuranceExpiry} <= ${horizon}`,
       sql`${transporters.permitExpiry} is not null and ${transporters.permitExpiry} <= ${horizon}`,
     ),
   );
-  const documentRiskWhere = sql`${documents.expiryDate} is not null and ${documents.expiryDate} <= ${horizon}`;
+  const documentRiskWhere = and(
+    eq(documents.organizationId, user.organizationId),
+    sql`${documents.expiryDate} is not null and ${documents.expiryDate} <= ${horizon}`,
+  );
   const inspectionRiskWhere = and(
+    eq(inspections.organizationId, user.organizationId),
     isNull(inspections.archivedAt),
     inArray(inspections.overallResult, [...RISK_RESULTS]),
   );
