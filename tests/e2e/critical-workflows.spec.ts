@@ -5,6 +5,12 @@ const inspectionEmail = process.env.E2E_USER_EMAIL || "e2e.inspector@vims.local"
 const inspectionPassword = process.env.E2E_USER_PASSWORD || "E2eOnly!Passw0rd2026";
 const trainingEmail = process.env.E2E_TRAINING_USER_EMAIL || "e2e.training.admin@vims.local";
 const trainingPassword = process.env.E2E_TRAINING_USER_PASSWORD || inspectionPassword;
+const tenantInspectionEmail = process.env.E2E_TENANT_USER_EMAIL || "e2e.tenant.inspector@vims.local";
+const tenantInspectionPassword = process.env.E2E_TENANT_USER_PASSWORD || inspectionPassword;
+const tenantTrainingEmail = process.env.E2E_TENANT_TRAINING_USER_EMAIL || "e2e.tenant.training.admin@vims.local";
+const tenantTrainingPassword = process.env.E2E_TENANT_TRAINING_USER_PASSWORD || inspectionPassword;
+const rslVehicleId = "e2e0000-0000-4000-8000-000000000004";
+const tenantVehicleId = "e2e10000-0000-4000-8000-000000000007";
 
 async function signIn(
   page: import("@playwright/test").Page,
@@ -61,6 +67,46 @@ test("Vehicle Inspection and Driver Training workspaces are isolated by account 
   await page.goto(`${baseURL}/vehicles`);
   await page.waitForURL(`${baseURL}/driver-training`);
   await expect(page.getByText("E2E-TRAIN-001")).toBeVisible();
+});
+
+
+test("separate subscriber organizations cannot see each other's operational records", async ({ page }) => {
+  await signIn(page, inspectionEmail, inspectionPassword, "/");
+
+  await page.goto(`${baseURL}/vehicles`);
+  await expect(page.getByText("E2E-2026")).toBeVisible();
+  await expect(page.getByText("TENANT-2026")).toHaveCount(0);
+
+  await page.goto(`${baseURL}/inspections`);
+  await expect(page.getByText("E2E-INSP-001")).toBeVisible();
+  await expect(page.getByText("TENANT-INSP-001")).toHaveCount(0);
+
+  const tenantVehicleResponse = await page.goto(`${baseURL}/vehicles/${tenantVehicleId}`);
+  expect(tenantVehicleResponse?.status()).toBe(404);
+
+  await signOut(page);
+  await signIn(page, tenantInspectionEmail, tenantInspectionPassword, "/");
+
+  await page.goto(`${baseURL}/vehicles`);
+  await expect(page.getByText("TENANT-2026")).toBeVisible();
+  await expect(page.getByText("E2E-2026")).toHaveCount(0);
+
+  await page.goto(`${baseURL}/inspections`);
+  await expect(page.getByText("TENANT-INSP-001")).toBeVisible();
+  await expect(page.getByText("E2E-INSP-001")).toHaveCount(0);
+
+  const rslVehicleResponse = await page.goto(`${baseURL}/vehicles/${rslVehicleId}`);
+  expect(rslVehicleResponse?.status()).toBe(404);
+
+  await signOut(page);
+  await signIn(page, trainingEmail, trainingPassword, "/driver-training");
+  await expect(page.getByText("E2E-TRAIN-001")).toBeVisible();
+  await expect(page.getByText("TENANT-TRAIN-001")).toHaveCount(0);
+
+  await signOut(page);
+  await signIn(page, tenantTrainingEmail, tenantTrainingPassword, "/driver-training");
+  await expect(page.getByText("TENANT-TRAIN-001")).toBeVisible();
+  await expect(page.getByText("E2E-TRAIN-001")).toHaveCount(0);
 });
 
 test("mobile Vehicle Inspection pages do not introduce horizontal document overflow", async ({ page }) => {
