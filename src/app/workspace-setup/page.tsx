@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, CheckCircle2, Clock3, CreditCard, ShieldCheck } from "lucide-react";
@@ -90,7 +91,7 @@ function InfoCard({
   detail,
   ok,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   detail: string;
