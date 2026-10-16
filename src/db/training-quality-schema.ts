@@ -8,13 +8,17 @@ import {
   text,
   index,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingParticipants, trainingSessions } from "./training-schema";
 
 export const trainingSessionFeedback = pgTable(
   "training_session_feedback",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -33,6 +37,7 @@ export const trainingSessionFeedback = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_session_feedback_organization_idx").on(t.organizationId),
     sessionIdx: index("training_feedback_session_idx").on(t.sessionId, t.createdAt),
     participantIdx: index("training_feedback_participant_idx").on(t.participantId),
     ratingIdx: index("training_feedback_rating_idx").on(t.overallRating),
@@ -43,6 +48,9 @@ export const trainingQualityFindings = pgTable(
   "training_quality_findings",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -66,6 +74,7 @@ export const trainingQualityFindings = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_quality_findings_organization_idx").on(t.organizationId),
     sessionIdx: index("training_quality_session_idx").on(t.sessionId, t.createdAt),
     statusDueIdx: index("training_quality_status_due_idx").on(t.status, t.dueDate),
     severityIdx: index("training_quality_severity_idx").on(t.severity),
@@ -77,6 +86,9 @@ export const trainingQualityEvents = pgTable(
   "training_quality_events",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     findingId: varchar("finding_id", { length: 36 })
       .notNull()
       .references(() => trainingQualityFindings.id, { onDelete: "cascade" }),
@@ -86,6 +98,7 @@ export const trainingQualityEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_quality_events_organization_idx").on(t.organizationId),
     findingCreatedIdx: index("training_quality_event_finding_created_idx").on(t.findingId, t.createdAt),
   })
 );
