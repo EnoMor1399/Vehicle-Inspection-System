@@ -44,7 +44,7 @@ async function requireTrainingManager() {
   return user;
 }
 
-async function participantContext(participantId: string) {
+async function participantContext(organizationId: string, participantId: string) {
   const [row] = await db
     .select({
       participantId: trainingParticipants.id,
@@ -56,7 +56,11 @@ async function participantContext(participantId: string) {
     })
     .from(trainingParticipants)
     .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-    .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participantId)))
+    .where(and(
+      eq(trainingParticipants.organizationId, organizationId),
+      eq(trainingSessions.organizationId, organizationId),
+      eq(trainingParticipants.id, participantId),
+    ))
     .limit(1);
   if (!row) throw new Error("Training participant not found");
   return row;
@@ -66,7 +70,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
   const actor = await requireTrainingManager();
   const parsed = trainingAttendanceActionSchema.safeParse({ participantId: field(formData, "participantId") });
   if (!parsed.success) throw new Error(trainingEvidenceValidationMessage(parsed.error));
-  const context = await participantContext(parsed.data.participantId);
+  const context = await participantContext(actor.organizationId, parsed.data.participantId);
   if (context.attendanceStatus === "withdrawn") throw new Error("Withdrawn participants cannot be checked in");
   if (!["scheduled", "in_progress"].includes(context.sessionStatus)) {
     throw new Error("Check-in is only available for scheduled or in-progress training sessions");
@@ -79,7 +83,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
-        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
+        eq(trainingAttendanceSignoffs.organizationId, actor.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -91,7 +95,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
       const [after] = await tx
         .update(trainingAttendanceSignoffs)
         .set({ checkInAt, checkOutAt: null, attendanceMinutes: 0, status: "open", updatedAt: checkInAt })
-        .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
+        .where(and(eq(trainingAttendanceSignoffs.organizationId, actor.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
         .returning();
       return { action: "update" as const, before, after };
     }
@@ -111,7 +115,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: result.action,
@@ -129,7 +133,7 @@ export async function checkOutTrainingParticipant(formData: FormData) {
   const actor = await requireTrainingManager();
   const parsed = trainingAttendanceActionSchema.safeParse({ participantId: field(formData, "participantId") });
   if (!parsed.success) throw new Error(trainingEvidenceValidationMessage(parsed.error));
-  const context = await participantContext(parsed.data.participantId);
+  const context = await participantContext(actor.organizationId, parsed.data.participantId);
   if (!["in_progress", "completed"].includes(context.sessionStatus)) {
     throw new Error("Check-out is only available for in-progress or completed training sessions");
   }
@@ -141,7 +145,7 @@ export async function checkOutTrainingParticipant(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
-        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
+        eq(trainingAttendanceSignoffs.organizationId, actor.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -156,13 +160,13 @@ export async function checkOutTrainingParticipant(formData: FormData) {
     const [after] = await tx
       .update(trainingAttendanceSignoffs)
       .set({ checkOutAt, attendanceMinutes, status: "open", updatedAt: checkOutAt })
-      .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
+      .where(and(eq(trainingAttendanceSignoffs.organizationId, actor.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
       .returning();
     return { before, after };
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -185,7 +189,7 @@ export async function confirmTrainingAttendance(formData: FormData) {
     notes: field(formData, "notes"),
   });
   if (!parsed.success) throw new Error(trainingEvidenceValidationMessage(parsed.error));
-  const context = await participantContext(parsed.data.participantId);
+  const context = await participantContext(actor.organizationId, parsed.data.participantId);
   if (!["in_progress", "completed"].includes(context.sessionStatus)) {
     throw new Error("Attendance confirmation is only available for in-progress or completed sessions");
   }
@@ -197,7 +201,7 @@ export async function confirmTrainingAttendance(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
-        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
+        eq(trainingAttendanceSignoffs.organizationId, actor.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -223,18 +227,18 @@ export async function confirmTrainingAttendance(formData: FormData) {
         notes: parsed.data.notes || null,
         updatedAt: confirmedAt,
       })
-      .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
+      .where(and(eq(trainingAttendanceSignoffs.organizationId, actor.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
       .returning();
 
     await tx
       .update(trainingParticipants)
       .set({ attendanceStatus: "attended", updatedAt: confirmedAt })
-      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, context.participantId)));
+      .where(and(eq(trainingParticipants.organizationId, actor.organizationId), eq(trainingParticipants.id, context.participantId)));
     return { before, after };
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -255,7 +259,7 @@ export async function disputeTrainingAttendance(formData: FormData) {
     reason: field(formData, "reason"),
   });
   if (!parsed.success) throw new Error(trainingEvidenceValidationMessage(parsed.error));
-  const context = await participantContext(parsed.data.participantId);
+  const context = await participantContext(actor.organizationId, parsed.data.participantId);
   const disputedAt = new Date();
 
   const result = await db.transaction(async (tx) => {
@@ -264,7 +268,7 @@ export async function disputeTrainingAttendance(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
-        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
+        eq(trainingAttendanceSignoffs.organizationId, actor.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -281,20 +285,20 @@ export async function disputeTrainingAttendance(formData: FormData) {
         notes: parsed.data.reason,
         updatedAt: disputedAt,
       })
-      .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
+      .where(and(eq(trainingAttendanceSignoffs.organizationId, actor.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
       .returning();
 
     if (before.status === "confirmed") {
       await tx
         .update(trainingParticipants)
         .set({ attendanceStatus: "registered", updatedAt: disputedAt })
-        .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, context.participantId)));
+        .where(and(eq(trainingParticipants.organizationId, actor.organizationId), eq(trainingParticipants.id, context.participantId)));
     }
     return { before, after };
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -325,7 +329,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
   const [session] = await db
     .select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber, status: trainingSessions.status })
     .from(trainingSessions)
-    .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId)))
+    .where(and(eq(trainingSessions.organizationId, actor.organizationId), eq(trainingSessions.id, data.sessionId)))
     .limit(1);
   if (!session) throw new Error("Training session not found");
 
@@ -334,7 +338,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
     const [participant] = await db
       .select({ id: trainingParticipants.id, sessionId: trainingParticipants.sessionId, fullName: trainingParticipants.fullName })
       .from(trainingParticipants)
-      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId)))
+      .where(and(eq(trainingParticipants.organizationId, actor.organizationId), eq(trainingParticipants.id, data.participantId)))
       .limit(1);
     if (!participant || participant.sessionId !== data.sessionId) {
       throw new Error("Evidence participant must belong to the selected training session");
@@ -349,7 +353,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
       .select({ id: trainingEvidenceRecords.id })
       .from(trainingEvidenceRecords)
       .where(and(
-        eq(trainingEvidenceRecords.organizationId, user.organizationId),
+        eq(trainingEvidenceRecords.organizationId, actor.organizationId),
         eq(trainingEvidenceRecords.sessionId, data.sessionId),
         eq(trainingEvidenceRecords.reference, data.reference),
         data.participantId
@@ -380,7 +384,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -407,7 +411,7 @@ export async function verifyTrainingEvidenceRecord(formData: FormData) {
   const [before] = await db
     .select()
     .from(trainingEvidenceRecords)
-    .where(and(eq(trainingEvidenceRecords.organizationId, user.organizationId), eq(trainingEvidenceRecords.id, parsed.data.evidenceId)))
+    .where(and(eq(trainingEvidenceRecords.organizationId, actor.organizationId), eq(trainingEvidenceRecords.id, parsed.data.evidenceId)))
     .limit(1);
   if (!before) throw new Error("Training evidence record not found");
 
@@ -420,11 +424,11 @@ export async function verifyTrainingEvidenceRecord(formData: FormData) {
       reviewNotes: parsed.data.reviewNotes || null,
       updatedAt: reviewedAt,
     })
-    .where(and(eq(trainingEvidenceRecords.organizationId, user.organizationId), eq(trainingEvidenceRecords.id, before.id)))
+    .where(and(eq(trainingEvidenceRecords.organizationId, actor.organizationId), eq(trainingEvidenceRecords.id, before.id)))
     .returning();
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
