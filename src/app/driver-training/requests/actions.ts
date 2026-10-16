@@ -131,6 +131,7 @@ export async function createTrainingRequest(formData: FormData) {
   await db.transaction(async (tx) => {
     await tx.insert(trainingRequests).values(values);
     await tx.insert(trainingRequestEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       requestId: id,
       eventType: "created",
@@ -142,6 +143,7 @@ export async function createTrainingRequest(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -169,7 +171,7 @@ export async function transitionTrainingRequest(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requestId}))`);
-    const [before] = await tx.select().from(trainingRequests).where(eq(trainingRequests.id, data.requestId)).limit(1);
+    const [before] = await tx.select().from(trainingRequests).where(and(eq(trainingRequests.organizationId, user.organizationId), eq(trainingRequests.id, data.requestId))).limit(1);
     if (!before) return { ok: false as const, error: "Training request not found" };
     if (!canTransitionTrainingRequest(before.status, data.status)) {
       return { ok: false as const, error: `Training request cannot move from ${before.status} to ${data.status}` };
@@ -186,13 +188,14 @@ export async function transitionTrainingRequest(formData: FormData) {
       updatedAt: now,
     } as const;
 
-    await tx.update(trainingRequests).set(patch).where(eq(trainingRequests.id, before.id));
+    await tx.update(trainingRequests).set(patch).where(and(eq(trainingRequests.organizationId, user.organizationId), eq(trainingRequests.id, before.id)));
     const eventType = data.status === "submitted"
       ? "submitted"
       : data.status === "under_review"
         ? "review_started"
         : data.status;
     await tx.insert(trainingRequestEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       requestId: before.id,
       eventType,
@@ -206,6 +209,7 @@ export async function transitionTrainingRequest(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: data.status === "approved" ? "approve" : data.status === "rejected" ? "reject" : "update",
@@ -240,7 +244,7 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requestId}))`);
-    const [request] = await tx.select().from(trainingRequests).where(eq(trainingRequests.id, data.requestId)).limit(1);
+    const [request] = await tx.select().from(trainingRequests).where(and(eq(trainingRequests.organizationId, user.organizationId), eq(trainingRequests.id, data.requestId))).limit(1);
     if (!request) return { ok: false as const, error: "Training request not found" };
     if (request.status !== "approved") return { ok: false as const, error: "Only approved training requests can be scheduled" };
     if (request.scheduledSessionId) return { ok: false as const, error: "This training request already has a scheduled session" };
@@ -305,8 +309,9 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
       status: "scheduled",
       scheduledSessionId: sessionId,
       updatedAt: new Date(),
-    }).where(eq(trainingRequests.id, request.id));
+    }).where(and(eq(trainingRequests.organizationId, user.organizationId), eq(trainingRequests.id, request.id)));
     await tx.insert(trainingRequestEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       requestId: request.id,
       eventType: "scheduled",
@@ -335,6 +340,7 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
   }
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -345,6 +351,7 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
     after: result.sessionValues,
   });
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
