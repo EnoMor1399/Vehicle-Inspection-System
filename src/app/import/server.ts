@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { dailyInspections, importJobs, inspections, transporters, vehicles } from "@/db/schema";
 import { newId } from "@/lib/utils";
