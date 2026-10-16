@@ -261,7 +261,17 @@ export async function convertOnboardingRequest(input: {
     : null;
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${request.contactEmail}))`);
+    // Serialize concurrent approvals of this request. Reading status before the
+    // lock is insufficient: two platform administrators may approve at once.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.requestId}))`);
+    const [currentRequest] = await tx
+      .select({ status: organizationOnboardingRequests.status })
+      .from(organizationOnboardingRequests)
+      .where(eq(organizationOnboardingRequests.id, input.requestId))
+      .limit(1);
+    if (!currentRequest || !["pending", "reviewing", "approved"].includes(currentRequest.status)) {
+      throw new Error("This onboarding request has already been processed or rejected");
+    }
 
     await tx.insert(organizations).values({
       id: organizationId,
