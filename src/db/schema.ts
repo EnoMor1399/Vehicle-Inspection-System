@@ -128,6 +128,191 @@ export const inspectionAppointmentStatusEnum = pgEnum("inspection_appointment_st
   "no_show",
 ]);
 
+export const organizationStatusEnum = pgEnum("organization_status", [
+  "pending",
+  "provisioning",
+  "active",
+  "suspended",
+  "cancelled",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "trialing",
+  "active",
+  "past_due",
+  "grace",
+  "suspended",
+  "cancelled",
+  "expired",
+]);
+
+export const billingCycleEnum = pgEnum("billing_cycle", ["monthly", "annual", "custom"]);
+
+export const onboardingRequestStatusEnum = pgEnum("onboarding_request_status", [
+  "pending",
+  "reviewing",
+  "approved",
+  "rejected",
+  "converted",
+]);
+
+// ============ MULTI-ORGANIZATION CONTROL PLANE ============
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 100 }).notNull().unique(),
+    legalName: varchar("legal_name", { length: 255 }),
+    registrationNumber: varchar("registration_number", { length: 100 }),
+    taxId: varchar("tax_id", { length: 100 }),
+    industry: varchar("industry", { length: 120 }),
+    country: varchar("country", { length: 100 }).notNull().default("Ghana"),
+    region: varchar("region", { length: 100 }),
+    city: varchar("city", { length: 100 }),
+    address: text("address"),
+    phone: varchar("phone", { length: 50 }),
+    email: varchar("email", { length: 200 }),
+    website: varchar("website", { length: 200 }),
+    logoDataUrl: text("logo_data_url"),
+    logoUrl: text("logo_url"),
+    themeColor: varchar("theme_color", { length: 20 }).notNull().default("#039703"),
+    accentColor: varchar("accent_color", { length: 20 }).notNull().default("#026b02"),
+    enabledModules: jsonb("enabled_modules").$type<string[]>().notNull().default([
+      "vehicle_inspection",
+      "driver_training",
+      "reports",
+    ]),
+    status: organizationStatusEnum("status").notNull().default("pending"),
+    onboardingStage: varchar("onboarding_stage", { length: 50 }).notNull().default("company_profile"),
+    operationalAccessEnabled: boolean("operational_access_enabled").notNull().default(false),
+    dataIsolationVerifiedAt: timestamp("data_isolation_verified_at"),
+    createdBy: varchar("created_by", { length: 36 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    slugIdx: index("organization_slug_idx").on(t.slug),
+    statusIdx: index("organization_status_idx").on(t.status),
+    createdIdx: index("organization_created_idx").on(t.createdAt),
+  }),
+);
+
+export const subscriptionPlans = pgTable(
+  "subscription_plans",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    code: varchar("code", { length: 50 }).notNull().unique(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    billingCycle: billingCycleEnum("billing_cycle").notNull().default("monthly"),
+    price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
+    currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    trialDays: integer("trial_days").notNull().default(14),
+    maxUsers: integer("max_users").notNull().default(10),
+    maxStations: integer("max_stations").notNull().default(2),
+    maxVehicles: integer("max_vehicles").notNull().default(500),
+    maxInspectionsPerMonth: integer("max_inspections_per_month").notNull().default(1000),
+    modules: jsonb("modules").$type<string[]>().notNull().default(["vehicle_inspection", "reports"]),
+    features: jsonb("features").$type<Record<string, boolean>>().notNull().default({}),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    codeIdx: index("subscription_plan_code_idx").on(t.code),
+    activeOrderIdx: index("subscription_plan_active_order_idx").on(t.isActive, t.sortOrder),
+  }),
+);
+
+export const organizationSubscriptions = pgTable(
+  "organization_subscriptions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    planId: varchar("plan_id", { length: 36 })
+      .notNull()
+      .references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+    status: subscriptionStatusEnum("status").notNull().default("trialing"),
+    provider: varchar("provider", { length: 40 }).notNull().default("manual"),
+    providerCustomerId: varchar("provider_customer_id", { length: 150 }),
+    providerSubscriptionId: varchar("provider_subscription_id", { length: 150 }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+    currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    currentPeriodStart: timestamp("current_period_start").notNull().defaultNow(),
+    currentPeriodEnd: timestamp("current_period_end"),
+    trialEndsAt: timestamp("trial_ends_at"),
+    graceEndsAt: timestamp("grace_ends_at"),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    seats: integer("seats").notNull().default(1),
+    notes: text("notes"),
+    createdBy: varchar("created_by", { length: 36 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    organizationIdx: index("organization_subscription_org_idx").on(t.organizationId, t.createdAt.desc()),
+    statusIdx: index("organization_subscription_status_idx").on(t.status),
+    providerIdx: index("organization_subscription_provider_idx").on(t.provider, t.providerSubscriptionId),
+  }),
+);
+
+export const organizationInvitations = pgTable(
+  "organization_invitations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 200 }).notNull(),
+    name: varchar("name", { length: 200 }),
+    role: userRoleEnum("role").notNull().default("viewer"),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    acceptedAt: timestamp("accepted_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdBy: varchar("created_by", { length: 36 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    organizationIdx: index("organization_invitation_org_idx").on(t.organizationId),
+    emailIdx: index("organization_invitation_email_idx").on(t.email),
+    expiryIdx: index("organization_invitation_expiry_idx").on(t.expiresAt),
+  }),
+);
+
+export const organizationOnboardingRequests = pgTable(
+  "organization_onboarding_requests",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    companyName: varchar("company_name", { length: 255 }).notNull(),
+    contactName: varchar("contact_name", { length: 200 }).notNull(),
+    contactEmail: varchar("contact_email", { length: 200 }).notNull(),
+    contactPhone: varchar("contact_phone", { length: 50 }),
+    country: varchar("country", { length: 100 }).notNull().default("Ghana"),
+    industry: varchar("industry", { length: 120 }),
+    estimatedUsers: integer("estimated_users"),
+    estimatedVehicles: integer("estimated_vehicles"),
+    desiredPlanCode: varchar("desired_plan_code", { length: 50 }),
+    requestedModules: jsonb("requested_modules").$type<string[]>().notNull().default(["vehicle_inspection"]),
+    notes: text("notes"),
+    status: onboardingRequestStatusEnum("status").notNull().default("pending"),
+    reviewNotes: text("review_notes"),
+    reviewedBy: varchar("reviewed_by", { length: 36 }),
+    reviewedAt: timestamp("reviewed_at"),
+    sourceIpHash: varchar("source_ip_hash", { length: 64 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    statusIdx: index("organization_onboarding_status_idx").on(t.status, t.createdAt.desc()),
+    emailIdx: index("organization_onboarding_email_idx").on(t.contactEmail),
+  }),
+);
+
 // ============ DAILY PRE-TRIP INSPECTIONS ============
 // Separate from bi-annual comprehensive inspections.
 // Must be completed before each trip to confirm the vehicle is roadworthy for that day.
@@ -195,6 +380,9 @@ export interface DailyChecklistCategory {
 // ============ SYSTEM SETTINGS (singleton) ============
 export const systemSettings = pgTable("system_settings", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  organizationId: varchar("organization_id", { length: 36 })
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
   // Branding
   logoDataUrl: text("logo_data_url"),
   logoUrl: text("logo_url"),
@@ -293,6 +481,9 @@ export const users = pgTable(
   "users",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     name: varchar("name", { length: 200 }).notNull(),
     email: varchar("email", { length: 200 }).notNull().unique(),
     role: userRoleEnum("role").notNull().default("viewer"),
@@ -317,6 +508,8 @@ export const users = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("user_organization_idx").on(t.organizationId),
+    organizationRoleIdx: index("user_organization_role_idx").on(t.organizationId, t.role),
     roleIdx: index("user_role_idx").on(t.role),
     locationIdx: index("user_location_idx").on(t.locationId),
     transporterIdx: index("user_transporter_idx").on(t.transporterId),
