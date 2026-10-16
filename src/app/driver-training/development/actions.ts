@@ -236,6 +236,7 @@ export async function transitionTrainingDevelopmentPlan(formData: FormData) {
     if (data.status === "verification" || data.status === "completed") {
       const [totalRow] = await tx.select({ n: count() }).from(trainingDevelopmentActions).where(and(eq(trainingDevelopmentActions.organizationId, user.organizationId), eq(trainingDevelopmentActions.planId, plan.id)));
       const [openRow] = await tx.select({ n: count() }).from(trainingDevelopmentActions).where(and(
+        eq(trainingDevelopmentActions.organizationId, user.organizationId),
         eq(trainingDevelopmentActions.planId, plan.id),
         inArray(trainingDevelopmentActions.status, ["pending", "in_progress"]),
       ));
