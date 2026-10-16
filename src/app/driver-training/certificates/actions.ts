@@ -211,6 +211,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
@@ -249,6 +250,7 @@ export async function revokeTrainingCertificate(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
