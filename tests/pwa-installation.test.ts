@@ -47,8 +47,8 @@ test("manifest declares a cross-platform installable standalone application", ()
   assert.equal(manifest.theme_color, "#039703");
   assert.ok(Array.isArray(manifest.display_override));
   assert.ok(manifest.display_override.includes("standalone"));
-  assert.ok(manifest.icons.some((icon: { sizes?: string }) => icon.sizes === "192x192"));
-  assert.ok(manifest.icons.some((icon: { sizes?: string }) => icon.sizes === "512x512"));
+  assert.ok(manifest.icons.some((icon: { sizes?: string; src?: string }) => icon.sizes === "192x192" && icon.src === "/pwa/icon/192"));
+  assert.ok(manifest.icons.some((icon: { sizes?: string; src?: string }) => icon.sizes === "512x512" && icon.src === "/pwa/icon/512"));
 });
 
 test("PWA provider captures the native browser install event", () => {
@@ -84,5 +84,21 @@ test("service worker improves install launch performance without caching protect
   assert.match(source, /event\.preloadResponse/);
   assert.match(source, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(source, /fetch\(request\)\.catch/);
+  assert.match(source, /Promise\.allSettled/);
+  assert.match(source, /\/pwa\/icon\/192/);
+  assert.match(source, /\/pwa\/icon\/512/);
   assert.doesNotMatch(source, /cache\.put\(request[\s\S]{0,120}url\.pathname\.startsWith\("\/api\/"\)/);
+});
+
+
+test("PWA icon endpoint generates the exact install icon sizes", () => {
+  const source = readFileSync("src/app/pwa/icon/[size]/route.tsx", "utf8");
+  const layout = readFileSync("src/app/layout.tsx", "utf8");
+
+  assert.match(source, /new ImageResponse/);
+  assert.match(source, /SUPPORTED_SIZES = new Set\(\[192, 512\]\)/);
+  assert.match(source, /"Cache-Control": "public, max-age=31536000, immutable"/);
+  assert.match(layout, /manifest: "\/manifest\.json\?v=4"/);
+  assert.match(layout, /url: "\/pwa\/icon\/192"/);
+  assert.match(layout, /url: "\/pwa\/icon\/512"/);
 });
