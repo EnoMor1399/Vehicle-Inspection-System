@@ -132,7 +132,7 @@ export async function login(
 
   if (!passwordValid) {
     const { getSettings } = await import("./settings");
-    const securitySettings = await getSettings();
+    const securitySettings = await getSettings(user.organizationId);
     const configuredMaxAttempts = Number(securitySettings.maxFailedAttempts || process.env.MAX_LOGIN_ATTEMPTS || 5);
     const configuredLockoutMinutes = Number(securitySettings.lockoutDurationMinutes || process.env.ACCOUNT_LOCKOUT_MINUTES || 15);
     const maxAttempts = Math.min(100, Math.max(1, Number.isFinite(configuredMaxAttempts) ? configuredMaxAttempts : 5));
