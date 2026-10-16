@@ -58,7 +58,7 @@ export async function recordWrittenExamScores(formData: FormData) {
     const [initial] = await tx
       .select()
       .from(trainingAssessments)
-      .where(eq(trainingAssessments.id, assessmentId))
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessmentId)))
       .limit(1);
     if (!initial) return { ok: false as const, error: "Driver assessment not found" };
 
@@ -67,14 +67,14 @@ export async function recordWrittenExamScores(formData: FormData) {
     const [assessment] = await tx
       .select()
       .from(trainingAssessments)
-      .where(eq(trainingAssessments.id, assessmentId))
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessmentId)))
       .limit(1);
     if (!assessment) return { ok: false as const, error: "Driver assessment not found" };
 
     const [latestAssessment] = await tx
       .select({ id: trainingAssessments.id })
       .from(trainingAssessments)
-      .where(eq(trainingAssessments.participantId, assessment.participantId))
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.participantId, assessment.participantId)))
       .orderBy(desc(trainingAssessments.assessedAt), desc(trainingAssessments.createdAt))
       .limit(1);
     if (!latestAssessment || latestAssessment.id !== assessment.id) {
@@ -132,12 +132,12 @@ export async function recordWrittenExamScores(formData: FormData) {
         reviewComments: null,
         reviewedAt: null,
       })
-      .where(eq(trainingAssessments.id, assessment.id));
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessment.id)));
 
     const [participant] = await tx
       .select({ id: trainingParticipants.id, fullName: trainingParticipants.fullName })
       .from(trainingParticipants)
-      .where(eq(trainingParticipants.id, assessment.participantId))
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, assessment.participantId)))
       .limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
 
@@ -149,7 +149,7 @@ export async function recordWrittenExamScores(formData: FormData) {
         riskLevel: outcome.riskLevel,
         updatedAt: new Date(),
       })
-      .where(eq(trainingParticipants.id, participant.id));
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participant.id)));
 
     return {
       ok: true as const,
@@ -166,6 +166,7 @@ export async function recordWrittenExamScores(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
