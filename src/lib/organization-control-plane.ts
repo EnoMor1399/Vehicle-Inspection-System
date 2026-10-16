@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "crypto";
-import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import {
   organizationInvitations,
@@ -8,7 +8,11 @@ import {
   organizationSubscriptions,
   subscriptionPlans,
   systemSettings,
+  inspections,
+  locations,
+  sessions,
   users,
+  vehicles,
 } from "@/db/schema";
 import { newId } from "@/lib/utils";
 import { hashPassword, validateEmail, validatePasswordStrength } from "@/lib/password";
@@ -641,6 +645,202 @@ export async function activateOrganizationWorkspace(input: {
 
   if (!updated) throw new Error("Organization activation did not complete");
   return { organization: updated, isolation };
+}
+
+
+function currentMonthWindow(at = new Date()) {
+  const start = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1));
+  return { start, end };
+}
+
+export async function getOrganizationPlanUsage(organizationId: string, at = new Date()) {
+  const { start, end } = currentMonthWindow(at);
+  const [[userCount], [stationCount], [vehicleCount], [inspectionCount]] = await Promise.all([
+    db.select({ n: count() }).from(users).where(and(
+      eq(users.organizationId, organizationId),
+      eq(users.isActive, true),
+    )),
+    db.select({ n: count() }).from(locations).where(and(
+      eq(locations.organizationId, organizationId),
+      ne(locations.status, "inactive"),
+    )),
+    db.select({ n: count() }).from(vehicles).where(and(
+      eq(vehicles.organizationId, organizationId),
+      ne(vehicles.status, "decommissioned"),
+    )),
+    db.select({ n: count() }).from(inspections).where(and(
+      eq(inspections.organizationId, organizationId),
+      gte(inspections.inspectionDate, start),
+      lt(inspections.inspectionDate, end),
+    )),
+  ]);
+
+  return {
+    users: Number(userCount?.n || 0),
+    stations: Number(stationCount?.n || 0),
+    vehicles: Number(vehicleCount?.n || 0),
+    monthlyInspections: Number(inspectionCount?.n || 0),
+    period: { start, end },
+  };
+}
+
+export async function getPlatformOrganizationSubscriptionDetail(organizationId: string) {
+  const [[organization], subscription, usage] = await Promise.all([
+    db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1),
+    getLatestOrganizationSubscription(organizationId),
+    getOrganizationPlanUsage(organizationId),
+  ]);
+
+  return {
+    organization: organization || null,
+    subscription,
+    usage,
+  };
+}
+
+export type ManagedSubscriptionStatus =
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "grace"
+  | "suspended"
+  | "cancelled"
+  | "expired";
+
+export async function updateOrganizationSubscriptionLifecycle(input: {
+  organizationId: string;
+  actorUserId: string;
+  planCode: string;
+  status: ManagedSubscriptionStatus;
+  amount?: string | number | null;
+  currency?: string | null;
+  currentPeriodEnd?: Date | null;
+  trialEndsAt?: Date | null;
+  graceEndsAt?: Date | null;
+  cancelAtPeriodEnd?: boolean;
+  notes?: string | null;
+}) {
+  const [organization] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId))
+    .limit(1);
+  if (!organization) throw new Error("Organization not found");
+
+  const current = await getLatestOrganizationSubscription(input.organizationId);
+  if (!current) throw new Error("Organization subscription not found");
+
+  const [targetPlan] = await db
+    .select()
+    .from(subscriptionPlans)
+    .where(and(
+      eq(subscriptionPlans.code, input.planCode.trim()),
+      eq(subscriptionPlans.isActive, true),
+    ))
+    .limit(1);
+  if (!targetPlan) throw new Error("Selected subscription plan is unavailable");
+
+  const usage = await getOrganizationPlanUsage(input.organizationId);
+  const violations: string[] = [];
+  if (usage.users > targetPlan.maxUsers) {
+    violations.push(`${usage.users} active users exceed the ${targetPlan.maxUsers} user limit`);
+  }
+  if (usage.stations > targetPlan.maxStations) {
+    violations.push(`${usage.stations} active stations exceed the ${targetPlan.maxStations} station limit`);
+  }
+  if (usage.vehicles > targetPlan.maxVehicles) {
+    violations.push(`${usage.vehicles} managed vehicles exceed the ${targetPlan.maxVehicles} vehicle limit`);
+  }
+  if (usage.monthlyInspections > targetPlan.maxInspectionsPerMonth) {
+    violations.push(
+      `${usage.monthlyInspections} inspections this month exceed the ${targetPlan.maxInspectionsPerMonth} monthly limit`,
+    );
+  }
+  if (violations.length) {
+    throw new Error(`Plan change blocked: ${violations.join("; ")}. Reduce usage or choose a larger plan.`);
+  }
+
+  if (input.status === "trialing" && !input.trialEndsAt) {
+    throw new Error("A trial end date is required for a trialing subscription");
+  }
+  if (input.status === "grace" && !input.graceEndsAt) {
+    throw new Error("A grace end date is required for a grace-period subscription");
+  }
+
+  const amountValue = input.amount === null || input.amount === undefined || input.amount === ""
+    ? String(targetPlan.price)
+    : String(input.amount);
+  const amountNumber = Number(amountValue);
+  if (!Number.isFinite(amountNumber) || amountNumber < 0 || amountNumber > 9999999999) {
+    throw new Error("Subscription amount is invalid");
+  }
+
+  const currency = (input.currency || targetPlan.currency || "GHS").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a 3-letter ISO code");
+
+  const notes = input.notes?.trim() || null;
+  if (notes && notes.length > 4000) throw new Error("Subscription notes must not exceed 4000 characters");
+
+  const now = new Date();
+  const planChanged = current.plan.id !== targetPlan.id;
+  const statusChanged = current.subscription.status !== input.status;
+
+  const [updated] = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`subscription-lifecycle:${input.organizationId}`}))`);
+
+    const [subscription] = await tx
+      .update(organizationSubscriptions)
+      .set({
+        planId: targetPlan.id,
+        status: input.status,
+        amount: amountValue,
+        currency,
+        currentPeriodEnd: input.currentPeriodEnd || null,
+        trialEndsAt: input.trialEndsAt || null,
+        graceEndsAt: input.graceEndsAt || null,
+        cancelAtPeriodEnd: Boolean(input.cancelAtPeriodEnd),
+        notes,
+        updatedAt: now,
+      })
+      .where(eq(organizationSubscriptions.id, current.subscription.id))
+      .returning();
+
+    await tx
+      .update(organizations)
+      .set({
+        enabledModules: targetPlan.modules,
+        updatedAt: now,
+      })
+      .where(eq(organizations.id, input.organizationId));
+
+    if (planChanged || statusChanged) {
+      const orgUsers = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.organizationId, input.organizationId));
+      if (orgUsers.length) {
+        await tx
+          .update(sessions)
+          .set({ isActive: false })
+          .where(inArray(sessions.userId, orgUsers.map((user) => user.id)));
+      }
+    }
+
+    return [subscription] as const;
+  });
+
+  if (!updated) throw new Error("Subscription update did not complete");
+
+  return {
+    organization,
+    before: current,
+    subscription: updated,
+    plan: targetPlan,
+    usage,
+    planChanged,
+    statusChanged,
+  };
 }
 
 export async function setOrganizationStatus(input: {
