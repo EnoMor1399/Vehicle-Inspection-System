@@ -6,7 +6,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
 import { issueApiKey } from "@/lib/api-keys";
-import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { hasPermission } from "@/lib/auth";
+import { requireOrganizationModule } from "@/lib/require-auth";
 import { logAudit } from "@/lib/audit";
 
 type ApiScope = "read" | "write" | "inspect" | "admin";
@@ -36,7 +37,7 @@ export async function generateApiKeyAction(input: {
     }
   | { ok: false; error: string }
 > {
-  const user = await getCurrentUser();
+  const user = await requireOrganizationModule("api");
   if (!hasPermission(user, "settings")) {
     return { ok: false, error: "You do not have permission to generate API keys." };
   }
@@ -110,7 +111,7 @@ export async function generateApiKeyAction(input: {
 }
 
 export async function revokeApiKeyAction(id: string): Promise<{ ok: boolean; error?: string }> {
-  const user = await getCurrentUser();
+  const user = await requireOrganizationModule("api");
   if (!hasPermission(user, "settings")) {
     return { ok: false, error: "You do not have permission to revoke API keys." };
   }
@@ -147,6 +148,7 @@ export async function revokeApiKeyAction(id: string): Promise<{ ok: boolean; err
     .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, user.id)));
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
