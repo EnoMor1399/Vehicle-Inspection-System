@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Award, BadgeCheck, ExternalLink, ShieldX } from "lucide-react";
 import { db } from "@/db";
 import { trainingCertificates, trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -31,7 +31,10 @@ export default async function TrainingCertificatesPage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-      .where(eq(trainingParticipants.certificateEligible, true))
+      .where(and(
+        eq(trainingParticipants.organizationId, user.organizationId),
+        eq(trainingParticipants.certificateEligible, true),
+      ))
       .orderBy(trainingParticipants.fullName)
       .limit(300),
     db
@@ -52,6 +55,7 @@ export default async function TrainingCertificatesPage() {
       .from(trainingCertificates)
       .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingCertificates.participantId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingCertificates.sessionId))
+      .where(eq(trainingCertificates.organizationId, user.organizationId))
       .orderBy(desc(trainingCertificates.issuedAt))
       .limit(300),
   ]);
