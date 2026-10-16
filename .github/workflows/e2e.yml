@@ -51,6 +51,10 @@ jobs:
       E2E_USER_PASSWORD: E2eOnly!Passw0rd2026
       E2E_TRAINING_USER_EMAIL: e2e.training.admin@vims.local
       E2E_TRAINING_USER_PASSWORD: E2eOnly!Passw0rd2026
+      E2E_TENANT_USER_EMAIL: e2e.tenant.inspector@vims.local
+      E2E_TENANT_USER_PASSWORD: E2eOnly!Passw0rd2026
+      E2E_TENANT_TRAINING_USER_EMAIL: e2e.tenant.training.admin@vims.local
+      E2E_TENANT_TRAINING_USER_PASSWORD: E2eOnly!Passw0rd2026
 
     steps:
       - name: Check out repository
