@@ -24,7 +24,16 @@ BEGIN
     'security_events'
   ]
   LOOP
-    EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS organization_id varchar(36)', table_name);
+    EXECUTE format(
+      'ALTER TABLE %I ADD COLUMN IF NOT EXISTS organization_id varchar(36) DEFAULT %L',
+      table_name,
+      '00000000-0000-4000-8000-000000000101'
+    );
+    EXECUTE format(
+      'ALTER TABLE %I ALTER COLUMN organization_id SET DEFAULT %L',
+      table_name,
+      '00000000-0000-4000-8000-000000000101'
+    );
     EXECUTE format(
       'UPDATE %I SET organization_id = %L WHERE organization_id IS NULL',
       table_name,
