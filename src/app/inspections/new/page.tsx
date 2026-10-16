@@ -36,10 +36,16 @@ export default async function NewInspectionPage({
     .where(
       vehicleQuery
         ? and(
+            eq(vehicles.organizationId, user.organizationId),
+            eq(transporters.organizationId, user.organizationId),
             isNull(transporters.deletedAt),
             ilike(vehicles.registrationNumber, `%${vehicleQuery}%`),
           )
-        : isNull(transporters.deletedAt),
+        : and(
+            eq(vehicles.organizationId, user.organizationId),
+            eq(transporters.organizationId, user.organizationId),
+            isNull(transporters.deletedAt),
+          ),
     )
     .orderBy(asc(vehicles.registrationNumber));
 
