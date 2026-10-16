@@ -248,6 +248,7 @@ export async function decommissionVehicle(id: string) {
   });
 
   await emitWebhookEvent("vehicle.updated", {
+    organizationId: user.organizationId,
     id,
     registrationNumber: vehicle.registrationNumber,
     transporterId: vehicle.transporterId,
