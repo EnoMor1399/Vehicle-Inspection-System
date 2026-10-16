@@ -32,7 +32,10 @@ export default async function SecurityDashboard() {
   const recentEvents = await db
     .select()
     .from(securityEvents)
-    .where(eq(securityEvents.userId, user.id))
+    .where(and(
+      eq(securityEvents.organizationId, user.organizationId),
+      eq(securityEvents.userId, user.id),
+    ))
     .orderBy(desc(securityEvents.createdAt))
     .limit(20);
 
