@@ -8,6 +8,7 @@ import { getCurrentUser, canManageLocations } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { newId } from "@/lib/utils";
 import { adminValidationMessage, stationAdminSchema } from "@/lib/admin-entity-policy";
+import { assertOrganizationModuleAccess, assertOrganizationQuota } from "@/lib/organization-access";
 
 export type StationInput = {
   id?: string;
@@ -28,6 +29,7 @@ export type StationInput = {
 export async function saveStation(input: StationInput) {
   const user = await getCurrentUser();
   if (!canManageLocations(user)) throw new Error("You do not have permission to manage inspection stations");
+  await assertOrganizationModuleAccess(user.organizationId, "vehicle_inspection");
 
   const parsed = stationAdminSchema.safeParse(input);
   if (!parsed.success) throw new Error(adminValidationMessage(parsed.error));
@@ -88,6 +90,7 @@ export async function saveStation(input: StationInput) {
       after: values,
     });
   } else {
+    await assertOrganizationQuota(user.organizationId, "stations");
     const id = newId();
     await db.insert(locations).values({ id, organizationId: user.organizationId, ...values });
     await logAudit({
