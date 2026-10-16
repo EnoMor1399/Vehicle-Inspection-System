@@ -6,9 +6,9 @@ test("report exports remain spreadsheet-safe and useful without recent rows", ()
   const actions = readFileSync("src/app/reports/ReportsActions.tsx", "utf8");
 
   assert.match(actions, /neutralizeSpreadsheetFormula/);
-  assert.match(actions, /recentData\.length > 0/);
+  assert.match(actions, /report\.rows\.length > 0/);
   assert.match(actions, /\["Metric", "Value"\]/);
-  assert.match(actions, /new Blob\(\["\\uFEFF", csvContent\]/);
+  assert.match(actions, /new Blob\(\["\\uFEFF", lines\.join\("\\n"\)\]\)/);
   assert.match(actions, /Inspection Compliance/);
 });
 
