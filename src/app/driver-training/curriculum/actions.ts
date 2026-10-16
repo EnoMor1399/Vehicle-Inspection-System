@@ -82,9 +82,10 @@ export async function createTrainingCurriculum(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-curriculum:${data.code}`}))`);
-    const [existing] = await tx.select({ id: trainingCurricula.id }).from(trainingCurricula).where(eq(trainingCurricula.code, data.code)).limit(1);
+    const [existing] = await tx.select({ id: trainingCurricula.id }).from(trainingCurricula).where(and(eq(trainingCurricula.organizationId, user.organizationId), eq(trainingCurricula.code, data.code))).limit(1);
     if (existing) throw new Error("A curriculum with this code already exists");
     const [created] = await tx.insert(trainingCurricula).values({
+      organizationId: user.organizationId,
       id,
       code: data.code,
       serviceId: data.serviceId,
@@ -100,6 +101,7 @@ export async function createTrainingCurriculum(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -135,7 +137,7 @@ export async function createTrainingCurriculumVersion(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-curriculum-version:${data.curriculumId}`}))`);
-    const [curriculum] = await tx.select().from(trainingCurricula).where(eq(trainingCurricula.id, data.curriculumId)).limit(1);
+    const [curriculum] = await tx.select().from(trainingCurricula).where(and(eq(trainingCurricula.organizationId, user.organizationId), eq(trainingCurricula.id, data.curriculumId))).limit(1);
     if (!curriculum) throw new Error("Training curriculum not found");
     if (curriculum.status !== "active") throw new Error("Versions can only be added to active curricula");
     const [duplicate] = await tx
@@ -145,6 +147,7 @@ export async function createTrainingCurriculumVersion(formData: FormData) {
       .limit(1);
     if (duplicate) throw new Error("This curriculum version already exists");
     const [created] = await tx.insert(trainingCurriculumVersions).values({
+      organizationId: user.organizationId,
       id,
       curriculumId: data.curriculumId,
       versionNumber: data.versionNumber,
@@ -167,6 +170,7 @@ export async function createTrainingCurriculumVersion(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -186,13 +190,13 @@ export async function approveTrainingCurriculumVersion(formData: FormData) {
   const approvedAt = new Date();
 
   const result = await db.transaction(async (tx) => {
-    const [before] = await tx.select().from(trainingCurriculumVersions).where(eq(trainingCurriculumVersions.id, parsed.data.versionId)).limit(1);
+    const [before] = await tx.select().from(trainingCurriculumVersions).where(and(eq(trainingCurriculumVersions.organizationId, user.organizationId), eq(trainingCurriculumVersions.id, parsed.data.versionId))).limit(1);
     if (!before) throw new Error("Curriculum version not found");
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-curriculum-approval:${before.curriculumId}`}))`);
     if (!canApproveTrainingCurriculumVersion(before)) {
       throw new Error("This draft is not approval-ready or is no longer in draft status");
     }
-    const [curriculum] = await tx.select().from(trainingCurricula).where(eq(trainingCurricula.id, before.curriculumId)).limit(1);
+    const [curriculum] = await tx.select().from(trainingCurricula).where(and(eq(trainingCurricula.organizationId, user.organizationId), eq(trainingCurricula.id, before.curriculumId))).limit(1);
     if (!curriculum || curriculum.status !== "active") throw new Error("Only active curricula can have an approved version");
 
     await tx
@@ -203,13 +207,14 @@ export async function approveTrainingCurriculumVersion(formData: FormData) {
     const [after] = await tx
       .update(trainingCurriculumVersions)
       .set({ status: "approved", approvedBy: actor.id, approvedAt, updatedAt: approvedAt })
-      .where(eq(trainingCurriculumVersions.id, before.id))
+      .where(and(eq(trainingCurriculumVersions.organizationId, user.organizationId), eq(trainingCurriculumVersions.id, before.id)))
       .returning();
     if (!after) throw new Error("Unable to approve curriculum version");
     return { curriculum, before, after };
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "approve",
@@ -235,29 +240,30 @@ export async function assignTrainingSessionCurriculum(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-session-curriculum:${data.sessionId}`}))`);
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!session) throw new Error("Training session not found");
     const [versionRow] = await tx
       .select({ version: trainingCurriculumVersions, curriculum: trainingCurricula })
       .from(trainingCurriculumVersions)
       .innerJoin(trainingCurricula, eq(trainingCurricula.id, trainingCurriculumVersions.curriculumId))
-      .where(eq(trainingCurriculumVersions.id, data.versionId))
+      .where(and(eq(trainingCurriculumVersions.organizationId, user.organizationId), eq(trainingCurriculumVersions.id, data.versionId)))
       .limit(1);
     if (!versionRow) throw new Error("Curriculum version not found");
     if (!canBindCurriculumToSession(session.status, versionRow.version.status, session.serviceId, versionRow.curriculum.serviceId)) {
       throw new Error("Only a scheduled session can be bound to an approved curriculum version for the same service");
     }
 
-    const [before] = await tx.select().from(trainingSessionCurricula).where(eq(trainingSessionCurricula.sessionId, session.id)).limit(1);
+    const [before] = await tx.select().from(trainingSessionCurricula).where(and(eq(trainingSessionCurricula.organizationId, user.organizationId), eq(trainingSessionCurricula.sessionId, session.id))).limit(1);
     if (before) {
       const [after] = await tx
         .update(trainingSessionCurricula)
         .set({ curriculumVersionId: data.versionId, assignedBy: actor.id, assignedAt })
-        .where(eq(trainingSessionCurricula.id, before.id))
+        .where(and(eq(trainingSessionCurricula.organizationId, user.organizationId), eq(trainingSessionCurricula.id, before.id)))
         .returning();
       return { session, curriculum: versionRow.curriculum, version: versionRow.version, before, after, action: "update" as const };
     }
     const [after] = await tx.insert(trainingSessionCurricula).values({
+      organizationId: user.organizationId,
       id: newId(),
       sessionId: session.id,
       curriculumVersionId: data.versionId,
@@ -268,6 +274,7 @@ export async function assignTrainingSessionCurriculum(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: result.action,
@@ -300,7 +307,7 @@ export async function saveTrainingMatrixRequirement(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-matrix:${requirementKey}`}))`);
-    const [before] = await tx.select().from(trainingMatrixRequirements).where(eq(trainingMatrixRequirements.requirementKey, requirementKey)).limit(1);
+    const [before] = await tx.select().from(trainingMatrixRequirements).where(and(eq(trainingMatrixRequirements.organizationId, user.organizationId), eq(trainingMatrixRequirements.requirementKey, requirementKey))).limit(1);
     const values = {
       scopeType: data.scopeType,
       clientName: data.scopeType === "client" ? data.clientName || null : null,
@@ -313,10 +320,11 @@ export async function saveTrainingMatrixRequirement(formData: FormData) {
       updatedAt,
     } as const;
     if (before) {
-      const [after] = await tx.update(trainingMatrixRequirements).set(values).where(eq(trainingMatrixRequirements.id, before.id)).returning();
+      const [after] = await tx.update(trainingMatrixRequirements).set(values).where(and(eq(trainingMatrixRequirements.organizationId, user.organizationId), eq(trainingMatrixRequirements.id, before.id))).returning();
       return { action: "update" as const, before, after };
     }
     const [after] = await tx.insert(trainingMatrixRequirements).values({
+      organizationId: user.organizationId,
       id: newId(),
       requirementKey,
       createdBy: actor.id,
@@ -327,6 +335,7 @@ export async function saveTrainingMatrixRequirement(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: result.action,
