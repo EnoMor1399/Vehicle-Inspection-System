@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   if (status && !VEHICLE_STATUSES.has(status)) return apiError(400, "Invalid vehicle status");
   if (transporterId && transporterId.length > 64) return apiError(400, "transporter_id is too long");
 
-  const where = [];
+  const where = [eq(vehicles.organizationId, auth.user.organizationId)];
   if (status) where.push(eq(vehicles.status, status as typeof vehicles.status.enumValues[number]));
   if (transporterId) where.push(eq(vehicles.transporterId, transporterId));
   const predicate = where.length ? and(...where) : undefined;
@@ -67,7 +67,11 @@ export async function POST(request: Request) {
     let transporterId: string | null = null;
     if (body.transporter_id) {
       const [t] = await db.select().from(transporters)
-        .where(and(eq(transporters.id, body.transporter_id), isNull(transporters.deletedAt)));
+        .where(and(
+          eq(transporters.organizationId, auth.user.organizationId),
+          eq(transporters.id, body.transporter_id),
+          isNull(transporters.deletedAt),
+        ));
       if (!t) return apiError(400, "transporter_id not found");
       transporterId = t.id;
     }
@@ -76,6 +80,7 @@ export async function POST(request: Request) {
     const id = newId();
     const payload = {
       id,
+      organizationId: auth.user.organizationId,
       transporterId,
       registrationNumber: body.registration_number.toUpperCase(),
       make: body.make,
@@ -96,6 +101,7 @@ export async function POST(request: Request) {
 
     const { logAudit } = await import("@/lib/audit");
     await logAudit({
+      organizationId: auth.user.organizationId,
       userId: auth.user.id,
       userName: auth.user.name,
       action: "create",
@@ -107,6 +113,7 @@ export async function POST(request: Request) {
     });
 
     await emitWebhookEvent("vehicle.created", {
+      organizationId: auth.user.organizationId,
       id,
       registrationNumber: payload.registrationNumber,
       transporterId,
