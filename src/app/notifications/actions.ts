@@ -14,7 +14,11 @@ export async function markRead(formData: FormData) {
   await db
     .update(notifications)
     .set({ readAt: new Date() })
-    .where(and(eq(notifications.id, id), eq(notifications.userId, user.id)));
+    .where(and(
+      eq(notifications.organizationId, user.organizationId),
+      eq(notifications.id, id),
+      eq(notifications.userId, user.id),
+    ));
 
   revalidatePath("/notifications");
 }
@@ -24,7 +28,10 @@ export async function markAllRead() {
   await db
     .update(notifications)
     .set({ readAt: new Date() })
-    .where(eq(notifications.userId, user.id));
+    .where(and(
+      eq(notifications.organizationId, user.organizationId),
+      eq(notifications.userId, user.id),
+    ));
 
   revalidatePath("/notifications");
 }
