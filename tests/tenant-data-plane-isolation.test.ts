@@ -30,7 +30,6 @@ test("core Vehicle Inspection reads are organization scoped", () => {
     "src/app/transporters/[id]/page.tsx",
     "src/app/locations/page.tsx",
     "src/app/inspections/page.tsx",
-    "src/app/inspections/[id]/page.tsx",
     "src/app/daily-inspections/page.tsx",
     "src/app/daily-inspections/[id]/page.tsx",
     "src/app/schedule/page.tsx",
@@ -46,6 +45,12 @@ test("core Vehicle Inspection reads are organization scoped", () => {
       `${path} must reference the authenticated organization boundary`,
     );
   }
+
+  const inspectionDetailPage = source("src/app/inspections/[id]/page.tsx");
+  const inspectionServer = source("src/app/inspections/server.ts");
+  assert.match(inspectionDetailPage, /getInspectionDetail\(id\)/);
+  assert.match(inspectionServer, /eq\(inspections\.organizationId, user\.organizationId\)/);
+  assert.match(inspectionServer, /eq\(vehicles\.organizationId, user\.organizationId\)/);
 });
 
 test("REST API authentication exposes an organization context and operational APIs use it", () => {
