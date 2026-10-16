@@ -11,7 +11,7 @@ import {
 import { YearlyComparisonChart } from "@/components/YearlyComparisonChart";
 import { db } from "@/db";
 import { inspections, vehicles, transporters, locations } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { formatDate } from "@/lib/utils";
 import {
   Activity,
@@ -42,14 +42,14 @@ export default async function ReportsPage() {
   }
 
   const [stats, trend, stations, transportersPerf, defects, regions, inspectors, yearlyData, recent] = await Promise.all([
-    computeDashboardStats(),
-    getMonthlyTrend(),
-    getStationStats(),
-    getTransporterPerformance(),
-    getCommonDefects(),
-    getRegionalStats(),
-    getInspectorPerformance(),
-    getYearlyComparison(),
+    computeDashboardStats(user.organizationId),
+    getMonthlyTrend(user.organizationId),
+    getStationStats(user.organizationId),
+    getTransporterPerformance(user.organizationId),
+    getCommonDefects(user.organizationId),
+    getRegionalStats(user.organizationId),
+    getInspectorPerformance(user.organizationId),
+    getYearlyComparison(user.organizationId),
     db
       .select({
         number: inspections.inspectionNumber,
@@ -63,6 +63,10 @@ export default async function ReportsPage() {
       .leftJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
       .leftJoin(transporters, eq(transporters.id, vehicles.transporterId))
       .leftJoin(locations, eq(locations.id, inspections.locationId))
+      .where(and(
+        eq(inspections.organizationId, user.organizationId),
+        eq(vehicles.organizationId, user.organizationId),
+      ))
       .orderBy(desc(inspections.inspectionDate))
       .limit(10),
   ]);
