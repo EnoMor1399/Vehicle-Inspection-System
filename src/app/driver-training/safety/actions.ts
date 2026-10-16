@@ -67,10 +67,10 @@ export async function createTrainingRiskAssessment(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-risk:${data.sessionId}`}))`);
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status !== "scheduled") return { ok: false as const, error: "Risk assessments can only be created for scheduled training sessions" };
-    const [existing] = await tx.select({ id: trainingRiskAssessments.id }).from(trainingRiskAssessments).where(eq(trainingRiskAssessments.sessionId, session.id)).limit(1);
+    const [existing] = await tx.select({ id: trainingRiskAssessments.id }).from(trainingRiskAssessments).where(and(eq(trainingRiskAssessments.organizationId, user.organizationId), eq(trainingRiskAssessments.sessionId, session.id))).limit(1);
     if (existing) return { ok: false as const, error: "This training session already has a risk assessment" };
     const values = {
       id,
@@ -90,7 +90,7 @@ export async function createTrainingRiskAssessment(formData: FormData) {
   });
   if (!result.ok) throw new Error(result.error);
 
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_risk_assessment", entityId: id, entityLabel: result.session.referenceNumber, summary: `Created training risk assessment for ${result.session.referenceNumber}`, after: result.values });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_risk_assessment", entityId: id, entityLabel: result.session.referenceNumber, summary: `Created training risk assessment for ${result.session.referenceNumber}`, after: result.values });
   refreshSafetyPaths();
 }
 
@@ -118,7 +118,7 @@ export async function addTrainingSafetyHazard(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-risk-assessment:${data.assessmentId}`}))`);
-    const [assessment] = await tx.select().from(trainingRiskAssessments).where(eq(trainingRiskAssessments.id, data.assessmentId)).limit(1);
+    const [assessment] = await tx.select().from(trainingRiskAssessments).where(and(eq(trainingRiskAssessments.organizationId, user.organizationId), eq(trainingRiskAssessments.id, data.assessmentId))).limit(1);
     if (!assessment) return { ok: false as const, error: "Training risk assessment not found" };
     if (!["draft", "blocked"].includes(assessment.status)) return { ok: false as const, error: "Hazards can only be changed while the risk assessment is draft or blocked" };
     const values = {
@@ -143,7 +143,7 @@ export async function addTrainingSafetyHazard(formData: FormData) {
   });
   if (!result.ok) throw new Error(result.error);
 
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_safety_hazard", entityId: id, entityLabel: result.assessment.sessionId, summary: `Added ${trainingSafetyRiskLevel(residualRiskScore)} residual-risk hazard`, after: result.values });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_safety_hazard", entityId: id, entityLabel: result.assessment.sessionId, summary: `Added ${trainingSafetyRiskLevel(residualRiskScore)} residual-risk hazard`, after: result.values });
   refreshSafetyPaths();
 }
 
@@ -155,29 +155,29 @@ export async function transitionTrainingRiskAssessment(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-risk-assessment:${data.assessmentId}`}))`);
-    const [assessment] = await tx.select().from(trainingRiskAssessments).where(eq(trainingRiskAssessments.id, data.assessmentId)).limit(1);
+    const [assessment] = await tx.select().from(trainingRiskAssessments).where(and(eq(trainingRiskAssessments.organizationId, user.organizationId), eq(trainingRiskAssessments.id, data.assessmentId))).limit(1);
     if (!assessment) return { ok: false as const, error: "Training risk assessment not found" };
     if (assessment.status === "approved" || assessment.status === "superseded") return { ok: false as const, error: "Approved or superseded risk assessments cannot be changed" };
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, assessment.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, assessment.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
 
     if (data.status === "blocked") {
-      await tx.update(trainingRiskAssessments).set({ status: "blocked", stopWorkRequired: true, notes: data.notes || assessment.notes, updatedAt: new Date() }).where(eq(trainingRiskAssessments.id, assessment.id));
+      await tx.update(trainingRiskAssessments).set({ status: "blocked", stopWorkRequired: true, notes: data.notes || assessment.notes, updatedAt: new Date() }).where(and(eq(trainingRiskAssessments.organizationId, user.organizationId), eq(trainingRiskAssessments.id, assessment.id)));
       return { ok: true as const, assessment, session, nextStatus: "blocked" as const };
     }
 
-    const [hazardCount] = await tx.select({ n: count() }).from(trainingSafetyHazards).where(eq(trainingSafetyHazards.assessmentId, assessment.id));
+    const [hazardCount] = await tx.select({ n: count() }).from(trainingSafetyHazards).where(and(eq(trainingSafetyHazards.organizationId, user.organizationId), eq(trainingSafetyHazards.assessmentId, assessment.id)));
     const [openCount] = await tx.select({ n: count() }).from(trainingSafetyHazards).where(and(eq(trainingSafetyHazards.assessmentId, assessment.id), eq(trainingSafetyHazards.status, "open")));
-    const [maxResidual] = await tx.select({ n: max(trainingSafetyHazards.residualRiskScore) }).from(trainingSafetyHazards).where(eq(trainingSafetyHazards.assessmentId, assessment.id));
+    const [maxResidual] = await tx.select({ n: max(trainingSafetyHazards.residualRiskScore) }).from(trainingSafetyHazards).where(and(eq(trainingSafetyHazards.organizationId, user.organizationId), eq(trainingSafetyHazards.assessmentId, assessment.id)));
     const approvalReady = canApproveTrainingRiskAssessment({ sessionStatus: session.status, stopWorkRequired: false, hazardCount: Number(hazardCount?.n || 0), openHazardCount: Number(openCount?.n || 0), maxResidualRiskScore: Number(maxResidual?.n || 0) });
     if (!approvalReady) return { ok: false as const, error: "Risk assessment cannot be approved until hazards are controlled, residual risk is acceptable, and the session remains scheduled" };
 
-    await tx.update(trainingRiskAssessments).set({ status: "approved", stopWorkRequired: false, approvedBy: user.id, approvedAt: new Date(), notes: data.notes || assessment.notes, updatedAt: new Date() }).where(eq(trainingRiskAssessments.id, assessment.id));
+    await tx.update(trainingRiskAssessments).set({ status: "approved", stopWorkRequired: false, approvedBy: user.id, approvedAt: new Date(), notes: data.notes || assessment.notes, updatedAt: new Date() }).where(and(eq(trainingRiskAssessments.organizationId, user.organizationId), eq(trainingRiskAssessments.id, assessment.id)));
     return { ok: true as const, assessment, session, nextStatus: "approved" as const };
   });
   if (!result.ok) throw new Error(result.error);
 
-  await logAudit({ userId: user.id, userName: user.name, action: data.status === "approved" ? "approve" : "update", entityType: "training_risk_assessment", entityId: result.assessment.id, entityLabel: result.session.referenceNumber, summary: `Changed training risk assessment status to ${result.nextStatus}`, before: { status: result.assessment.status, stopWorkRequired: result.assessment.stopWorkRequired }, after: { status: result.nextStatus, stopWorkRequired: result.nextStatus === "blocked" } });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: data.status === "approved" ? "approve" : "update", entityType: "training_risk_assessment", entityId: result.assessment.id, entityLabel: result.session.referenceNumber, summary: `Changed training risk assessment status to ${result.nextStatus}`, before: { status: result.assessment.status, stopWorkRequired: result.assessment.stopWorkRequired }, after: { status: result.nextStatus, stopWorkRequired: result.nextStatus === "blocked" } });
   refreshSafetyPaths();
 }
 
@@ -195,11 +195,11 @@ export async function reportTrainingSafetyIncident(formData: FormData) {
   const incidentNumber = `TSI-${new Date().getUTCFullYear()}-${id.slice(0, 8).toUpperCase()}`;
 
   const result = await db.transaction(async (tx) => {
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status === "cancelled") return { ok: false as const, error: "Safety incidents cannot be recorded against a cancelled training session" };
     if (data.participantId) {
-      const [participant] = await tx.select({ id: trainingParticipants.id, sessionId: trainingParticipants.sessionId }).from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+      const [participant] = await tx.select({ id: trainingParticipants.id, sessionId: trainingParticipants.sessionId }).from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId))).limit(1);
       if (!participant || participant.sessionId !== session.id) return { ok: false as const, error: "Selected participant does not belong to this training session" };
     }
     const values = {
@@ -224,7 +224,7 @@ export async function reportTrainingSafetyIncident(formData: FormData) {
   });
   if (!result.ok) throw new Error(result.error);
 
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_safety_incident", entityId: id, entityLabel: incidentNumber, summary: `Reported ${data.severity} ${data.incidentType.replaceAll("_", " ")} for ${result.session.referenceNumber}${stopWork ? " with stop-work control" : ""}`, after: result.values });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_safety_incident", entityId: id, entityLabel: incidentNumber, summary: `Reported ${data.severity} ${data.incidentType.replaceAll("_", " ")} for ${result.session.referenceNumber}${stopWork ? " with stop-work control" : ""}`, after: result.values });
   refreshSafetyPaths();
 }
 
@@ -236,7 +236,7 @@ export async function transitionTrainingSafetyIncident(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-safety-incident:${data.incidentId}`}))`);
-    const [incident] = await tx.select().from(trainingSafetyIncidents).where(eq(trainingSafetyIncidents.id, data.incidentId)).limit(1);
+    const [incident] = await tx.select().from(trainingSafetyIncidents).where(and(eq(trainingSafetyIncidents.organizationId, user.organizationId), eq(trainingSafetyIncidents.id, data.incidentId))).limit(1);
     if (!incident) return { ok: false as const, error: "Training safety incident not found" };
     if (!canTransitionTrainingSafetyIncident(incident.status, data.status)) return { ok: false as const, error: `Safety incident cannot move from ${incident.status} to ${data.status}` };
 
@@ -261,11 +261,11 @@ export async function transitionTrainingSafetyIncident(formData: FormData) {
       closedAt: data.status === "closed" ? now : incident.closedAt,
       updatedAt: now,
     } as const;
-    await tx.update(trainingSafetyIncidents).set(patch).where(eq(trainingSafetyIncidents.id, incident.id));
+    await tx.update(trainingSafetyIncidents).set(patch).where(and(eq(trainingSafetyIncidents.organizationId, user.organizationId), eq(trainingSafetyIncidents.id, incident.id)));
     return { ok: true as const, incident, patch };
   });
   if (!result.ok) throw new Error(result.error);
 
-  await logAudit({ userId: user.id, userName: user.name, action: data.status === "closed" ? "approve" : "update", entityType: "training_safety_incident", entityId: result.incident.id, entityLabel: result.incident.incidentNumber, summary: `Changed safety incident status to ${data.status}`, before: { status: result.incident.status }, after: { status: data.status, rootCause: data.rootCause || undefined, correctiveActions: data.correctiveActions || undefined, evidenceReference: data.evidenceReference || undefined, closureReview: data.closureReview || undefined } });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: data.status === "closed" ? "approve" : "update", entityType: "training_safety_incident", entityId: result.incident.id, entityLabel: result.incident.incidentNumber, summary: `Changed safety incident status to ${data.status}`, before: { status: result.incident.status }, after: { status: data.status, rootCause: data.rootCause || undefined, correctiveActions: data.correctiveActions || undefined, evidenceReference: data.evidenceReference || undefined, closureReview: data.closureReview || undefined } });
   refreshSafetyPaths();
 }
