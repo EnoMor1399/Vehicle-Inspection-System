@@ -52,6 +52,8 @@ const migrationPaths = [
   "migrations/20260921_audit_hash_chain.sql",
   "migrations/20261002_rate_limit_buckets.sql",
   "migrations/20261015_inspection_scheduling.sql",
+  "migrations/20261016_admin_domain_roles.sql",
+  "migrations/20261016_admin_domain_assignment.sql",
 ];
 
 const client = new pg.Client({
