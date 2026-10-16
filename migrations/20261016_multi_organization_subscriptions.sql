@@ -1,3 +1,5 @@
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'organization_owner';
+
 -- VIMS multi-organization subscription control plane.
 -- Existing production records are assigned to the legacy RSL organization.
 -- New subscriber organizations remain operationally locked until tenant data
@@ -289,3 +291,27 @@ $$;
 CREATE INDEX IF NOT EXISTS user_organization_idx ON users(organization_id);
 CREATE INDEX IF NOT EXISTS user_organization_role_idx ON users(organization_id, role);
 CREATE UNIQUE INDEX IF NOT EXISTS system_settings_organization_uidx ON system_settings(organization_id);
+
+
+-- Organization Owners manage subscription/account administration only and are
+-- intentionally excluded from both operational domains.
+ALTER TABLE users
+  DROP CONSTRAINT IF EXISTS users_single_operational_domain_chk;
+
+ALTER TABLE users
+  ADD CONSTRAINT users_single_operational_domain_chk
+  CHECK (
+    role = 'super_admin'
+    OR (
+      role = 'organization_owner'
+      AND NOT COALESCE((permissions->>'*')::boolean, false)
+      AND COALESCE((permissions->>'vehicle_inspection')::boolean, false) = false
+      AND COALESCE((permissions->>'training')::boolean, false) = false
+    )
+    OR (
+      role <> 'organization_owner'
+      AND NOT COALESCE((permissions->>'*')::boolean, false)
+      AND COALESCE((permissions->>'vehicle_inspection')::boolean, true)
+          <> COALESCE((permissions->>'training')::boolean, false)
+    )
+  );
