@@ -2,7 +2,7 @@ import { z } from "zod";
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { inspections, vehicles } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { API_AI_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
 
 const requestSchema = z.object({
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     const parsed = requestSchema.safeParse(bodyResult.value);
     if (!parsed.success) return apiError(400, "Invalid risk-analysis request");
-    const analysis = await analyzeHistoricalDefectRisk(parsed.data.vehicle_id, parsed.data.section);
+    const analysis = await analyzeHistoricalDefectRisk(auth.user.organizationId, parsed.data.vehicle_id, parsed.data.section);
     return json({
       data: {
         ...analysis,
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   if (section.length > 20) return apiError(400, "section is invalid");
 
   try {
-    const analysis = await analyzeHistoricalDefectRisk(parsedVehicleId.data, section);
+    const analysis = await analyzeHistoricalDefectRisk(auth.user.organizationId, parsedVehicleId.data, section);
     return json({
       data: { ...analysis, image_analysis: null, image_analysis_status: "not_requested" },
       model: "historical-defect-risk-v2",
@@ -68,8 +68,11 @@ export async function GET(request: Request) {
   }
 }
 
-async function analyzeHistoricalDefectRisk(vehicleId: string, section: string) {
-  const [vehicle] = await db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.id, vehicleId));
+async function analyzeHistoricalDefectRisk(organizationId: string, vehicleId: string, section: string) {
+  const [vehicle] = await db.select({ id: vehicles.id }).from(vehicles).where(and(
+    eq(vehicles.organizationId, organizationId),
+    eq(vehicles.id, vehicleId),
+  ));
   if (!vehicle) throw new Error("Vehicle not found");
 
   const history = await db
@@ -80,7 +83,10 @@ async function analyzeHistoricalDefectRisk(vehicleId: string, section: string) {
       sectionData: inspections.sectionData,
     })
     .from(inspections)
-    .where(eq(inspections.vehicleId, vehicleId))
+    .where(and(
+      eq(inspections.organizationId, organizationId),
+      eq(inspections.vehicleId, vehicleId),
+    ))
     .orderBy(desc(inspections.inspectionDate))
     .limit(20);
 
