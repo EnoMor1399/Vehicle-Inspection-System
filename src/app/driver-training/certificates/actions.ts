@@ -70,7 +70,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     const [participant] = await tx
       .select()
       .from(trainingParticipants)
-      .where(eq(trainingParticipants.id, data.participantId))
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId)))
       .limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
     if (!participant.certificateEligible) {
@@ -80,7 +80,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
     const [session] = await tx
       .select()
       .from(trainingSessions)
-      .where(eq(trainingSessions.id, participant.sessionId))
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, participant.sessionId)))
       .limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status !== "completed") {
@@ -102,6 +102,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
       })
       .from(trainingAssessments)
       .where(and(
+        eq(trainingAssessments.organizationId, user.organizationId),
         eq(trainingAssessments.participantId, participant.id),
         inArray(trainingAssessments.result, [...PASSING_RESULTS]),
       ))
@@ -153,6 +154,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
       .select({ revokedAt: trainingCertificates.revokedAt, certificateNumber: trainingCertificates.certificateNumber })
       .from(trainingCertificates)
       .where(and(
+        eq(trainingCertificates.organizationId, user.organizationId),
         eq(trainingCertificates.participantId, participant.id),
         eq(trainingCertificates.sessionId, participant.sessionId),
         eq(trainingCertificates.status, "revoked"),
@@ -170,6 +172,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
       .select({ id: trainingCertificates.id, certificateNumber: trainingCertificates.certificateNumber, expiryDate: trainingCertificates.expiryDate })
       .from(trainingCertificates)
       .where(and(
+        eq(trainingCertificates.organizationId, user.organizationId),
         eq(trainingCertificates.participantId, participant.id),
         eq(trainingCertificates.sessionId, participant.sessionId),
         eq(trainingCertificates.status, "active"),
@@ -184,11 +187,12 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
       .filter((certificate) => effectiveTrainingCertificateStatus("active", certificate.expiryDate, issuedAt) === "expired")
       .map((certificate) => certificate.id);
     for (const expiredId of expiredIds) {
-      await tx.update(trainingCertificates).set({ status: "expired" }).where(eq(trainingCertificates.id, expiredId));
+      await tx.update(trainingCertificates).set({ status: "expired" }).where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.id, expiredId)));
     }
 
     const certificate = {
       id,
+      organizationId: user.organizationId,
       certificateNumber,
       verificationCode,
       participantId: participant.id,
@@ -207,6 +211,7 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "approve",
@@ -230,20 +235,21 @@ export async function revokeTrainingCertificate(formData: FormData) {
     const [certificate] = await tx
       .select({ id: trainingCertificates.id, certificateNumber: trainingCertificates.certificateNumber, status: trainingCertificates.status, participantId: trainingCertificates.participantId, revokedAt: trainingCertificates.revokedAt, revocationReason: trainingCertificates.revocationReason })
       .from(trainingCertificates)
-      .where(eq(trainingCertificates.id, data.certificateId))
+      .where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.id, data.certificateId)))
       .limit(1);
     if (!certificate) return { ok: false as const, error: "Training certificate not found" };
     if (certificate.status === "revoked") return { ok: false as const, error: "Training certificate is already revoked" };
 
-    const [participant] = await tx.select({ fullName: trainingParticipants.fullName }).from(trainingParticipants).where(eq(trainingParticipants.id, certificate.participantId)).limit(1);
+    const [participant] = await tx.select({ fullName: trainingParticipants.fullName }).from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, certificate.participantId))).limit(1);
     const revokedAt = new Date();
-    await tx.update(trainingCertificates).set({ status: "revoked", revokedAt, revocationReason: data.reason }).where(eq(trainingCertificates.id, certificate.id));
+    await tx.update(trainingCertificates).set({ status: "revoked", revokedAt, revocationReason: data.reason }).where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.id, certificate.id)));
     return { ok: true as const, certificate, participant, revokedAt };
   });
 
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "reject",
