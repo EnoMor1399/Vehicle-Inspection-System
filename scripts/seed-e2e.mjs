@@ -22,6 +22,7 @@ try {
     throw new Error(`Refusing E2E seed against ${target.rows[0]?.name || "unknown"}; expected ${expectedDatabase}`);
   }
 
+  const organizationId = "00000000-0000-4000-8000-000000000101";
   const userId = "e2e0000-0000-4000-8000-000000000001";
   const trainingUserId = "e2e0000-0000-4000-8000-000000000008";
   const locationId = "e2e0000-0000-4000-8000-000000000002";
@@ -48,8 +49,8 @@ try {
   );
   await client.query(
     `insert into users
-      (id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
-     values ($1, 'E2E Inspector', $2, 'inspector', $3, $4::jsonb, true, $5, 0, false)
+      (id, organization_id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
+     values ($1, $6, 'E2E Inspector', $2, 'inspector', $3, $4::jsonb, true, $5, 0, false)
      on conflict (email) do update set
        name = excluded.name,
        role = excluded.role,
@@ -74,12 +75,13 @@ try {
         reports: true,
       }),
       locationId,
+      organizationId,
     ],
   );
   await client.query(
     `insert into users
-      (id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
-     values ($1, 'E2E Training Administrator', $2, 'driver_training_admin', $3, $4::jsonb, true, null, 0, false)
+      (id, organization_id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
+     values ($1, $5, 'E2E Training Administrator', $2, 'driver_training_admin', $3, $4::jsonb, true, null, 0, false)
      on conflict (email) do update set
        name = excluded.name,
        role = excluded.role,
@@ -107,6 +109,7 @@ try {
         training_compliance_manage: true,
         training_governance_manage: true,
       }),
+      organizationId,
     ],
   );
   await client.query(
