@@ -1,7 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { db } from "@/db";
 import { users, apiKeys } from "@/db/schema";
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { hashApiKey, legacyApiKeyHash } from "@/lib/api-keys";
@@ -47,7 +47,10 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
       const [row] = await db
         .select({ key: apiKeys, user: users })
         .from(apiKeys)
-        .innerJoin(users, eq(users.id, apiKeys.userId))
+        .innerJoin(users, and(
+          eq(users.id, apiKeys.userId),
+          eq(users.organizationId, apiKeys.organizationId),
+        ))
         .where(or(eq(apiKeys.keyHash, currentHash), eq(apiKeys.keyHash, legacyHash)))
         .limit(1);
 
@@ -80,7 +83,10 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
               // Transparently upgrade legacy unsalted hashes after a successful use.
               ...(upgradingLegacyHash ? { keyHash: currentHash } : {}),
             })
-            .where(eq(apiKeys.id, keyRow.id));
+            .where(and(
+              eq(apiKeys.organizationId, user.organizationId),
+              eq(apiKeys.id, keyRow.id),
+            ));
         } catch (error) {
           // Usage telemetry must not turn a valid authenticated request into an outage.
           // Never log the raw API key or either key hash.
