@@ -56,7 +56,7 @@ async function participantContext(participantId: string) {
     })
     .from(trainingParticipants)
     .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-    .where(eq(trainingParticipants.id, participantId))
+    .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participantId)))
     .limit(1);
   if (!row) throw new Error("Training participant not found");
   return row;
@@ -90,7 +90,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
       const [after] = await tx
         .update(trainingAttendanceSignoffs)
         .set({ checkInAt, checkOutAt: null, attendanceMinutes: 0, status: "open", updatedAt: checkInAt })
-        .where(eq(trainingAttendanceSignoffs.id, before.id))
+        .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
         .returning();
       return { action: "update" as const, before, after };
     }
@@ -110,6 +110,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: result.action,
@@ -153,12 +154,13 @@ export async function checkOutTrainingParticipant(formData: FormData) {
     const [after] = await tx
       .update(trainingAttendanceSignoffs)
       .set({ checkOutAt, attendanceMinutes, status: "open", updatedAt: checkOutAt })
-      .where(eq(trainingAttendanceSignoffs.id, before.id))
+      .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
       .returning();
     return { before, after };
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -218,17 +220,18 @@ export async function confirmTrainingAttendance(formData: FormData) {
         notes: parsed.data.notes || null,
         updatedAt: confirmedAt,
       })
-      .where(eq(trainingAttendanceSignoffs.id, before.id))
+      .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
       .returning();
 
     await tx
       .update(trainingParticipants)
       .set({ attendanceStatus: "attended", updatedAt: confirmedAt })
-      .where(eq(trainingParticipants.id, context.participantId));
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, context.participantId)));
     return { before, after };
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -274,19 +277,20 @@ export async function disputeTrainingAttendance(formData: FormData) {
         notes: parsed.data.reason,
         updatedAt: disputedAt,
       })
-      .where(eq(trainingAttendanceSignoffs.id, before.id))
+      .where(and(eq(trainingAttendanceSignoffs.organizationId, user.organizationId), eq(trainingAttendanceSignoffs.id, before.id)))
       .returning();
 
     if (before.status === "confirmed") {
       await tx
         .update(trainingParticipants)
         .set({ attendanceStatus: "registered", updatedAt: disputedAt })
-        .where(eq(trainingParticipants.id, context.participantId));
+        .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, context.participantId)));
     }
     return { before, after };
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -317,7 +321,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
   const [session] = await db
     .select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber, status: trainingSessions.status })
     .from(trainingSessions)
-    .where(eq(trainingSessions.id, data.sessionId))
+    .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId)))
     .limit(1);
   if (!session) throw new Error("Training session not found");
 
@@ -326,7 +330,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
     const [participant] = await db
       .select({ id: trainingParticipants.id, sessionId: trainingParticipants.sessionId, fullName: trainingParticipants.fullName })
       .from(trainingParticipants)
-      .where(eq(trainingParticipants.id, data.participantId))
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId)))
       .limit(1);
     if (!participant || participant.sessionId !== data.sessionId) {
       throw new Error("Evidence participant must belong to the selected training session");
@@ -371,6 +375,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -397,7 +402,7 @@ export async function verifyTrainingEvidenceRecord(formData: FormData) {
   const [before] = await db
     .select()
     .from(trainingEvidenceRecords)
-    .where(eq(trainingEvidenceRecords.id, parsed.data.evidenceId))
+    .where(and(eq(trainingEvidenceRecords.organizationId, user.organizationId), eq(trainingEvidenceRecords.id, parsed.data.evidenceId)))
     .limit(1);
   if (!before) throw new Error("Training evidence record not found");
 
@@ -410,10 +415,11 @@ export async function verifyTrainingEvidenceRecord(formData: FormData) {
       reviewNotes: parsed.data.reviewNotes || null,
       updatedAt: reviewedAt,
     })
-    .where(eq(trainingEvidenceRecords.id, before.id))
+    .where(and(eq(trainingEvidenceRecords.organizationId, user.organizationId), eq(trainingEvidenceRecords.id, before.id)))
     .returning();
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
