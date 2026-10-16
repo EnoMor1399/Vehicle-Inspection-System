@@ -39,6 +39,7 @@ export default async function TrainingInstructorsPage() {
       })
       .from(trainingInstructorProfiles)
       .innerJoin(users, eq(users.id, trainingInstructorProfiles.userId))
+      .where(eq(trainingInstructorProfiles.organizationId, user.organizationId))
       .orderBy(users.name)
       .limit(300),
     db
