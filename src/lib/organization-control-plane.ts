@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import {
   organizationInvitations,
@@ -176,6 +176,7 @@ export async function getOrganizationAccountSnapshot(organizationId: string) {
           eq(organizationInvitations.organizationId, organizationId),
           isNull(organizationInvitations.acceptedAt),
           isNull(organizationInvitations.revokedAt),
+          gt(organizationInvitations.expiresAt, new Date()),
         ),
       ),
   ]);
@@ -358,34 +359,75 @@ export async function createOrganizationAdministratorInvitation(input: {
   if (!validateEmail(normalizedEmail)) throw new Error("Enter a valid email address");
   if (!SUBSCRIBER_ADMIN_ROLES.includes(input.role)) throw new Error("Invalid administrator role");
 
-  const snapshot = await getOrganizationAccountSnapshot(input.organizationId);
-  if (!snapshot.organization || !snapshot.subscription) throw new Error("Organization subscription is unavailable");
-
-  if (input.role === "driver_training_admin" && !snapshot.subscription.plan.modules.includes("driver_training")) {
-    throw new Error("The current subscription plan does not include Driver Training & Assessment");
-  }
-
-  if (snapshot.userCount + snapshot.pendingInvitationCount >= snapshot.subscription.plan.maxUsers) {
-    throw new Error("The subscription user limit has been reached");
-  }
-
-  const [existingUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
-  if (existingUser) throw new Error("An account with this email already exists");
-
   const token = randomBytes(32).toString("base64url");
-  await db.insert(organizationInvitations).values({
-    id: newId(),
-    organizationId: input.organizationId,
-    email: normalizedEmail,
-    name: input.name?.trim().slice(0, 200) || null,
-    role: input.role,
-    tokenHash: invitationHash(token),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    createdBy: input.actorUserId,
+
+  await db.transaction(async (tx) => {
+    // Reserve invitation capacity atomically, rather than checking seats and
+    // inserting invitations in separate requests. All invitations for a given
+    // organization use this lock; acceptance uses the same lock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.organizationId}))`);
+    const [organization] = await tx
+      .select({ status: organizations.status })
+      .from(organizations)
+      .where(eq(organizations.id, input.organizationId))
+      .limit(1);
+    if (!organization || organization.status === "suspended" || organization.status === "cancelled") {
+      throw new Error("Organization is not accepting administrator invitations");
+    }
+
+    const [entitlement] = await tx
+      .select({ subscription: organizationSubscriptions, plan: subscriptionPlans })
+      .from(organizationSubscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptionPlans.id, organizationSubscriptions.planId))
+      .where(eq(organizationSubscriptions.organizationId, input.organizationId))
+      .orderBy(desc(organizationSubscriptions.createdAt))
+      .limit(1);
+    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status)) {
+      throw new Error("An eligible organization subscription is required");
+    }
+
+    const requiredModule = input.role === "driver_training_admin" ? "driver_training" : "vehicle_inspection";
+    if (!entitlement.plan.modules.includes(requiredModule)) {
+      throw new Error("The current subscription plan does not include this administration domain");
+    }
+
+    const [[existingUsers], [outstanding], [existingUser], [sameEmailInvitation]] = await Promise.all([
+      tx.select({ n: count() }).from(users).where(and(
+        eq(users.organizationId, input.organizationId),
+        eq(users.isActive, true),
+      )),
+      tx.select({ n: count() }).from(organizationInvitations).where(and(
+        eq(organizationInvitations.organizationId, input.organizationId),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      )),
+      tx.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1),
+      tx.select({ id: organizationInvitations.id }).from(organizationInvitations).where(and(
+        eq(organizationInvitations.organizationId, input.organizationId),
+        eq(organizationInvitations.email, normalizedEmail),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      )).limit(1),
+    ]);
+
+    if (existingUser) throw new Error("An account with this email already exists");
+    if (sameEmailInvitation) throw new Error("An active invitation already exists for this email");
+    if (Number(existingUsers?.n || 0) + Number(outstanding?.n || 0) >= entitlement.plan.maxUsers) {
+      throw new Error("The subscription user limit has been reached");
+    }
+
+    await tx.insert(organizationInvitations).values({
+      id: newId(),
+      organizationId: input.organizationId,
+      email: normalizedEmail,
+      name: input.name?.trim().slice(0, 200) || null,
+      role: input.role,
+      tokenHash: invitationHash(token),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdBy: input.actorUserId,
+    });
   });
 
   return token;
