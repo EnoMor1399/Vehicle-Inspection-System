@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 "use client";
 
 import { useActionState } from "react";
@@ -85,7 +86,7 @@ export function AdministratorInvitationForm({ trainingEnabled }: { trainingEnabl
 
 const inputClass = "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/10";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>{children}</label>;
 }
 function Status({ state }: { state: OrganizationAccountState }) {
