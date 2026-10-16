@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { asc, desc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { AlertTriangle, BadgeCheck, CalendarClock, FileCheck2, Landmark, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -32,10 +32,10 @@ export default async function TrainingAccreditationPage() {
   const canManage = canManageTrainingGovernance(user);
 
   const [requirements, accreditations, sessions, reviews] = await Promise.all([
-    db.select().from(trainingRegulatoryRequirements).orderBy(asc(trainingRegulatoryRequirements.requirementCode)).limit(500),
-    db.select().from(trainingAccreditationRecords).orderBy(desc(trainingAccreditationRecords.createdAt)).limit(1500),
-    db.select().from(trainingSessions).orderBy(desc(trainingSessions.startAt)).limit(500),
-    db.select().from(trainingSessionComplianceReviews).orderBy(desc(trainingSessionComplianceReviews.reviewedAt)).limit(500),
+    db.select().from(trainingRegulatoryRequirements).where(eq(trainingRegulatoryRequirements.organizationId, user.organizationId)).orderBy(asc(trainingRegulatoryRequirements.requirementCode)).limit(500),
+    db.select().from(trainingAccreditationRecords).where(eq(trainingAccreditationRecords.organizationId, user.organizationId)).orderBy(desc(trainingAccreditationRecords.createdAt)).limit(1500),
+    db.select().from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)).orderBy(desc(trainingSessions.startAt)).limit(500),
+    db.select().from(trainingSessionComplianceReviews).where(eq(trainingSessionComplianceReviews.organizationId, user.organizationId)).orderBy(desc(trainingSessionComplianceReviews.reviewedAt)).limit(500),
   ]);
 
   const now = new Date();
