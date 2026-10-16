@@ -6,7 +6,11 @@ import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
-import { getOrganizationSubscriptionState } from "@/lib/organization-access";
+import {
+  getOrganizationSubscriptionState,
+  hasOrganizationModule,
+  type OrganizationModule,
+} from "@/lib/organization-access";
 
 const PRIVILEGED_2FA_ROLES = new Set([
   "super_admin",
@@ -85,20 +89,42 @@ export async function requireInternalUser() {
   return user;
 }
 
+async function requireOrganizationModuleForUser(
+  user: Awaited<ReturnType<typeof requireAuth>>,
+  module: OrganizationModule,
+) {
+  const organizationState = await getOrganizationSubscriptionState(user.organizationId);
+  if (!hasOrganizationModule(organizationState, module)) {
+    redirect(`/subscription-access?module=${module}`);
+  }
+  return organizationState;
+}
+
 export async function requireVehicleInspectionUser() {
   const user = await requireInternalUser();
+  await requireOrganizationModuleForUser(user, "vehicle_inspection");
   if (!canAccessVehicleInspection(user)) redirect("/driver-training");
   return user;
 }
 
 export async function requireDriverTrainingUser() {
   const user = await requireInternalUser();
+  await requireOrganizationModuleForUser(user, "driver_training");
   if (!canAccessDriverTraining(user)) redirect("/");
+  return user;
+}
+
+export async function requireOrganizationModule(module: OrganizationModule) {
+  const user = await requireInternalUser();
+  await requireOrganizationModuleForUser(user, module);
   return user;
 }
 
 export async function requirePermission(resource: string) {
   const user = await requireVehicleInspectionUser();
+  if (resource === "reports") {
+    await requireOrganizationModuleForUser(user, "reports");
+  }
   if (!hasPermission(user, resource)) redirect("/");
   return user;
 }
