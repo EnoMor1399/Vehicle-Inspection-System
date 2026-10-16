@@ -209,6 +209,7 @@ export function PWAInstallCentre() {
       setPrompt(null);
 
       if (choice.outcome === "accepted") {
+        setState("installed");
         setMessage("Installation accepted. VIMS will appear with your installed apps.");
       } else {
         setState("instructions");
