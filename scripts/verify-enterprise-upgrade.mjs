@@ -355,7 +355,7 @@ try {
   const missingTables = requiredTables.filter((name) => !presentTables.has(name));
 
   const tenantColumnResult = await client.query(
-    `SELECT table_name, is_nullable
+    `SELECT table_name, is_nullable, column_default
        FROM information_schema.columns
       WHERE table_schema = 'public'
         AND column_name = 'organization_id'
@@ -363,11 +363,17 @@ try {
     [requiredTenantTables],
   );
   const tenantColumnMap = new Map(
-    tenantColumnResult.rows.map((row) => [row.table_name, row.is_nullable]),
+    tenantColumnResult.rows.map((row) => [row.table_name, {
+      isNullable: row.is_nullable,
+      columnDefault: row.column_default,
+    }]),
   );
   const missingTenantColumns = requiredTenantTables.filter((name) => !tenantColumnMap.has(name));
   const nullableTenantColumns = requiredTenantTables.filter(
-    (name) => tenantColumnMap.get(name) && tenantColumnMap.get(name) !== "NO",
+    (name) => tenantColumnMap.get(name)?.isNullable !== "NO",
+  );
+  const tenantColumnsWithDefaults = requiredTenantTables.filter(
+    (name) => tenantColumnMap.get(name)?.columnDefault != null,
   );
 
   const tenantTriggerResult = await client.query(
@@ -508,6 +514,7 @@ try {
       tenantColumnsVerified: requiredTenantTables.length - missingTenantColumns.length,
       tenantColumnsExpected: requiredTenantTables.length,
       nullableTenantColumns: nullableTenantColumns.length,
+      tenantColumnsWithDefaults: tenantColumnsWithDefaults.length,
       tenantTriggersVerified: requiredTenantTriggers.length - missingTenantTriggers.length,
       tenantTriggersExpected: requiredTenantTriggers.length,
     }),
@@ -530,6 +537,7 @@ try {
     || Number(tenantAssignment.active_plans || 0) < 3
     || missingTenantColumns.length > 0
     || nullableTenantColumns.length > 0
+    || tenantColumnsWithDefaults.length > 0
     || missingTenantTriggers.length > 0
   ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
@@ -548,6 +556,7 @@ try {
     if (Number(tenantAssignment.active_plans || 0) < 3) console.error(`Expected at least 3 active subscription plans, found ${tenantAssignment.active_plans}`);
     if (missingTenantColumns.length > 0) console.error(`Missing organization_id columns: ${missingTenantColumns.join(", ")}`);
     if (nullableTenantColumns.length > 0) console.error(`Nullable organization_id columns: ${nullableTenantColumns.join(", ")}`);
+    if (tenantColumnsWithDefaults.length > 0) console.error(`Tenant columns still using compatibility defaults: ${tenantColumnsWithDefaults.join(", ")}`);
     if (missingTenantTriggers.length > 0) console.error(`Missing tenant reference guards: ${missingTenantTriggers.join(", ")}`);
     process.exitCode = 1;
   } else {
