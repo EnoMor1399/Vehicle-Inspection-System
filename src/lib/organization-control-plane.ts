@@ -456,11 +456,6 @@ export async function acceptOrganizationInvitation(input: {
 }) {
   const row = await getInvitationByToken(input.token);
   if (!row) throw new Error("Invitation is invalid");
-  const { invitation, organization } = row;
-  if (invitation.acceptedAt) throw new Error("Invitation has already been accepted");
-  if (invitation.revokedAt) throw new Error("Invitation has been revoked");
-  if (row.expired) throw new Error("Invitation has expired");
-  if (organization.status === "cancelled") throw new Error("Organization account is no longer available");
 
   const name = input.name.trim().slice(0, 200);
   if (name.length < 2) throw new Error("Enter your full name");
@@ -470,20 +465,81 @@ export async function acceptOrganizationInvitation(input: {
 
   const passwordHash = await hashPassword(input.password);
   const userId = newId();
-  const permissions =
-    invitation.role === "organization_owner"
-      ? { vehicle_inspection: false, training: false }
-      : invitation.role === "driver_training_admin"
-        ? { vehicle_inspection: false, training: true }
-        : { vehicle_inspection: true, training: false };
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    // Re-check the invitation *inside* the transaction after serializing
+    // competing claims for the organization. The initial page read alone
+    // cannot prevent double acceptance or post-invitation plan changes.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${row.invitation.organizationId}))`);
+    const [fresh] = await tx
+      .select({
+        invitation: organizationInvitations,
+        organization: organizations,
+        expired: sql<boolean>`${organizationInvitations.expiresAt} <= now()`,
+      })
+      .from(organizationInvitations)
+      .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
+      .where(eq(organizationInvitations.tokenHash, invitationHash(input.token)))
+      .limit(1);
+
+    if (!fresh) throw new Error("Invitation is invalid");
+    const { invitation, organization } = fresh;
+    if (invitation.acceptedAt) throw new Error("Invitation has already been accepted");
+    if (invitation.revokedAt) throw new Error("Invitation has been revoked");
+    if (fresh.expired) throw new Error("Invitation has expired");
+    if (organization.status === "cancelled" || organization.status === "suspended") {
+      throw new Error("This organization cannot accept invitations at the moment");
+    }
+
+    if (!["organization_owner", ...SUBSCRIBER_ADMIN_ROLES].includes(invitation.role)) {
+      throw new Error("This invitation does not contain an eligible subscriber role");
+    }
+
+    const [entitlement] = await tx
+      .select({ subscription: organizationSubscriptions, plan: subscriptionPlans })
+      .from(organizationSubscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptionPlans.id, organizationSubscriptions.planId))
+      .where(eq(organizationSubscriptions.organizationId, organization.id))
+      .orderBy(desc(organizationSubscriptions.createdAt))
+      .limit(1);
+
+    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status)) {
+      throw new Error("This organization does not have an eligible subscription");
+    }
+    if (invitation.role === "driver_training_admin" && !entitlement.plan.modules.includes("driver_training")) {
+      throw new Error("Driver Training is no longer included in this subscription");
+    }
+    if (invitation.role === "vehicle_inspection_admin" && !entitlement.plan.modules.includes("vehicle_inspection")) {
+      throw new Error("Vehicle Inspection is no longer included in this subscription");
+    }
+
     const [existing] = await tx
       .select({ id: users.id })
       .from(users)
       .where(eq(users.email, invitation.email))
       .limit(1);
     if (existing) throw new Error("An account with this email already exists");
+
+    // Claim the invitation conditionally before creating an account. A losing
+    // concurrent request fails and any failed account insert rolls back the claim.
+    const [claimed] = await tx
+      .update(organizationInvitations)
+      .set({ acceptedAt: new Date() })
+      .where(and(
+        eq(organizationInvitations.id, invitation.id),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      ))
+      .returning({ id: organizationInvitations.id });
+    if (!claimed) throw new Error("Invitation is no longer available");
+
+    const permissions =
+      invitation.role === "organization_owner"
+        ? { vehicle_inspection: false, training: false }
+        : invitation.role === "driver_training_admin"
+          ? { vehicle_inspection: false, training: true }
+          : { vehicle_inspection: true, training: false };
 
     await tx.insert(users).values({
       id: userId,
@@ -496,21 +552,15 @@ export async function acceptOrganizationInvitation(input: {
       isActive: true,
     });
 
-    await tx
-      .update(organizationInvitations)
-      .set({ acceptedAt: new Date() })
-      .where(eq(organizationInvitations.id, invitation.id));
-
-    await tx
-      .update(organizations)
-      .set({
-        onboardingStage: invitation.role === "organization_owner" ? "owner_active" : organization.onboardingStage,
+    if (invitation.role === "organization_owner") {
+      await tx.update(organizations).set({
+        onboardingStage: "owner_active",
         updatedAt: new Date(),
-      })
-      .where(eq(organizations.id, organization.id));
-  });
+      }).where(eq(organizations.id, organization.id));
+    }
 
-  return { userId, organizationId: invitation.organizationId, role: invitation.role };
+    return { userId, organizationId: invitation.organizationId, role: invitation.role };
+  });
 }
 
 export async function listOrganizationInvitations(organizationId: string) {
