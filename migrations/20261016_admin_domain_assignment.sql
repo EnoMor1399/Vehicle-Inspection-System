@@ -41,6 +41,16 @@ UPDATE users
        updated_at = now()
  WHERE role = 'admin';
 
+-- Force migrated administrators to authenticate again so no session continues
+-- with the legacy Administrator authorization context.
+UPDATE sessions
+   SET is_active = false
+ WHERE user_id IN (
+   SELECT id
+     FROM users
+    WHERE role IN ('vehicle_inspection_admin', 'driver_training_admin')
+ );
+
 -- Every ordinary internal account must belong to exactly one operational
 -- domain. Only Super Administrator can span both.
 ALTER TABLE users
