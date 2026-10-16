@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { vehicles, transporters } from "@/db/schema";
-import { and, eq, ilike, isNull, asc } from "drizzle-orm";
+import { and, eq, ilike, isNull, or, asc } from "drizzle-orm";
 import Link from "next/link";
 import { ArrowLeft, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/ui";
@@ -24,6 +24,14 @@ export default async function NewInspectionPage({
   const rawQuery = Array.isArray(params.q) ? params.q[0] : params.q;
   const vehicleQuery = (rawQuery || "").trim().slice(0, 32);
 
+  const transporterScope = or(
+    isNull(vehicles.transporterId),
+    and(
+      eq(transporters.organizationId, user.organizationId),
+      isNull(transporters.deletedAt),
+    ),
+  );
+
   const rawOptions = await db
     .select({
       id: vehicles.id,
@@ -37,14 +45,12 @@ export default async function NewInspectionPage({
       vehicleQuery
         ? and(
             eq(vehicles.organizationId, user.organizationId),
-            eq(transporters.organizationId, user.organizationId),
-            isNull(transporters.deletedAt),
+            transporterScope,
             ilike(vehicles.registrationNumber, `%${vehicleQuery}%`),
           )
         : and(
             eq(vehicles.organizationId, user.organizationId),
-            eq(transporters.organizationId, user.organizationId),
-            isNull(transporters.deletedAt),
+            transporterScope,
           ),
     )
     .orderBy(asc(vehicles.registrationNumber));
