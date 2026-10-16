@@ -67,8 +67,14 @@ export function organizationHasModule(
   module: SubscriptionModule,
 ) {
   if (!state.organization || !state.plan || !state.subscriptionUsable) return false;
-  if (!state.organization.enabledModules.includes(module)) return false;
-  return planHasModule(state.plan, module);
+  if (!planHasModule(state.plan, module)) return false;
+
+  const organizationEnabled = state.organization.enabledModules.includes(module);
+  if (organizationEnabled) return true;
+
+  // Professional plans created before API became a first-class module use the
+  // api_access feature flag as their entitlement source.
+  return module === "api" && state.plan.features?.api_access === true;
 }
 
 export function subscriptionModuleLabel(module: SubscriptionModule) {
