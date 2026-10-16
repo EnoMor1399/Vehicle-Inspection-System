@@ -150,6 +150,7 @@ export async function decideTrainingAccreditationRecord(formData: FormData) {
     const now = new Date();
     if (data.status === "verified") {
       await tx.update(trainingAccreditationRecords).set({ status: "superseded", updatedAt: now }).where(and(
+        eq(trainingAccreditationRecords.organizationId, user.organizationId),
         eq(trainingAccreditationRecords.requirementId, record.requirementId),
         eq(trainingAccreditationRecords.status, "verified"),
       ));
@@ -179,15 +180,15 @@ export async function reviewTrainingSessionRegulatoryCompliance(formData: FormDa
   if (!session) throw new Error("Training session not found");
   if (!["scheduled", "in_progress"].includes(session.status)) throw new Error("Regulatory compliance review is only available for scheduled or in-progress sessions");
   const [requirements, accreditations] = await Promise.all([
-    db.select().from(trainingRegulatoryRequirements),
-    db.select().from(trainingAccreditationRecords),
+    db.select().from(trainingRegulatoryRequirements).where(eq(trainingRegulatoryRequirements.organizationId, user.organizationId)),
+    db.select().from(trainingAccreditationRecords).where(eq(trainingAccreditationRecords.organizationId, user.organizationId)),
   ]);
   const evaluation = evaluateTrainingRegulatoryCompliance(session.serviceId, requirements, accreditations);
   const now = new Date();
   const [existing] = await db.select().from(trainingSessionComplianceReviews).where(and(eq(trainingSessionComplianceReviews.organizationId, user.organizationId), eq(trainingSessionComplianceReviews.sessionId, session.id))).limit(1);
   const values = { status: evaluation.ready ? "ready" : "blocked", blockers: evaluation.blockers, reviewedBy: user.id, reviewedAt: now, notes: data.notes || null, updatedAt: now } as const;
   if (existing) await db.update(trainingSessionComplianceReviews).set(values).where(and(eq(trainingSessionComplianceReviews.organizationId, user.organizationId), eq(trainingSessionComplianceReviews.id, existing.id)));
-  else await db.insert(trainingSessionComplianceReviews).values({ id: newId(), sessionId: session.id, ...values });
+  else await db.insert(trainingSessionComplianceReviews).values({ organizationId: user.organizationId, id: newId(), sessionId: session.id, ...values });
 
   await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "inspect", entityType: "training_session_compliance", entityId: session.id, entityLabel: session.referenceNumber, summary: `Reviewed regulatory compliance: ${evaluation.ready ? "ready" : "blocked"}`, after: { ...values, applicableRequirements: evaluation.applicableCount } });
   refreshAccreditationPaths();
