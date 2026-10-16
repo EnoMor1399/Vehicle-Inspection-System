@@ -8,7 +8,9 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const expectedDatabase = process.env.EXPECTED_DATABASE_NAME || "Vehicle-Inspection-Enterprise";
 const email = (process.env.E2E_USER_EMAIL || "e2e.inspector@vims.local").toLowerCase();
+const trainingEmail = (process.env.E2E_TRAINING_USER_EMAIL || "e2e.training.admin@vims.local").toLowerCase();
 const password = process.env.E2E_USER_PASSWORD || "E2eOnly!Passw0rd2026";
+const trainingPassword = process.env.E2E_TRAINING_USER_PASSWORD || password;
 
 const url = new URL(databaseUrl);
 const client = new pg.Client({ connectionString: url.toString() });
@@ -21,6 +23,7 @@ try {
   }
 
   const userId = "e2e0000-0000-4000-8000-000000000001";
+  const trainingUserId = "e2e0000-0000-4000-8000-000000000008";
   const locationId = "e2e0000-0000-4000-8000-000000000002";
   const transporterId = "e2e0000-0000-4000-8000-000000000003";
   const vehicleId = "e2e0000-0000-4000-8000-000000000004";
@@ -28,6 +31,7 @@ try {
   const sessionId = "e2e0000-0000-4000-8000-000000000006";
   const participantId = "e2e0000-0000-4000-8000-000000000007";
   const passwordHash = await bcrypt.hash(password, 10);
+  const trainingPasswordHash = await bcrypt.hash(trainingPassword, 10);
 
   await client.query("begin");
   await client.query(
@@ -63,13 +67,46 @@ try {
       passwordHash,
       JSON.stringify({
         vehicle_inspection: true,
-        training: true,
+        training: false,
         vehicles: true,
         inspections: true,
         documents: true,
         reports: true,
       }),
       locationId,
+    ],
+  );
+  await client.query(
+    `insert into users
+      (id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
+     values ($1, 'E2E Training Administrator', $2, 'driver_training_admin', $3, $4::jsonb, true, null, 0, false)
+     on conflict (email) do update set
+       name = excluded.name,
+       role = excluded.role,
+       password_hash = excluded.password_hash,
+       permissions = excluded.permissions,
+       is_active = true,
+       location_id = null,
+       transporter_id = null,
+       failed_login_attempts = 0,
+       locked_until = null,
+       two_factor_enabled = false,
+       two_factor_secret = null`,
+    [
+      trainingUserId,
+      trainingEmail,
+      trainingPasswordHash,
+      JSON.stringify({
+        vehicle_inspection: false,
+        training: true,
+        training_manage: true,
+        training_user_admin: true,
+        training_assessment_review: true,
+        training_commercials_manage: true,
+        training_certificates_manage: true,
+        training_compliance_manage: true,
+        training_governance_manage: true,
+      }),
     ],
   );
   await client.query(
@@ -90,18 +127,24 @@ try {
       (id, reference_number, service_id, title, client_name, location_id, venue, start_at, end_at, status, created_by)
      values ($1, 'E2E-TRAIN-001', 'defensive-driving', 'E2E Defensive Driving', 'E2E Transport Ltd', $2, 'E2E Test Station', now(), now() + interval '1 day', 'scheduled', $3)
      on conflict (reference_number) do update set title = excluded.title, status = excluded.status`,
-    [sessionId, locationId, userId],
+    [sessionId, locationId, trainingUserId],
   );
   await client.query(
     `insert into training_participants
       (id, session_id, full_name, company_name, employee_number, attendance_status, assessment_status, certificate_eligible, created_by)
      values ($1, $2, 'E2E Driver', 'E2E Transport Ltd', 'E2E-EMP-001', 'attended', 'pending', false, $3)
      on conflict (id) do update set full_name = excluded.full_name, attendance_status = excluded.attendance_status`,
-    [participantId, sessionId, userId],
+    [participantId, sessionId, trainingUserId],
   );
   await client.query("commit");
 
-  console.log(JSON.stringify({ email, passwordConfigured: Boolean(password), fixtureId: crypto.randomUUID() }));
+  console.log(JSON.stringify({
+    email,
+    trainingEmail,
+    passwordConfigured: Boolean(password),
+    trainingPasswordConfigured: Boolean(trainingPassword),
+    fixtureId: crypto.randomUUID(),
+  }));
 } catch (error) {
   await client.query("rollback").catch(() => {});
   throw error;
