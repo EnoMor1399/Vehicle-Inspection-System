@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { AlertTriangle, Boxes, CalendarRange, CheckCircle2, PackageCheck, Truck } from "lucide-react";
 import { db } from "@/db";
 import { trainingSessions } from "@/db/training-schema";
@@ -30,18 +30,19 @@ export default async function TrainingLogisticsPage() {
   const canManage = canManageTraining(user);
 
   const [resources, allocations, scheduledSessions] = await Promise.all([
-    db.select().from(trainingResources).orderBy(asc(trainingResources.resourceType), asc(trainingResources.resourceCode)).limit(400),
+    db.select().from(trainingResources).where(eq(trainingResources.organizationId, user.organizationId)).orderBy(asc(trainingResources.resourceType), asc(trainingResources.resourceCode)).limit(400),
     db
       .select({ allocation: trainingResourceAllocations, resource: trainingResources, session: trainingSessions })
       .from(trainingResourceAllocations)
       .innerJoin(trainingResources, eq(trainingResources.id, trainingResourceAllocations.resourceId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingResourceAllocations.sessionId))
+      .where(eq(trainingResourceAllocations.organizationId, user.organizationId))
       .orderBy(desc(trainingSessions.startAt), desc(trainingResourceAllocations.allocatedAt))
       .limit(600),
     db
       .select()
       .from(trainingSessions)
-      .where(eq(trainingSessions.status, "scheduled"))
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.status, "scheduled")))
       .orderBy(asc(trainingSessions.startAt))
       .limit(250),
   ]);
