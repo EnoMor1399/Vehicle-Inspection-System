@@ -45,6 +45,7 @@ export default async function UsersPage() {
     })
     .from(users)
     .leftJoin(locations, eq(locations.id, users.locationId))
+    .where(eq(users.organizationId, user.organizationId))
     .orderBy(asc(users.name));
 
   const vehicleUsers = allUsers.filter((account) => canAccessVehicleInspection(account));
