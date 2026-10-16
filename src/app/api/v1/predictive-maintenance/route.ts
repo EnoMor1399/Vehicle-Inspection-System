@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     const selectedVehicles = await db
       .select()
       .from(vehicles)
+      .where(eq(vehicles.organizationId, auth.user.organizationId))
       .orderBy(desc(vehicles.createdAt))
       .limit(100);
 
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
         rank: sql<number>`row_number() over (partition by ${inspections.vehicleId} order by ${inspections.inspectionDate} desc)`.as("inspection_rank"),
       })
       .from(inspections)
+      .where(eq(inspections.organizationId, auth.user.organizationId))
       .as("ranked_history");
 
     const historyRows = await db
@@ -84,7 +86,14 @@ export async function GET(request: Request) {
     });
   }
 
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(vehicles.id, vehicleId),
+    ))
+    .limit(1);
   if (!vehicle) return apiError(404, "Vehicle not found");
 
   const history = await db
@@ -94,7 +103,10 @@ export async function GET(request: Request) {
       sectionData: inspections.sectionData,
     })
     .from(inspections)
-    .where(eq(inspections.vehicleId, vehicleId))
+    .where(and(
+      eq(inspections.organizationId, auth.user.organizationId),
+      eq(inspections.vehicleId, vehicleId),
+    ))
     .orderBy(desc(inspections.inspectionDate))
     .limit(12);
 
