@@ -182,7 +182,8 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
           "Do not use one department's administrator account to perform or approve the other department's work",
           "Role or domain changes revoke active sessions so the user must sign in again under the new authorization boundary",
         ],
-      },      {
+      },
+      {
         id: "subscriber-plans",
         title: "Subscriber Plans, Modules & Capacity",
         content:
@@ -206,7 +207,6 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
           "Do not reduce a subscriber plan simply to force records out of scope; reduce legitimate usage first or choose a larger plan",
         ],
       },
-
     ],
   },
   inspections: {
