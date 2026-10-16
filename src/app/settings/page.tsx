@@ -8,16 +8,16 @@ import { ShieldAlert } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  await requirePermission("settings");
+  const user = await requirePermission("settings");
   const canEdit = true;
-  const settings = toEditableSystemSettings(await getSettings());
+  const settings = toEditableSystemSettings(await getSettings(user.organizationId));
 
   return (
     <div className="p-6 lg:p-10">
       <PageHeader
         eyebrow="Administration"
         title="System Settings"
-        description="Configure branding, organization details, inspection defaults, security and notifications for the entire platform."
+        description="Configure branding, organization details, inspection defaults, security and notifications for your organization workspace."
         action={
           canEdit ? (
             <Badge tone="emerald" className="text-sm px-3 py-1">

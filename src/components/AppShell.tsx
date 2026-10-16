@@ -9,6 +9,7 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  Building2,
   CalendarCheck,
   CalendarClock,
   Car,
@@ -32,10 +33,11 @@ import {
   X,
 } from "lucide-react";
 
-const NO_SHELL_PATHS = ["/login"];
+const NO_SHELL_PATHS = ["/login", "/subscribe"];
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Administrator",
+  organization_owner: "Organization Owner",
   vehicle_inspection_admin: "Vehicle Inspection Administrator",
   driver_training_admin: "Driver Training Administrator",
   admin: "Legacy Administrator",
@@ -55,6 +57,7 @@ type NavItem = {
   icon: ComponentType<{ className?: string }>;
   resource?: string;
   superAdminOnly?: boolean;
+  organizationOwnerOnly?: boolean;
 };
 
 type NavGroup = {
@@ -103,8 +106,15 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Platform Administration",
+    items: [
+      { href: "/platform/organizations", label: "Subscriber Companies", icon: Building2, superAdminOnly: true },
+    ],
+  },
+  {
     label: "Access & Support",
     items: [
+      { href: "/organization/account", label: "Organization Account", icon: Building2, organizationOwnerOnly: true },
       { href: "/portal", label: "Transporter Portal", icon: Truck, superAdminOnly: true },
       { href: "/apps", label: "App Access", icon: Smartphone },
       { href: "/api-docs", label: "API & Integrations", icon: FileBarChart, resource: "settings" },
@@ -172,6 +182,7 @@ export function AppShell({
             if (!userRole) return false;
             if (isSuperAdmin) return true;
             if (item.superAdminOnly) return false;
+            if (item.organizationOwnerOnly && userRole !== "organization_owner") return false;
             if (!item.resource) return true;
             return allowed.has(item.resource);
           }),
@@ -186,7 +197,12 @@ export function AppShell({
     return null;
   })();
 
-  if (NO_SHELL_PATHS.includes(pathname) || pathname.startsWith("/verify") || pathname.startsWith("/certificate")) {
+  if (
+    NO_SHELL_PATHS.includes(pathname)
+    || pathname.startsWith("/invite/")
+    || pathname.startsWith("/verify")
+    || pathname.startsWith("/certificate")
+  ) {
     return <>{children}{appearanceControl}</>;
   }
 

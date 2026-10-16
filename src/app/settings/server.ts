@@ -12,7 +12,8 @@ import { logAudit } from "@/lib/audit";
 import { settingsValidationMessage, systemSettingsUpdateSchema } from "@/lib/settings-policy";
 
 export async function getSettingsAction(): Promise<EditableSystemSettings> {
-  return toEditableSystemSettings(await getSettings());
+  const user = await getCurrentUser();
+  return toEditableSystemSettings(await getSettings(user.organizationId));
 }
 
 export async function updateSettingsAction(
@@ -32,15 +33,15 @@ export async function updateSettingsAction(
   }
 
   try {
-    const before = await getSettings();
-    const updated = await updateSettings(parsed.data, user.id);
+    const before = await getSettings(user.organizationId);
+    const updated = await updateSettings(parsed.data, user.id, user.organizationId);
     await logAudit({
       userId: user.id,
       userName: user.name,
       action: "update",
       entityType: "system_settings",
-      entityId: "singleton",
-      entityLabel: "System Settings",
+      entityId: user.organizationId,
+      entityLabel: "Organization Settings",
       summary: "Updated system settings",
       before,
       after: updated,

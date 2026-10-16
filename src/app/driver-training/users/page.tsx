@@ -91,6 +91,7 @@ export default async function DriverTrainingUsersPage({ searchParams }: DriverTr
     })
     .from(users)
     .leftJoin(locations, eq(locations.id, users.locationId))
+    .where(eq(users.organizationId, user.organizationId))
     .orderBy(asc(users.name));
 
   const trainingUsers = allUsers.filter((account) => canAccessDriverTraining(account));

@@ -10,6 +10,7 @@ import { hashPassword, validatePasswordStrength, validateEmail } from "@/lib/pas
 import { login as secureLogin, logout as secureLogout } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIpFromHeaders, normalizeUserAgent } from "@/lib/request-context";
+import { RSL_ORGANIZATION_ID } from "@/lib/organization-access";
 
 const MAX_PASSWORD_INPUT_LENGTH = 256;
 const MAX_EMAIL_LENGTH = 200;
@@ -170,6 +171,7 @@ export async function signUp(input: {
 
     await tx.insert(users).values({
       id,
+      organizationId: RSL_ORGANIZATION_ID,
       name: normalizedName,
       email: normalized,
       role,

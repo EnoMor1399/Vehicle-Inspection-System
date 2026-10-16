@@ -53,6 +53,11 @@ const requiredTables = [
   "training_communication_events",
   "rate_limit_buckets",
   "inspection_appointments",
+  "organizations",
+  "subscription_plans",
+  "organization_subscriptions",
+  "organization_invitations",
+  "organization_onboarding_requests",
 ];
 
 const requiredAuditColumns = [
@@ -218,6 +223,14 @@ const requiredIndexes = [
   "inspection_appointment_vehicle_scheduled_idx",
   "inspection_appointment_inspector_scheduled_idx",
   "inspection_appointment_linked_inspection_idx",
+  "organization_slug_idx",
+  "organization_status_idx",
+  "subscription_plan_code_idx",
+  "organization_subscription_org_idx",
+  "organization_onboarding_status_idx",
+  "user_organization_idx",
+  "user_organization_role_idx",
+  "system_settings_organization_uidx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
@@ -285,10 +298,11 @@ try {
        JOIN pg_enum e ON e.enumtypid = t.oid
       WHERE t.typname = 'user_role'
         AND e.enumlabel = ANY($1::text[])`,
-    [["vehicle_inspection_admin", "driver_training_admin"]],
+    [["vehicle_inspection_admin", "driver_training_admin", "organization_owner"]],
   );
   const presentDomainRoles = new Set(roleResult.rows.map((row) => row.enumlabel));
-  const missingDomainRoles = ["vehicle_inspection_admin", "driver_training_admin"].filter(
+  const requiredDomainRoles = ["vehicle_inspection_admin", "driver_training_admin", "organization_owner"];
+  const missingDomainRoles = requiredDomainRoles.filter(
     (role) => !presentDomainRoles.has(role),
   );
 
@@ -308,13 +322,39 @@ try {
     `SELECT
        count(*) FILTER (WHERE role = 'admin')::int AS legacy_admins,
        count(*) FILTER (
-         WHERE role <> 'super_admin'
+         WHERE role NOT IN ('super_admin', 'organization_owner')
            AND COALESCE((permissions->>'vehicle_inspection')::boolean, true)
              = COALESCE((permissions->>'training')::boolean, false)
        )::int AS invalid_domain_assignments
        FROM users`,
   );
   const separation = separationResult.rows[0] || { legacy_admins: 0, invalid_domain_assignments: 0 };
+
+  const organizationResult = await client.query(
+    `SELECT
+       count(*) FILTER (WHERE id = '00000000-0000-4000-8000-000000000101')::int AS rsl_org_rows,
+       count(*) FILTER (
+         WHERE id = '00000000-0000-4000-8000-000000000101'
+           AND status = 'active'
+           AND operational_access_enabled = true
+           AND data_isolation_verified_at IS NOT NULL
+       )::int AS rsl_ready_rows
+       FROM organizations`,
+  );
+  const organizationState = organizationResult.rows[0] || { rsl_org_rows: 0, rsl_ready_rows: 0 };
+
+  const tenantAssignmentResult = await client.query(
+    `SELECT
+       count(*) FILTER (WHERE organization_id IS NULL)::int AS users_without_org,
+       (SELECT count(*)::int FROM system_settings WHERE organization_id IS NULL) AS settings_without_org,
+       (SELECT count(*)::int FROM subscription_plans WHERE is_active = true) AS active_plans
+       FROM users`,
+  );
+  const tenantAssignment = tenantAssignmentResult.rows[0] || {
+    users_without_org: 0,
+    settings_without_org: 0,
+    active_plans: 0,
+  };
 
   const metadata = readiness.rows[0];
   console.log(
@@ -330,12 +370,17 @@ try {
       requiredIndexesVerified: requiredIndexes.length - missing.length,
       requiredIndexesExpected: requiredIndexes.length,
       redundantIndexesRemaining: redundantStillPresent.length,
-      administrationRolesVerified: 2 - missingDomainRoles.length,
-      administrationRolesExpected: 2,
+      administrationRolesVerified: requiredDomainRoles.length - missingDomainRoles.length,
+      administrationRolesExpected: requiredDomainRoles.length,
       administrationConstraintsVerified: 2 - missingDomainConstraints.length,
       administrationConstraintsExpected: 2,
       legacyAdministratorsRemaining: Number(separation.legacy_admins || 0),
       invalidDomainAssignments: Number(separation.invalid_domain_assignments || 0),
+      rslOrganizationRows: Number(organizationState.rsl_org_rows || 0),
+      rslOperationalReadyRows: Number(organizationState.rsl_ready_rows || 0),
+      usersWithoutOrganization: Number(tenantAssignment.users_without_org || 0),
+      settingsWithoutOrganization: Number(tenantAssignment.settings_without_org || 0),
+      activeSubscriptionPlans: Number(tenantAssignment.active_plans || 0),
     }),
   );
 
@@ -349,6 +394,11 @@ try {
     || missingDomainConstraints.length > 0
     || Number(separation.legacy_admins || 0) > 0
     || Number(separation.invalid_domain_assignments || 0) > 0
+    || Number(organizationState.rsl_org_rows || 0) !== 1
+    || Number(organizationState.rsl_ready_rows || 0) !== 1
+    || Number(tenantAssignment.users_without_org || 0) > 0
+    || Number(tenantAssignment.settings_without_org || 0) > 0
+    || Number(tenantAssignment.active_plans || 0) < 3
   ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
@@ -359,6 +409,11 @@ try {
     if (missingDomainConstraints.length > 0) console.error(`Missing administration constraints: ${missingDomainConstraints.join(", ")}`);
     if (Number(separation.legacy_admins || 0) > 0) console.error(`Legacy Administrator accounts remaining: ${separation.legacy_admins}`);
     if (Number(separation.invalid_domain_assignments || 0) > 0) console.error(`Invalid non-super cross/no-domain assignments: ${separation.invalid_domain_assignments}`);
+    if (Number(organizationState.rsl_org_rows || 0) !== 1) console.error("RSL organization seed is missing or duplicated");
+    if (Number(organizationState.rsl_ready_rows || 0) !== 1) console.error("RSL organization is not operationally ready");
+    if (Number(tenantAssignment.users_without_org || 0) > 0) console.error(`Users without organization: ${tenantAssignment.users_without_org}`);
+    if (Number(tenantAssignment.settings_without_org || 0) > 0) console.error(`Settings rows without organization: ${tenantAssignment.settings_without_org}`);
+    if (Number(tenantAssignment.active_plans || 0) < 3) console.error(`Expected at least 3 active subscription plans, found ${tenantAssignment.active_plans}`);
     process.exitCode = 1;
   } else {
     console.log("Enterprise database upgrade verification passed.");

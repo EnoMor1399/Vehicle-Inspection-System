@@ -6,6 +6,7 @@ import { canAccessVehicleInspection } from "@/lib/system-access";
 
 export const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Administrator",
+  organization_owner: "Organization Owner",
   vehicle_inspection_admin: "Vehicle Inspection Administrator",
   driver_training_admin: "Driver Training Administrator",
   admin: "Legacy Administrator",
@@ -22,6 +23,7 @@ export const ROLE_LABEL: Record<string, string> = {
 
 const PRIVILEGED_2FA_ROLES = new Set([
   "super_admin",
+  "organization_owner",
   "vehicle_inspection_admin",
   "driver_training_admin",
   "admin",
@@ -132,7 +134,7 @@ export async function login(
 
   if (!passwordValid) {
     const { getSettings } = await import("./settings");
-    const securitySettings = await getSettings();
+    const securitySettings = await getSettings(user.organizationId);
     const configuredMaxAttempts = Number(securitySettings.maxFailedAttempts || process.env.MAX_LOGIN_ATTEMPTS || 5);
     const configuredLockoutMinutes = Number(securitySettings.lockoutDurationMinutes || process.env.ACCOUNT_LOCKOUT_MINUTES || 15);
     const maxAttempts = Math.min(100, Math.max(1, Number.isFinite(configuredMaxAttempts) ? configuredMaxAttempts : 5));
@@ -174,7 +176,7 @@ export async function login(
   }
 
   const privileged2FARequired = process.env.REQUIRE_PRIVILEGED_2FA === "true"
-    && ["super_admin", "vehicle_inspection_admin", "driver_training_admin", "admin", "operations_manager", "supervisor"].includes(user.role);
+    && ["super_admin", "organization_owner", "vehicle_inspection_admin", "driver_training_admin", "admin", "operations_manager", "supervisor"].includes(user.role);
   if (privileged2FARequired && (!user.twoFactorEnabled || !user.twoFactorSecret)) {
     // Do not reject valid primary credentials here: the authenticated user
     // needs a revocable session to reach the mandatory enrollment screen.
@@ -272,6 +274,7 @@ const VEHICLE_ADMIN_PERMISSIONS = {
 
 const ROLE_MATRIX: Record<string, Record<string, boolean>> = {
   super_admin: { "*": true },
+  organization_owner: {},
   vehicle_inspection_admin: VEHICLE_ADMIN_PERMISSIONS,
   driver_training_admin: {},
   // Kept only for a controlled migration window. New assignments must use one

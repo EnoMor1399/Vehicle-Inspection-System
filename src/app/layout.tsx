@@ -83,8 +83,7 @@ function buildThemeBootstrap(accountMode: ThemeMode | null) {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const nonce = (await headers()).get("x-nonce") || undefined;
-  const settings = await getSettings();
-  let shellUser: { role: string; name: string; allowedResources: string[] } | null = null;
+  let shellUser: { role: string; name: string; organizationId: string; allowedResources: string[] } | null = null;
   let accountTheme: ThemeMode | null = null;
 
   try {
@@ -97,12 +96,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     shellUser = {
       role: user.role,
       name: user.name,
+      organizationId: user.organizationId,
       allowedResources,
     };
   } catch {
     // Public and login routes intentionally render without an authenticated shell identity.
   }
 
+  const settings = await getSettings(shellUser?.organizationId);
   const themeBootstrap = buildThemeBootstrap(accountTheme);
   const appearanceControl = <ThemeSwitcher accountMode={accountTheme} authenticated={Boolean(shellUser)} />;
 
