@@ -279,6 +279,43 @@ try {
   const missing = requiredIndexes.filter((name) => !present.has(name));
   const redundantStillPresent = redundantIndexes.filter((name) => present.has(name));
 
+  const roleResult = await client.query(
+    `SELECT e.enumlabel
+       FROM pg_type t
+       JOIN pg_enum e ON e.enumtypid = t.oid
+      WHERE t.typname = 'user_role'
+        AND e.enumlabel = ANY($1::text[])`,
+    [["vehicle_inspection_admin", "driver_training_admin"]],
+  );
+  const presentDomainRoles = new Set(roleResult.rows.map((row) => row.enumlabel));
+  const missingDomainRoles = ["vehicle_inspection_admin", "driver_training_admin"].filter(
+    (role) => !presentDomainRoles.has(role),
+  );
+
+  const constraintResult = await client.query(
+    `SELECT conname
+       FROM pg_constraint
+      WHERE conrelid = 'users'::regclass
+        AND conname = ANY($1::text[])`,
+    [["users_single_operational_domain_chk", "users_role_domain_chk"]],
+  );
+  const presentDomainConstraints = new Set(constraintResult.rows.map((row) => row.conname));
+  const missingDomainConstraints = ["users_single_operational_domain_chk", "users_role_domain_chk"].filter(
+    (name) => !presentDomainConstraints.has(name),
+  );
+
+  const separationResult = await client.query(
+    `SELECT
+       count(*) FILTER (WHERE role = 'admin')::int AS legacy_admins,
+       count(*) FILTER (
+         WHERE role <> 'super_admin'
+           AND COALESCE((permissions->>'vehicle_inspection')::boolean, true)
+             = COALESCE((permissions->>'training')::boolean, false)
+       )::int AS invalid_domain_assignments
+       FROM users`,
+  );
+  const separation = separationResult.rows[0] || { legacy_admins: 0, invalid_domain_assignments: 0 };
+
   const metadata = readiness.rows[0];
   console.log(
     JSON.stringify({
@@ -293,15 +330,35 @@ try {
       requiredIndexesVerified: requiredIndexes.length - missing.length,
       requiredIndexesExpected: requiredIndexes.length,
       redundantIndexesRemaining: redundantStillPresent.length,
+      administrationRolesVerified: 2 - missingDomainRoles.length,
+      administrationRolesExpected: 2,
+      administrationConstraintsVerified: 2 - missingDomainConstraints.length,
+      administrationConstraintsExpected: 2,
+      legacyAdministratorsRemaining: Number(separation.legacy_admins || 0),
+      invalidDomainAssignments: Number(separation.invalid_domain_assignments || 0),
     }),
   );
 
-  if (missingTables.length > 0 || missingAssessmentColumns.length > 0 || missingAuditColumns.length > 0 || missing.length > 0 || redundantStillPresent.length > 0) {
+  if (
+    missingTables.length > 0
+    || missingAssessmentColumns.length > 0
+    || missingAuditColumns.length > 0
+    || missing.length > 0
+    || redundantStillPresent.length > 0
+    || missingDomainRoles.length > 0
+    || missingDomainConstraints.length > 0
+    || Number(separation.legacy_admins || 0) > 0
+    || Number(separation.invalid_domain_assignments || 0) > 0
+  ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
     if (missingAuditColumns.length > 0) console.error(`Missing audit integrity columns: ${missingAuditColumns.join(", ")}`);
     if (missing.length > 0) console.error(`Missing required indexes: ${missing.join(", ")}`);
     if (redundantStillPresent.length > 0) console.error(`Redundant indexes still present: ${redundantStillPresent.join(", ")}`);
+    if (missingDomainRoles.length > 0) console.error(`Missing administration roles: ${missingDomainRoles.join(", ")}`);
+    if (missingDomainConstraints.length > 0) console.error(`Missing administration constraints: ${missingDomainConstraints.join(", ")}`);
+    if (Number(separation.legacy_admins || 0) > 0) console.error(`Legacy Administrator accounts remaining: ${separation.legacy_admins}`);
+    if (Number(separation.invalid_domain_assignments || 0) > 0) console.error(`Invalid non-super cross/no-domain assignments: ${separation.invalid_domain_assignments}`);
     process.exitCode = 1;
   } else {
     console.log("Enterprise database upgrade verification passed.");
