@@ -28,18 +28,18 @@ export default async function TrainingAnalyticsPage() {
     db.select({
       total: count(),
       completed: sql<number>`count(*) filter (where ${trainingSessions.status} = 'completed')::int`,
-    }).from(trainingSessions),
+    }).from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)),
     db.select({
       total: count(),
       passed: sql<number>`count(*) filter (where ${trainingParticipants.assessmentStatus} = 'passed')::int`,
       failed: sql<number>`count(*) filter (where ${trainingParticipants.assessmentStatus} = 'failed')::int`,
       highRisk: sql<number>`count(*) filter (where ${trainingParticipants.riskLevel} in ('high','critical'))::int`,
-    }).from(trainingParticipants),
+    }).from(trainingParticipants).where(eq(trainingParticipants.organizationId, user.organizationId)),
     db.select({
       active: sql<number>`count(*) filter (where ${trainingCertificates.status} = 'active' and (${trainingCertificates.expiryDate} is null or ${trainingCertificates.expiryDate} >= ${todayText}))::int`,
       revoked: sql<number>`count(*) filter (where ${trainingCertificates.status} = 'revoked')::int`,
       expiring: sql<number>`count(*) filter (where ${trainingCertificates.status} = 'active' and ${trainingCertificates.expiryDate} between ${todayText} and ${renewalCutoffText})::int`,
-    }).from(trainingCertificates),
+    }).from(trainingCertificates).where(eq(trainingCertificates.organizationId, user.organizationId)),
     db.select({
       serviceId: trainingSessions.serviceId,
       sessions: countDistinct(trainingSessions.id),
@@ -50,6 +50,7 @@ export default async function TrainingAnalyticsPage() {
     })
       .from(trainingSessions)
       .leftJoin(trainingParticipants, eq(trainingParticipants.sessionId, trainingSessions.id))
+      .where(eq(trainingSessions.organizationId, user.organizationId))
       .groupBy(trainingSessions.serviceId)
       .orderBy(trainingSessions.serviceId),
     db.select({
@@ -61,6 +62,7 @@ export default async function TrainingAnalyticsPage() {
       .from(trainingCertificates)
       .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingCertificates.participantId))
       .where(and(
+        eq(trainingCertificates.organizationId, user.organizationId),
         eq(trainingCertificates.status, "active"),
         isNotNull(trainingCertificates.expiryDate),
         gte(trainingCertificates.expiryDate, todayText),
