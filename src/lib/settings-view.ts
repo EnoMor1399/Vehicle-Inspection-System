@@ -1,5 +1,6 @@
 export const SYSTEM_SETTINGS_SERVER_FIELDS = [
   "id",
+  "organizationId",
   "defaultStationId",
   "updatedAt",
   "updatedBy",
