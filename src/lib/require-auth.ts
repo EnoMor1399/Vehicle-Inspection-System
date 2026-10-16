@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
+import { getOrganizationSubscriptionState } from "@/lib/organization-access";
 
 const PRIVILEGED_2FA_ROLES = new Set([
   "super_admin",
@@ -57,8 +58,15 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
   return user;
 }
 
-export async function requireInternalUser() {
+export async function requireWorkspaceUser() {
   const user = await requireAuth();
+  const organizationState = await getOrganizationSubscriptionState(user.organizationId);
+  if (!organizationState.operationalAccess) redirect("/workspace-setup");
+  return user;
+}
+
+export async function requireInternalUser() {
+  const user = await requireWorkspaceUser();
   if (user.role === "transporter_user") redirect("/portal");
   return user;
 }
