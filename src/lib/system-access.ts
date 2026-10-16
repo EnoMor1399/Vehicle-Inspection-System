@@ -29,7 +29,11 @@ export function canAccessVehicleInspection(user: SystemAccessUser): boolean {
   if (explicit !== undefined) return Boolean(explicit);
 
   if (user.role === "super_admin" || user.role === VEHICLE_INSPECTION_ADMIN_ROLE) return true;
-  if (user.role === DRIVER_TRAINING_ADMIN_ROLE || user.role === "instructor") return false;
+  if (
+    user.role === "organization_owner"
+    || user.role === DRIVER_TRAINING_ADMIN_ROLE
+    || user.role === "instructor"
+  ) return false;
 
   // Existing non-training VIMS accounts predate explicit system assignment.
   // They remain Vehicle Inspection-only until an administrator records a
@@ -48,6 +52,7 @@ export function canAccessDriverTraining(user: SystemAccessUser): boolean {
   if (user.role === "super_admin" || user.role === DRIVER_TRAINING_ADMIN_ROLE || user.role === "instructor") {
     return true;
   }
+  if (user.role === "organization_owner") return false;
 
   // Preserve explicitly delegated fine-grained training capabilities on older
   // accounts until they are normalized into a single administration domain.
