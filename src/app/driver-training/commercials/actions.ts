@@ -72,21 +72,21 @@ export async function createTrainingQuotation(formData: FormData) {
   const id = newId();
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requestId}))`);
-    const [request] = await tx.select().from(trainingRequests).where(and(eq(trainingRequests.user.organizationId, user.organizationId), eq(trainingRequests.id, data.requestId))).limit(1);
+    const [request] = await tx.select().from(trainingRequests).where(and(eq(trainingRequests.organizationId, user.organizationId), eq(trainingRequests.id, data.requestId))).limit(1);
     if (!request) return { ok: false as const, error: "Training request not found" };
     if (request.requestType !== "client") return { ok: false as const, error: "Internal training requests do not require a client quotation" };
     if (request.status !== "approved" || request.scheduledSessionId) {
       return { ok: false as const, error: "Only approved, unscheduled client requests can receive quotations" };
     }
 
-    const existing = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.requestId, request.id)));
+    const existing = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.requestId, request.id)));
     if (existing.some((quote) => ["draft", "pending_approval", "approved", "sent", "accepted"].includes(quote.status))) {
       return { ok: false as const, error: "Resolve or supersede the current active quotation before creating another version" };
     }
     const versionNumber = existing.reduce((max, quote) => Math.max(max, quote.versionNumber), 0) + 1;
     const quotationNumber = `TQT-${new Date().getUTCFullYear()}-${id.slice(0, 8).toUpperCase()}-V${versionNumber}`;
     const values = {
-      user.organizationId: user.organizationId,
+      organizationId: user.organizationId,
       id,
       quotationNumber,
       requestId: request.id,
@@ -110,7 +110,7 @@ export async function createTrainingQuotation(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
-    user.organizationId: user.organizationId,
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -136,17 +136,17 @@ export async function updateTrainingQuotationPricing(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.quotationId}))`);
-    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.id, data.quotationId))).limit(1);
+    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.id, data.quotationId))).limit(1);
     if (!quote) return { ok: false as const, error: "Training quotation not found" };
     if (quote.status !== "draft") return { ok: false as const, error: "Quotation pricing can only be changed while the quotation is draft" };
     const recalculated = await recalculateQuotation(tx as unknown as typeof db, user.organizationId, quote.id, data.discountAmount, data.taxRate);
-    await tx.update(trainingQuotations).set({ validUntil: data.validUntil, updatedAt: new Date() }).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.id, quote.id)));
+    await tx.update(trainingQuotations).set({ validUntil: data.validUntil, updatedAt: new Date() }).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.id, quote.id)));
     return { ok: true as const, quote, totals: recalculated.totals };
   });
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
-    user.organizationId: user.organizationId,
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -175,12 +175,12 @@ export async function addTrainingQuotationItem(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.quotationId}))`);
-    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.id, data.quotationId))).limit(1);
+    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.id, data.quotationId))).limit(1);
     if (!quote) return { ok: false as const, error: "Training quotation not found" };
     if (quote.status !== "draft") return { ok: false as const, error: "Quotation line items can only be edited while the quotation is draft" };
     const lineTotal = quotationLineTotal(data.quantity, data.unitPrice);
     await tx.insert(trainingQuotationItems).values({
-      user.organizationId: user.organizationId,
+      organizationId: user.organizationId,
       id: itemId,
       quotationId: quote.id,
       itemType: data.itemType,
@@ -195,7 +195,7 @@ export async function addTrainingQuotationItem(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
-    user.organizationId: user.organizationId,
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -214,20 +214,20 @@ export async function removeTrainingQuotationItem(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(itemId)) throw new Error("Invalid quotation line item");
 
   const result = await db.transaction(async (tx) => {
-    const [item] = await tx.select().from(trainingQuotationItems).where(and(eq(trainingQuotationItems.user.organizationId, user.organizationId), eq(trainingQuotationItems.id, itemId))).limit(1);
+    const [item] = await tx.select().from(trainingQuotationItems).where(and(eq(trainingQuotationItems.organizationId, user.organizationId), eq(trainingQuotationItems.id, itemId))).limit(1);
     if (!item) return { ok: false as const, error: "Quotation line item not found" };
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${item.quotationId}))`);
-    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.id, item.quotationId))).limit(1);
+    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.id, item.quotationId))).limit(1);
     if (!quote) return { ok: false as const, error: "Training quotation not found" };
     if (quote.status !== "draft") return { ok: false as const, error: "Quotation line items can only be edited while the quotation is draft" };
-    await tx.delete(trainingQuotationItems).where(and(eq(trainingQuotationItems.user.organizationId, user.organizationId), eq(trainingQuotationItems.id, item.id)));
+    await tx.delete(trainingQuotationItems).where(and(eq(trainingQuotationItems.organizationId, user.organizationId), eq(trainingQuotationItems.id, item.id)));
     await recalculateQuotation(tx as unknown as typeof db, user.organizationId, quote.id, Number(quote.discountAmount), Number(quote.taxRate));
     return { ok: true as const, quote, item };
   });
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
-    user.organizationId: user.organizationId,
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "delete",
@@ -254,12 +254,12 @@ export async function transitionTrainingQuotation(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.quotationId}))`);
-    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.id, data.quotationId))).limit(1);
+    const [quote] = await tx.select().from(trainingQuotations).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.id, data.quotationId))).limit(1);
     if (!quote) return { ok: false as const, error: "Training quotation not found" };
     if (!canTransitionTrainingQuotation(quote.status, data.status)) {
       return { ok: false as const, error: `Quotation cannot move from ${quote.status} to ${data.status}` };
     }
-    const items = await tx.select().from(trainingQuotationItems).where(and(eq(trainingQuotationItems.user.organizationId, user.organizationId), eq(trainingQuotationItems.quotationId, quote.id)));
+    const items = await tx.select().from(trainingQuotationItems).where(and(eq(trainingQuotationItems.organizationId, user.organizationId), eq(trainingQuotationItems.quotationId, quote.id)));
     const totalAmount = Number(quote.totalAmount);
     const now = new Date();
 
@@ -274,7 +274,7 @@ export async function transitionTrainingQuotation(formData: FormData) {
         return { ok: false as const, error: "Expired quotations cannot be accepted" };
       }
       const [otherAccepted] = await tx.select({ id: trainingQuotations.id }).from(trainingQuotations).where(and(
-        eq(trainingQuotations.user.organizationId, user.organizationId),
+        eq(trainingQuotations.organizationId, user.organizationId),
         eq(trainingQuotations.requestId, quote.requestId),
         eq(trainingQuotations.status, "accepted"),
         ne(trainingQuotations.id, quote.id),
@@ -300,13 +300,13 @@ export async function transitionTrainingQuotation(formData: FormData) {
       clientDecisionNotes: data.decisionNotes || quote.clientDecisionNotes,
       updatedAt: now,
     } as const;
-    await tx.update(trainingQuotations).set(patch).where(and(eq(trainingQuotations.user.organizationId, user.organizationId), eq(trainingQuotations.id, quote.id)));
+    await tx.update(trainingQuotations).set(patch).where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.id, quote.id)));
     return { ok: true as const, quote, patch };
   });
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
-    user.organizationId: user.organizationId,
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: data.status === "approved" ? "approve" : data.status === "rejected" ? "reject" : "update",
