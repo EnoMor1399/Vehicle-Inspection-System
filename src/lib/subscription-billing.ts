@@ -152,6 +152,18 @@ export async function createSubscriptionInvoice(input: {
     throw new Error("Cannot issue a new invoice for a cancelled subscription");
   }
 
+  const [existingPayableInvoice] = await db
+    .select()
+    .from(billingInvoices)
+    .where(and(
+      eq(billingInvoices.organizationId, input.organizationId),
+      eq(billingInvoices.subscriptionId, subscription.subscription.id),
+      inArray(billingInvoices.status, ["open", "overdue"]),
+    ))
+    .orderBy(desc(billingInvoices.createdAt))
+    .limit(1);
+  if (existingPayableInvoice) return existingPayableInvoice;
+
   const subtotalSource = Number(subscription.subscription.amount) > 0
     ? String(subscription.subscription.amount)
     : String(subscription.plan.price);
@@ -177,18 +189,6 @@ export async function createSubscriptionInvoice(input: {
       : new Date();
 
   const periodEnd = addBillingCycle(periodStart, subscription.plan.billingCycle);
-  const existingConditions = [
-    eq(billingInvoices.organizationId, input.organizationId),
-    eq(billingInvoices.subscriptionId, subscription.subscription.id),
-    eq(billingInvoices.periodStart, periodStart),
-    ne(billingInvoices.status, "void"),
-  ];
-  const [existing] = await db
-    .select()
-    .from(billingInvoices)
-    .where(and(...existingConditions))
-    .limit(1);
-  if (existing) return existing;
 
   const id = newId();
   const suffix = id.replaceAll("-", "").slice(-8).toUpperCase();
