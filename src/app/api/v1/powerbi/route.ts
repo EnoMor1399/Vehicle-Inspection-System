@@ -93,15 +93,15 @@ export async function GET(request: Request) {
   try {
     const opts = parseQueryOptions(url.searchParams, queryString);
     const loaders: Record<string, () => Promise<PageResult>> = {
-      inspections: () => loadInspections(opts),
-      pretripinspections: () => loadPreTripInspections(opts),
-      vehicles: () => loadVehicles(opts),
-      transporters: () => loadTransporters(opts),
-      stations: () => loadStations(opts),
-      defects: () => loadDefects(opts),
-      documents: () => loadDocuments(opts),
-      auditlogs: () => loadAuditLogs(opts),
-      users: () => loadUsers(opts),
+      inspections: () => loadInspections(opts, auth.user.organizationId),
+      pretripinspections: () => loadPreTripInspections(opts, auth.user.organizationId),
+      vehicles: () => loadVehicles(opts, auth.user.organizationId),
+      transporters: () => loadTransporters(opts, auth.user.organizationId),
+      stations: () => loadStations(opts, auth.user.organizationId),
+      defects: () => loadDefects(opts, auth.user.organizationId),
+      documents: () => loadDocuments(opts, auth.user.organizationId),
+      auditlogs: () => loadAuditLogs(opts, auth.user.organizationId),
+      users: () => loadUsers(opts, auth.user.organizationId),
     };
 
     const loader = loaders[entity];
@@ -198,6 +198,13 @@ function safeSqlLiteral(raw: string): string {
   invalidQuery("Unsupported OData filter value");
 }
 
+function tenantCondition(alias: string, organizationId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(organizationId)) {
+    invalidQuery("Organization context is invalid");
+  }
+  return `${alias}.organization_id = '${organizationId}'`;
+}
+
 function buildWhereClause(filter: string, allowedFields: Record<string, string>, baseCondition?: string): string {
   const trimmed = filter.trim();
   if (!trimmed) return baseCondition ? `WHERE ${baseCondition}` : "";
@@ -269,7 +276,7 @@ async function finishPage(rows: Row[], opts: QueryOptions, countQuery: SQL): Pro
   return { data, total: Number.isFinite(total) ? total : 0, hasMore };
 }
 
-async function loadInspections(opts: QueryOptions): Promise<PageResult> {
+async function loadInspections(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const fields: Record<string, string> = {
     id: "i.id",
     InspectionNumber: "i.inspection_number",
@@ -282,7 +289,7 @@ async function loadInspections(opts: QueryOptions): Promise<PageResult> {
     StationName: "l.name",
   };
   const defaults = ["id", "InspectionNumber", "InspectionDate", "OverallResult", "WorkflowStatus", "VehicleRegistration", "InspectorName", "TransporterName", "StationName"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("i", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`
@@ -302,7 +309,7 @@ async function loadInspections(opts: QueryOptions): Promise<PageResult> {
   );
 }
 
-async function loadPreTripInspections(opts: QueryOptions): Promise<PageResult> {
+async function loadPreTripInspections(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const fields: Record<string, string> = {
     id: "d.id",
     InspectionDate: "d.inspection_date",
@@ -315,7 +322,7 @@ async function loadPreTripInspections(opts: QueryOptions): Promise<PageResult> {
     TransporterName: "t.company_name",
   };
   const defaults = ["id", "InspectionDate", "Status", "ClearedForTrip", "VehicleRegistration", "DriverName", "PassedItems", "FailedItems", "TransporterName"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("d", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`
@@ -334,7 +341,7 @@ async function loadPreTripInspections(opts: QueryOptions): Promise<PageResult> {
   );
 }
 
-async function loadVehicles(opts: QueryOptions): Promise<PageResult> {
+async function loadVehicles(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const totalInspections = "(SELECT count(*) FROM inspections i WHERE i.vehicle_id = v.id)";
   const fields: Record<string, string> = {
     id: "v.id",
@@ -349,14 +356,14 @@ async function loadVehicles(opts: QueryOptions): Promise<PageResult> {
     TotalInspections: totalInspections,
   };
   const defaults = ["id", "RegistrationNumber", "Make", "Model", "Status", "Category", "TransporterName", "InsuranceExpiry", "RoadworthyExpiry", "TotalInspections"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("v", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "RegistrationNumber asc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`SELECT ${select} FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
   return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM vehicles v LEFT JOIN transporters t ON t.id = v.transporter_id ${where}`));
 }
 
-async function loadTransporters(opts: QueryOptions): Promise<PageResult> {
+async function loadTransporters(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const fleetSize = "(SELECT count(*) FROM vehicles v WHERE v.transporter_id = t.id)";
   const passCount = "(SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'pass')";
   const failCount = "(SELECT count(*) FROM vehicles v INNER JOIN inspections i ON i.vehicle_id = v.id WHERE v.transporter_id = t.id AND i.overall_result = 'fail')";
@@ -370,14 +377,14 @@ async function loadTransporters(opts: QueryOptions): Promise<PageResult> {
     FailCount: failCount,
   };
   const defaults = ["id", "CompanyName", "Region", "District", "FleetSize", "PassCount", "FailCount"];
-  const where = buildWhereClause(opts.filter, fields, "t.deleted_at IS NULL");
+  const where = buildWhereClause(opts.filter, fields, `${tenantCondition("t", organizationId)} AND t.deleted_at IS NULL`);
   const orderBy = buildOrderBy(opts.orderby, fields, "CompanyName asc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`SELECT ${select} FROM transporters t ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
   return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM transporters t ${where}`));
 }
 
-async function loadStations(opts: QueryOptions): Promise<PageResult> {
+async function loadStations(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const inspectionCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id)";
   const passCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'pass')";
   const failCount = "(SELECT count(*) FROM inspections i WHERE i.location_id = l.id AND i.overall_result = 'fail')";
@@ -392,14 +399,14 @@ async function loadStations(opts: QueryOptions): Promise<PageResult> {
     FailCount: failCount,
   };
   const defaults = ["id", "Name", "Code", "Region", "Capacity", "InspectionCount", "PassCount", "FailCount"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("l", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`SELECT ${select} FROM locations l ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
   return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM locations l ${where}`));
 }
 
-async function loadDefects(opts: QueryOptions): Promise<PageResult> {
+async function loadDefects(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const photoCount = "jsonb_array_length(coalesce(item->'photos', '[]'::jsonb))";
   const fields: Record<string, string> = {
     InspectionNumber: "i.inspection_number",
@@ -411,7 +418,7 @@ async function loadDefects(opts: QueryOptions): Promise<PageResult> {
     PhotoCount: photoCount,
   };
   const defaults = ["InspectionNumber", "InspectionDate", "VehicleRegistration", "SectionCode", "ItemName", "Severity", "PhotoCount"];
-  const where = buildWhereClause(opts.filter, fields, "item->>'result' = 'fail'");
+  const where = buildWhereClause(opts.filter, fields, `${tenantCondition("i", organizationId)} AND item->>'result' = 'fail'`);
   const orderBy = buildOrderBy(opts.orderby, fields, "InspectionDate desc");
   const select = selectedColumns(opts, fields, defaults);
   const from = `FROM inspections i INNER JOIN vehicles v ON v.id = i.vehicle_id, jsonb_array_elements(i.section_data) as sec, jsonb_array_elements(sec->'items') as item`;
@@ -419,7 +426,7 @@ async function loadDefects(opts: QueryOptions): Promise<PageResult> {
   return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c ${from} ${where}`));
 }
 
-async function loadDocuments(opts: QueryOptions): Promise<PageResult> {
+async function loadDocuments(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const fields: Record<string, string> = {
     id: "d.id",
     Name: "d.name",
@@ -430,14 +437,14 @@ async function loadDocuments(opts: QueryOptions): Promise<PageResult> {
     UploadedBy: "u.name",
   };
   const defaults = ["id", "Name", "Type", "OwnerType", "ExpiryDate", "Version", "UploadedBy"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("d", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`SELECT ${select} FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
   return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by ${where}`));
 }
 
-async function loadAuditLogs(opts: QueryOptions): Promise<PageResult> {
+async function loadAuditLogs(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const fields: Record<string, string> = {
     id: "a.id",
     Action: "a.action",
@@ -448,14 +455,14 @@ async function loadAuditLogs(opts: QueryOptions): Promise<PageResult> {
     CreatedAt: "a.created_at",
   };
   const defaults = ["id", "Action", "EntityType", "UserName", "Summary", "IPAddress", "CreatedAt"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("a", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "CreatedAt desc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`SELECT ${select} FROM audit_logs a ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
   return finishPage(rows, opts, sql.raw(`SELECT count(*)::int as c FROM audit_logs a ${where}`));
 }
 
-async function loadUsers(opts: QueryOptions): Promise<PageResult> {
+async function loadUsers(opts: QueryOptions, organizationId: string): Promise<PageResult> {
   const fields: Record<string, string> = {
     id: "u.id",
     Name: "u.name",
@@ -466,7 +473,7 @@ async function loadUsers(opts: QueryOptions): Promise<PageResult> {
     StationName: "l.name",
   };
   const defaults = ["id", "Name", "Email", "Role", "IsActive", "LastLoginAt", "StationName"];
-  const where = buildWhereClause(opts.filter, fields);
+  const where = buildWhereClause(opts.filter, fields, tenantCondition("u", organizationId));
   const orderBy = buildOrderBy(opts.orderby, fields, "Name asc");
   const select = selectedColumns(opts, fields, defaults);
   const rows = await query(sql.raw(`SELECT ${select} FROM users u LEFT JOIN locations l ON l.id = u.location_id ${where} ${orderBy} LIMIT ${opts.top + 1} OFFSET ${opts.skip}`));
