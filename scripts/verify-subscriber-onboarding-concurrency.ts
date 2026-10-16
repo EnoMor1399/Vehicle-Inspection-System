@@ -21,7 +21,8 @@ if (!process.env.E2E_BASE_URL || !["127.0.0.1", "localhost"].includes(hostname))
   throw new Error("Subscriber concurrency tests can run only on the isolated localhost E2E database");
 }
 
-try {
+async function main() {
+  try {
   const suffix = randomUUID().slice(0, 8);
   const companyName = `Concurrency Fixture ${suffix}`;
   const ownerEmail = `onboarding.owner.${suffix}@vims.local`;
@@ -99,6 +100,12 @@ try {
   assert.equal(Number(pending.n), 9, "The database must hold exactly nine live pending invitations");
 
   console.log("Subscriber onboarding concurrency: PASS (approval, token reuse, nine-seat reservation, tenant lock)");
-} finally {
-  await pool.end();
+  } finally {
+    await pool.end();
+  }
 }
+
+void main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
