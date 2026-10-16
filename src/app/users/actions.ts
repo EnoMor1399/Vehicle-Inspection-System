@@ -37,6 +37,9 @@ export async function updateUserAccess(input: {
   const requestedRole = input.role;
   if (!isUserRole(actorRole)) throw new Error("Your account role is not recognized");
   if (!isUserRole(requestedRole)) throw new Error("Invalid user role");
+  if (requestedRole === "admin") {
+    throw new Error("The legacy Administrator role can no longer be assigned. Choose Vehicle Inspection Administrator or Driver Training Administrator.");
+  }
   if (!input.userId || input.userId.length > 64) throw new Error("Invalid user account identifier");
 
   const result = await db.transaction(async (tx) => {
@@ -62,25 +65,36 @@ export async function updateUserAccess(input: {
       if (actorRole !== "super_admin") {
         return { ok: false as const, error: "Only a Super Administrator can assign Super Administrator access" };
       }
-      // Super Administrators retain governance visibility across both systems.
+      // Super Administrator is the only ordinary account allowed to span both
+      // administration domains.
       vehicleInspectionAccess = true;
       driverTrainingAccess = true;
+    } else if (
+      requestedRole === "vehicle_inspection_admin"
+      || requestedRole === "inspector"
+      || requestedRole === "transporter_user"
+    ) {
+      vehicleInspectionAccess = true;
+      driverTrainingAccess = false;
+    } else if (
+      requestedRole === "driver_training_admin"
+      || requestedRole === "instructor"
+    ) {
+      vehicleInspectionAccess = false;
+      driverTrainingAccess = true;
+    } else if (vehicleInspectionAccess === driverTrainingAccess) {
+      return {
+        ok: false as const,
+        error: "Assign this operational role to exactly one domain: Vehicle Inspection or Driver Training & Assessment",
+      };
     }
 
-    if (requestedRole === "transporter_user") {
-      if (!vehicleInspectionAccess || driverTrainingAccess) {
-        return { ok: false as const, error: "Transporter Portal users can only belong to Vehicle Inspection" };
-      }
+    if (requestedRole === "transporter_user" && !vehicleInspectionAccess) {
+      return { ok: false as const, error: "Transporter Portal users can only belong to Vehicle Inspection" };
     }
 
-    if (requestedRole === "instructor") {
-      if (vehicleInspectionAccess || !driverTrainingAccess) {
-        return { ok: false as const, error: "Instructor Account must be assigned to Driver Training & Assessment only" };
-      }
-    }
-
-    if (!vehicleInspectionAccess && !driverTrainingAccess) {
-      return { ok: false as const, error: "Assign the account to Vehicle Inspection, Driver Training, or both" };
+    if (requestedRole === "instructor" && !driverTrainingAccess) {
+      return { ok: false as const, error: "Instructor Account must be assigned to Driver Training & Assessment only" };
     }
 
     if (actorRole !== "super_admin") {
@@ -135,17 +149,28 @@ export async function updateUserAccess(input: {
     const currentPermissions = target.permissions && typeof target.permissions === "object"
       ? target.permissions
       : {};
+    const { ["*"]: _discardWildcard, ...scopedCurrentPermissions } = currentPermissions;
+    void _discardWildcard;
+
     const roleOrTrainingAssignmentChanged =
       targetRole !== requestedRole || currentDriverTrainingAccess !== driverTrainingAccess;
     const scopedTrainingPermissions = roleOrTrainingAssignmentChanged
       ? trainingPermissionsForRole(driverTrainingAccess ? requestedRole : "__no_training_access__")
       : {};
-    const permissions = {
-      ...currentPermissions,
-      ...scopedTrainingPermissions,
-      [VEHICLE_INSPECTION_ACCESS_KEY]: vehicleInspectionAccess,
-      [DRIVER_TRAINING_ACCESS_KEY]: driverTrainingAccess,
-    };
+    const permissions = requestedRole === "super_admin"
+      ? {
+          ...scopedCurrentPermissions,
+          ...trainingPermissionsForRole("super_admin"),
+          "*": true,
+          [VEHICLE_INSPECTION_ACCESS_KEY]: true,
+          [DRIVER_TRAINING_ACCESS_KEY]: true,
+        }
+      : {
+          ...scopedCurrentPermissions,
+          ...scopedTrainingPermissions,
+          [VEHICLE_INSPECTION_ACCESS_KEY]: vehicleInspectionAccess,
+          [DRIVER_TRAINING_ACCESS_KEY]: driverTrainingAccess,
+        };
 
     const patch: Partial<typeof users.$inferInsert> = {
       role: requestedRole as (typeof users.$inferInsert)["role"],

@@ -36,7 +36,9 @@ const NO_SHELL_PATHS = ["/login"];
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Administrator",
-  admin: "Administrator",
+  vehicle_inspection_admin: "Vehicle Inspection Administrator",
+  driver_training_admin: "Driver Training Administrator",
+  admin: "Legacy Administrator",
   operations_manager: "Operations Manager",
   supervisor: "Supervisor",
   inspector: "Inspector",
@@ -62,7 +64,7 @@ type NavGroup = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Operations",
+    label: "Vehicle Inspection Operations",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard, resource: "vehicle_inspection" },
       { href: "/vehicles", label: "Vehicles", icon: Car, resource: "vehicles" },
@@ -74,13 +76,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Departments",
+    label: "Driver Training & Assessment",
     items: [
       { href: "/driver-training", label: "Driver Training & Assessment", icon: GraduationCap, resource: "training" },
     ],
   },
   {
-    label: "Intelligence",
+    label: "Vehicle Inspection Intelligence",
     items: [
       { href: "/reports", label: "Reports & Analytics", icon: FileBarChart, resource: "reports" },
       { href: "/compliance", label: "Compliance Centre", icon: ShieldCheck, resource: "reports" },
@@ -90,7 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Administration",
+    label: "Vehicle Inspection Administration",
     items: [
       { href: "/users", label: "Vehicle Inspection Users", icon: Users, resource: "users" },
       { href: "/documents", label: "Documents", icon: FileText, resource: "documents" },

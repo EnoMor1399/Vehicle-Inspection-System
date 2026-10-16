@@ -49,6 +49,8 @@ jobs:
       E2E_BASE_URL: http://127.0.0.1:3000
       E2E_USER_EMAIL: e2e.inspector@vims.local
       E2E_USER_PASSWORD: E2eOnly!Passw0rd2026
+      E2E_TRAINING_USER_EMAIL: e2e.training.admin@vims.local
+      E2E_TRAINING_USER_PASSWORD: E2eOnly!Passw0rd2026
 
     steps:
       - name: Check out repository

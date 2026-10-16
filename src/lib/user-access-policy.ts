@@ -1,5 +1,7 @@
 export const USER_ROLES = [
   "super_admin",
+  "vehicle_inspection_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
@@ -16,6 +18,8 @@ export type UserRole = typeof USER_ROLES[number];
 
 const ROLE_RANK: Record<UserRole, number> = {
   super_admin: 100,
+  vehicle_inspection_admin: 90,
+  driver_training_admin: 90,
   admin: 90,
   operations_manager: 70,
   supervisor: 60,
@@ -42,8 +46,15 @@ export function validateDelegatedRoleChange(
   if (targetRole === "super_admin" || requestedRole === "super_admin") {
     return { ok: false, message: "Only a Super Administrator can modify Super Administrator access" };
   }
-  if (targetRole === "admin" || requestedRole === "admin") {
-    return { ok: false, message: "Only a Super Administrator can modify or assign Administrator access" };
+  if (
+    targetRole === "admin"
+    || requestedRole === "admin"
+    || targetRole === "vehicle_inspection_admin"
+    || requestedRole === "vehicle_inspection_admin"
+    || targetRole === "driver_training_admin"
+    || requestedRole === "driver_training_admin"
+  ) {
+    return { ok: false, message: "Only a Super Administrator can modify or assign an administration role" };
   }
 
   const actorRank = ROLE_RANK[actorRole];

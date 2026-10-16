@@ -41,15 +41,16 @@ test("department outcomes cover safety, professionalism, compliance and operatio
   assert.match(joined, /operational efficiency/);
 });
 
-test("Driver Training page is restricted to authenticated internal users", () => {
+test("Driver Training routes are restricted to the Driver Training domain", () => {
+  const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
   const source = readFileSync("src/app/driver-training/page.tsx", "utf8");
-  assert.match(source, /requireInternalUser\(\)/);
+  assert.match(layout, /requireDriverTrainingUser\(\)/);
   assert.match(source, /DRIVER_TRAINING_SERVICES/);
 });
 
 test("navigation exposes Driver Training as a department workspace", () => {
   const source = readFileSync("src/components/AppShell.tsx", "utf8");
-  assert.match(source, /label: "Departments"/);
+  assert.match(source, /label: "Driver Training & Assessment"/);
   assert.match(source, /href: "\/driver-training"/);
   assert.match(source, /Driver Training & Assessment/);
 });
