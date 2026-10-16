@@ -133,32 +133,6 @@ export function PWAInstallCentre() {
   const [message, setMessage] = useState("Checking installation support…");
 
   useEffect(() => {
-    const detectedPlatform = detectInstallPlatform({
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      maxTouchPoints: navigator.maxTouchPoints,
-    });
-    const detectedBrowser = detectInstallBrowser(navigator.userAgent);
-    setPlatform(detectedPlatform);
-    setBrowser(detectedBrowser);
-
-    const installed = isStandaloneMode();
-    if (installed) {
-      setState("installed");
-      setMessage("VIMS is already installed on this device.");
-      return;
-    }
-
-    const existingPrompt = window.__vimsInstallPrompt || null;
-    if (existingPrompt) {
-      setPrompt(existingPrompt);
-      setState("prompt-ready");
-      setMessage("This browser is ready to install VIMS.");
-    } else {
-      setState("instructions");
-      setMessage("Use the installation steps for this device.");
-    }
-
     const onInstallAvailable = () => {
       const nextPrompt = window.__vimsInstallPrompt || null;
       if (nextPrompt) {
@@ -184,7 +158,35 @@ export function PWAInstallCentre() {
     window.addEventListener("appinstalled", onInstalled);
     displayMode.addEventListener?.("change", onDisplayChange);
 
+    const initializeTimer = window.setTimeout(() => {
+      const detectedPlatform = detectInstallPlatform({
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        maxTouchPoints: navigator.maxTouchPoints,
+      });
+      const detectedBrowser = detectInstallBrowser(navigator.userAgent);
+      setPlatform(detectedPlatform);
+      setBrowser(detectedBrowser);
+
+      if (isStandaloneMode()) {
+        setState("installed");
+        setMessage("VIMS is already installed on this device.");
+        return;
+      }
+
+      const existingPrompt = window.__vimsInstallPrompt || null;
+      if (existingPrompt) {
+        setPrompt(existingPrompt);
+        setState("prompt-ready");
+        setMessage("This browser is ready to install VIMS.");
+      } else {
+        setState("instructions");
+        setMessage("Use the installation steps for this device.");
+      }
+    }, 0);
+
     return () => {
+      window.clearTimeout(initializeTimer);
       window.removeEventListener("vims:install-available", onInstallAvailable);
       window.removeEventListener("appinstalled", onInstalled);
       displayMode.removeEventListener?.("change", onDisplayChange);
