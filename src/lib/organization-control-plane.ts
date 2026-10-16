@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import {
   organizationInvitations,
@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { newId } from "@/lib/utils";
 import { hashPassword, validateEmail, validatePasswordStrength } from "@/lib/password";
+import { periodAllowsAccess } from "@/lib/organization-access";
 
 export const SUBSCRIBER_ADMIN_ROLES = [
   "vehicle_inspection_admin",
@@ -176,6 +177,7 @@ export async function getOrganizationAccountSnapshot(organizationId: string) {
           eq(organizationInvitations.organizationId, organizationId),
           isNull(organizationInvitations.acceptedAt),
           isNull(organizationInvitations.revokedAt),
+          gt(organizationInvitations.expiresAt, new Date()),
         ),
       ),
   ]);
@@ -261,7 +263,17 @@ export async function convertOnboardingRequest(input: {
     : null;
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${request.contactEmail}))`);
+    // Serialize concurrent approvals of this request. Reading status before the
+    // lock is insufficient: two platform administrators may approve at once.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.requestId}))`);
+    const [currentRequest] = await tx
+      .select({ status: organizationOnboardingRequests.status })
+      .from(organizationOnboardingRequests)
+      .where(eq(organizationOnboardingRequests.id, input.requestId))
+      .limit(1);
+    if (!currentRequest || !["pending", "reviewing", "approved"].includes(currentRequest.status)) {
+      throw new Error("This onboarding request has already been processed or rejected");
+    }
 
     await tx.insert(organizations).values({
       id: organizationId,
@@ -348,34 +360,75 @@ export async function createOrganizationAdministratorInvitation(input: {
   if (!validateEmail(normalizedEmail)) throw new Error("Enter a valid email address");
   if (!SUBSCRIBER_ADMIN_ROLES.includes(input.role)) throw new Error("Invalid administrator role");
 
-  const snapshot = await getOrganizationAccountSnapshot(input.organizationId);
-  if (!snapshot.organization || !snapshot.subscription) throw new Error("Organization subscription is unavailable");
-
-  if (input.role === "driver_training_admin" && !snapshot.subscription.plan.modules.includes("driver_training")) {
-    throw new Error("The current subscription plan does not include Driver Training & Assessment");
-  }
-
-  if (snapshot.userCount + snapshot.pendingInvitationCount >= snapshot.subscription.plan.maxUsers) {
-    throw new Error("The subscription user limit has been reached");
-  }
-
-  const [existingUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
-  if (existingUser) throw new Error("An account with this email already exists");
-
   const token = randomBytes(32).toString("base64url");
-  await db.insert(organizationInvitations).values({
-    id: newId(),
-    organizationId: input.organizationId,
-    email: normalizedEmail,
-    name: input.name?.trim().slice(0, 200) || null,
-    role: input.role,
-    tokenHash: invitationHash(token),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    createdBy: input.actorUserId,
+
+  await db.transaction(async (tx) => {
+    // Reserve invitation capacity atomically, rather than checking seats and
+    // inserting invitations in separate requests. All invitations for a given
+    // organization use this lock; acceptance uses the same lock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.organizationId}))`);
+    const [organization] = await tx
+      .select({ status: organizations.status })
+      .from(organizations)
+      .where(eq(organizations.id, input.organizationId))
+      .limit(1);
+    if (!organization || organization.status === "suspended" || organization.status === "cancelled") {
+      throw new Error("Organization is not accepting administrator invitations");
+    }
+
+    const [entitlement] = await tx
+      .select({ subscription: organizationSubscriptions, plan: subscriptionPlans })
+      .from(organizationSubscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptionPlans.id, organizationSubscriptions.planId))
+      .where(eq(organizationSubscriptions.organizationId, input.organizationId))
+      .orderBy(desc(organizationSubscriptions.createdAt))
+      .limit(1);
+    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status) || !periodAllowsAccess(entitlement.subscription)) {
+      throw new Error("An eligible organization subscription is required");
+    }
+
+    const requiredModule = input.role === "driver_training_admin" ? "driver_training" : "vehicle_inspection";
+    if (!entitlement.plan.modules.includes(requiredModule)) {
+      throw new Error("The current subscription plan does not include this administration domain");
+    }
+
+    const [[existingUsers], [outstanding], [existingUser], [sameEmailInvitation]] = await Promise.all([
+      tx.select({ n: count() }).from(users).where(and(
+        eq(users.organizationId, input.organizationId),
+        eq(users.isActive, true),
+      )),
+      tx.select({ n: count() }).from(organizationInvitations).where(and(
+        eq(organizationInvitations.organizationId, input.organizationId),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      )),
+      tx.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1),
+      tx.select({ id: organizationInvitations.id }).from(organizationInvitations).where(and(
+        eq(organizationInvitations.organizationId, input.organizationId),
+        eq(organizationInvitations.email, normalizedEmail),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      )).limit(1),
+    ]);
+
+    if (existingUser) throw new Error("An account with this email already exists");
+    if (sameEmailInvitation) throw new Error("An active invitation already exists for this email");
+    if (Number(existingUsers?.n || 0) + Number(outstanding?.n || 0) >= entitlement.plan.maxUsers) {
+      throw new Error("The subscription user limit has been reached");
+    }
+
+    await tx.insert(organizationInvitations).values({
+      id: newId(),
+      organizationId: input.organizationId,
+      email: normalizedEmail,
+      name: input.name?.trim().slice(0, 200) || null,
+      role: input.role,
+      tokenHash: invitationHash(token),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdBy: input.actorUserId,
+    });
   });
 
   return token;
@@ -404,11 +457,6 @@ export async function acceptOrganizationInvitation(input: {
 }) {
   const row = await getInvitationByToken(input.token);
   if (!row) throw new Error("Invitation is invalid");
-  const { invitation, organization } = row;
-  if (invitation.acceptedAt) throw new Error("Invitation has already been accepted");
-  if (invitation.revokedAt) throw new Error("Invitation has been revoked");
-  if (row.expired) throw new Error("Invitation has expired");
-  if (organization.status === "cancelled") throw new Error("Organization account is no longer available");
 
   const name = input.name.trim().slice(0, 200);
   if (name.length < 2) throw new Error("Enter your full name");
@@ -418,20 +466,81 @@ export async function acceptOrganizationInvitation(input: {
 
   const passwordHash = await hashPassword(input.password);
   const userId = newId();
-  const permissions =
-    invitation.role === "organization_owner"
-      ? { vehicle_inspection: false, training: false }
-      : invitation.role === "driver_training_admin"
-        ? { vehicle_inspection: false, training: true }
-        : { vehicle_inspection: true, training: false };
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    // Re-check the invitation *inside* the transaction after serializing
+    // competing claims for the organization. The initial page read alone
+    // cannot prevent double acceptance or post-invitation plan changes.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${row.invitation.organizationId}))`);
+    const [fresh] = await tx
+      .select({
+        invitation: organizationInvitations,
+        organization: organizations,
+        expired: sql<boolean>`${organizationInvitations.expiresAt} <= now()`,
+      })
+      .from(organizationInvitations)
+      .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
+      .where(eq(organizationInvitations.tokenHash, invitationHash(input.token)))
+      .limit(1);
+
+    if (!fresh) throw new Error("Invitation is invalid");
+    const { invitation, organization } = fresh;
+    if (invitation.acceptedAt) throw new Error("Invitation has already been accepted");
+    if (invitation.revokedAt) throw new Error("Invitation has been revoked");
+    if (fresh.expired) throw new Error("Invitation has expired");
+    if (organization.status === "cancelled" || organization.status === "suspended") {
+      throw new Error("This organization cannot accept invitations at the moment");
+    }
+
+    if (!["organization_owner", ...SUBSCRIBER_ADMIN_ROLES].includes(invitation.role)) {
+      throw new Error("This invitation does not contain an eligible subscriber role");
+    }
+
+    const [entitlement] = await tx
+      .select({ subscription: organizationSubscriptions, plan: subscriptionPlans })
+      .from(organizationSubscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptionPlans.id, organizationSubscriptions.planId))
+      .where(eq(organizationSubscriptions.organizationId, organization.id))
+      .orderBy(desc(organizationSubscriptions.createdAt))
+      .limit(1);
+
+    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status) || !periodAllowsAccess(entitlement.subscription)) {
+      throw new Error("This organization does not have an eligible subscription");
+    }
+    if (invitation.role === "driver_training_admin" && !entitlement.plan.modules.includes("driver_training")) {
+      throw new Error("Driver Training is no longer included in this subscription");
+    }
+    if (invitation.role === "vehicle_inspection_admin" && !entitlement.plan.modules.includes("vehicle_inspection")) {
+      throw new Error("Vehicle Inspection is no longer included in this subscription");
+    }
+
     const [existing] = await tx
       .select({ id: users.id })
       .from(users)
       .where(eq(users.email, invitation.email))
       .limit(1);
     if (existing) throw new Error("An account with this email already exists");
+
+    // Claim the invitation conditionally before creating an account. A losing
+    // concurrent request fails and any failed account insert rolls back the claim.
+    const [claimed] = await tx
+      .update(organizationInvitations)
+      .set({ acceptedAt: new Date() })
+      .where(and(
+        eq(organizationInvitations.id, invitation.id),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      ))
+      .returning({ id: organizationInvitations.id });
+    if (!claimed) throw new Error("Invitation is no longer available");
+
+    const permissions =
+      invitation.role === "organization_owner"
+        ? { vehicle_inspection: false, training: false }
+        : invitation.role === "driver_training_admin"
+          ? { vehicle_inspection: false, training: true }
+          : { vehicle_inspection: true, training: false };
 
     await tx.insert(users).values({
       id: userId,
@@ -444,21 +553,15 @@ export async function acceptOrganizationInvitation(input: {
       isActive: true,
     });
 
-    await tx
-      .update(organizationInvitations)
-      .set({ acceptedAt: new Date() })
-      .where(eq(organizationInvitations.id, invitation.id));
-
-    await tx
-      .update(organizations)
-      .set({
-        onboardingStage: invitation.role === "organization_owner" ? "owner_active" : organization.onboardingStage,
+    if (invitation.role === "organization_owner") {
+      await tx.update(organizations).set({
+        onboardingStage: "owner_active",
         updatedAt: new Date(),
-      })
-      .where(eq(organizations.id, organization.id));
-  });
+      }).where(eq(organizations.id, organization.id));
+    }
 
-  return { userId, organizationId: invitation.organizationId, role: invitation.role };
+    return { userId, organizationId: invitation.organizationId, role: invitation.role };
+  });
 }
 
 export async function listOrganizationInvitations(organizationId: string) {

@@ -75,6 +75,9 @@ jobs:
           npm run db:upgrade
           node scripts/seed-e2e.mjs
 
+      - name: Verify subscriber onboarding races
+        run: npx tsx scripts/verify-subscriber-onboarding-concurrency.ts
+
       - name: Build production application
         run: npm run build
 
