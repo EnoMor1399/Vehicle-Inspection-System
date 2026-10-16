@@ -31,14 +31,14 @@ export default async function TrainingDevelopmentPage() {
   const canManage = canManageTraining(user);
 
   const [plans, actions, participants, assessments, internalUsers] = await Promise.all([
-    db.select().from(trainingDevelopmentPlans).orderBy(desc(trainingDevelopmentPlans.createdAt)).limit(300),
-    db.select().from(trainingDevelopmentActions).orderBy(desc(trainingDevelopmentActions.createdAt)).limit(1500),
-    db.select().from(trainingParticipants).orderBy(asc(trainingParticipants.fullName)).limit(1000),
-    db.select().from(trainingAssessments).orderBy(desc(trainingAssessments.assessedAt)).limit(1000),
+    db.select().from(trainingDevelopmentPlans).where(eq(trainingDevelopmentPlans.organizationId, user.organizationId)).orderBy(desc(trainingDevelopmentPlans.createdAt)).limit(300),
+    db.select().from(trainingDevelopmentActions).where(eq(trainingDevelopmentActions.organizationId, user.organizationId)).orderBy(desc(trainingDevelopmentActions.createdAt)).limit(1500),
+    db.select().from(trainingParticipants).where(eq(trainingParticipants.organizationId, user.organizationId)).orderBy(asc(trainingParticipants.fullName)).limit(1000),
+    db.select().from(trainingAssessments).where(eq(trainingAssessments.organizationId, user.organizationId)).orderBy(desc(trainingAssessments.assessedAt)).limit(1000),
     db
       .select({ id: users.id, name: users.name, role: users.role })
       .from(users)
-      .where(and(eq(users.isActive, true), ne(users.role, "transporter_user")))
+      .where(and(eq(users.organizationId, user.organizationId), eq(users.isActive, true), ne(users.role, "transporter_user")))
       .orderBy(asc(users.name))
       .limit(300),
   ]);
