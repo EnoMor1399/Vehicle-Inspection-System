@@ -98,7 +98,10 @@ export async function createTrainingRequest(formData: FormData) {
   const data = parsed.data;
 
   if (data.locationId) {
-    const [location] = await db.select({ id: locations.id }).from(locations).where(eq(locations.id, data.locationId)).limit(1);
+    const [location] = await db.select({ id: locations.id }).from(locations).where(and(
+      eq(locations.organizationId, user.organizationId),
+      eq(locations.id, data.locationId),
+    )).limit(1);
     if (!location) throw new Error("Selected training location does not exist");
   }
 
@@ -106,6 +109,7 @@ export async function createTrainingRequest(formData: FormData) {
   const requestNumber = `TRQ-${new Date().getUTCFullYear()}-${id.slice(0, 8).toUpperCase()}`;
   const values = {
     id,
+    organizationId: user.organizationId,
     requestNumber,
     requestType: data.requestType,
     serviceId: data.serviceId,
@@ -276,16 +280,23 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
 
     const locationId = data.locationId || request.locationId;
     if (locationId) {
-      const [location] = await tx.select({ id: locations.id }).from(locations).where(eq(locations.id, locationId)).limit(1);
+      const [location] = await tx.select({ id: locations.id }).from(locations).where(and(
+        eq(locations.organizationId, user.organizationId),
+        eq(locations.id, locationId),
+      )).limit(1);
       if (!location) return { ok: false as const, error: "Selected training location does not exist" };
     }
     if (data.instructorId) {
-      const [instructor] = await tx.select({ id: users.id, isActive: users.isActive }).from(users).where(eq(users.id, data.instructorId)).limit(1);
+      const [instructor] = await tx.select({ id: users.id, isActive: users.isActive }).from(users).where(and(
+        eq(users.organizationId, user.organizationId),
+        eq(users.id, data.instructorId),
+      )).limit(1);
       if (!instructor?.isActive) return { ok: false as const, error: "Selected instructor is unavailable" };
     }
 
     const sessionValues = {
       id: sessionId,
+      organizationId: user.organizationId,
       referenceNumber,
       serviceId: request.serviceId,
       title: request.title,
