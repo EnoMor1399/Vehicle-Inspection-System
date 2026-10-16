@@ -7,7 +7,8 @@ import { AlertTriangle, Car, GraduationCap, ShieldCheck, X } from "lucide-react"
 
 const ROLE_OPTIONS = [
   ["super_admin", "Super Administrator"],
-  ["admin", "Administrator"],
+  ["vehicle_inspection_admin", "Vehicle Inspection Administrator"],
+  ["driver_training_admin", "Driver Training Administrator"],
   ["operations_manager", "Operations Manager"],
   ["supervisor", "Supervisor"],
   ["instructor", "Instructor Account"],
@@ -50,24 +51,41 @@ export function UserAccessEditor({
 
   function handleRoleChange(nextRole: string) {
     setRole(nextRole);
+
     if (nextRole === "super_admin") {
       setVehicleInspectionAccess(true);
       setDriverTrainingAccess(true);
       return;
     }
-    if (nextRole === "transporter_user") {
+
+    if (nextRole === "vehicle_inspection_admin" || nextRole === "inspector" || nextRole === "transporter_user") {
       setVehicleInspectionAccess(true);
       setDriverTrainingAccess(false);
       return;
     }
-    if (nextRole === "instructor") {
+
+    if (nextRole === "driver_training_admin" || nextRole === "instructor") {
       setVehicleInspectionAccess(false);
       setDriverTrainingAccess(true);
+      return;
+    }
+
+    // Shared functional roles still belong to exactly one operational domain.
+    // Preserve the current single-domain selection when possible.
+    if (vehicleInspectionAccess === driverTrainingAccess) {
+      setVehicleInspectionAccess(true);
+      setDriverTrainingAccess(false);
     }
   }
 
-  const instructorAccount = role === "instructor";
-  const systemAssignmentLocked = role === "super_admin" || role === "transporter_user" || instructorAccount;
+  const roleLocksInspection =
+    role === "super_admin"
+    || role === "vehicle_inspection_admin"
+    || role === "driver_training_admin"
+    || role === "transporter_user"
+    || role === "instructor"
+    || role === "inspector";
+  const systemAssignmentLocked = roleLocksInspection;
 
   function save() {
     setError(null);
@@ -119,14 +137,19 @@ export function UserAccessEditor({
               <div>
                 <div className="mb-2">
                   <p className="text-sm font-semibold text-slate-900">System assignment</p>
-                  <p className="mt-0.5 text-xs leading-5 text-slate-500">Keep Vehicle Inspection and Driver Training accounts operationally separate. Select both only when the user genuinely works across both systems.</p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500">Each account belongs to one operational domain. Only the Super Administrator has cross-domain governance access.</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
                     <input
-                      type="checkbox"
+                      type={systemAssignmentLocked ? "checkbox" : "radio"}
+                      name={systemAssignmentLocked ? undefined : "administration-domain"}
                       checked={vehicleInspectionAccess}
-                      onChange={(event) => setVehicleInspectionAccess(event.target.checked)}
+                      onChange={(event) => {
+                        if (!event.target.checked || systemAssignmentLocked) return;
+                        setVehicleInspectionAccess(true);
+                        setDriverTrainingAccess(false);
+                      }}
                       disabled={systemAssignmentLocked}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300"
                     />
@@ -137,9 +160,14 @@ export function UserAccessEditor({
                   </label>
                   <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
                     <input
-                      type="checkbox"
+                      type={systemAssignmentLocked ? "checkbox" : "radio"}
+                      name={systemAssignmentLocked ? undefined : "administration-domain"}
                       checked={driverTrainingAccess}
-                      onChange={(event) => setDriverTrainingAccess(event.target.checked)}
+                      onChange={(event) => {
+                        if (!event.target.checked || systemAssignmentLocked) return;
+                        setDriverTrainingAccess(true);
+                        setVehicleInspectionAccess(false);
+                      }}
                       disabled={systemAssignmentLocked}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300"
                     />
@@ -149,9 +177,24 @@ export function UserAccessEditor({
                     </span>
                   </label>
                 </div>
-                {instructorAccount && (
+                {role === "vehicle_inspection_admin" && (
+                  <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
+                    Vehicle Inspection Administrator is restricted to inspection operations, inspection users, stations, compliance and reporting administration.
+                  </p>
+                )}
+                {role === "driver_training_admin" && (
+                  <p className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-800">
+                    Driver Training Administrator is restricted to training programmes, participants, instructors, assessments, reviews, certificates and training user administration.
+                  </p>
+                )}
+                {role === "instructor" && (
                   <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
                     Instructor Account is restricted to Driver Training & Assessment and cannot be assigned Vehicle Inspection privileges.
+                  </p>
+                )}
+                {role === "inspector" && (
+                  <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+                    Inspector is restricted to Vehicle Inspection and cannot access Driver Training & Assessment administration.
                   </p>
                 )}
               </div>
