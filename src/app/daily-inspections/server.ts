@@ -92,7 +92,14 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
   validateDailyChecklist(input.checklist);
   const odometer = parseOdometer(input.odometer);
 
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, input.vehicleId)).limit(1);
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, user.organizationId),
+      eq(vehicles.id, input.vehicleId),
+    ))
+    .limit(1);
   if (!vehicle) throw new Error("Vehicle not found");
   if (vehicle.status === "decommissioned") throw new Error("A decommissioned vehicle cannot receive a daily inspection");
 
@@ -128,6 +135,7 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
 
   await db.insert(dailyInspections).values({
     id,
+    organizationId: user.organizationId,
     vehicleId: input.vehicleId,
     driverId: user.id,
     driverName,
@@ -149,6 +157,7 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
   } as any);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "inspect",
@@ -176,7 +185,11 @@ export async function getDailyInspectionDetail(id: string) {
     })
     .from(dailyInspections)
     .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
-    .where(eq(dailyInspections.id, id));
+    .where(and(
+      eq(dailyInspections.organizationId, user.organizationId),
+      eq(vehicles.organizationId, user.organizationId),
+      eq(dailyInspections.id, id),
+    ));
   if (!row || !canAccessTransporterScope(user, row.vehicle.transporterId)) return null;
   return row;
 }
@@ -191,12 +204,23 @@ export async function getTodaysInspection(vehicleId: string, date: string) {
     return null;
   }
 
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, user.organizationId),
+      eq(vehicles.id, vehicleId),
+    ))
+    .limit(1);
   if (!vehicle || !canAccessTransporterScope(user, vehicle.transporterId)) return null;
   const [row] = await db
     .select()
     .from(dailyInspections)
-    .where(and(eq(dailyInspections.vehicleId, vehicleId), eq(dailyInspections.inspectionDate, date)))
+    .where(and(
+      eq(dailyInspections.organizationId, user.organizationId),
+      eq(dailyInspections.vehicleId, vehicleId),
+      eq(dailyInspections.inspectionDate, date),
+    ))
     .orderBy(desc(dailyInspections.createdAt))
     .limit(1);
   return row || null;
@@ -212,7 +236,10 @@ export async function approveDailyInspection(id: string, supervisorNotes?: strin
 
   const [existing] = await db.select({ id: dailyInspections.id, supervisorReview: dailyInspections.supervisorReview })
     .from(dailyInspections)
-    .where(eq(dailyInspections.id, id))
+    .where(and(
+      eq(dailyInspections.organizationId, user.organizationId),
+      eq(dailyInspections.id, id),
+    ))
     .limit(1);
   if (!existing) throw new Error("Daily inspection not found");
   if (existing.supervisorReview) return { approved: true, alreadyApproved: true };
@@ -222,8 +249,12 @@ export async function approveDailyInspection(id: string, supervisorNotes?: strin
     supervisorId: user.id,
     supervisorNotes: supervisorNotes?.trim() || null,
     updatedAt: new Date(),
-  }).where(eq(dailyInspections.id, id));
+  }).where(and(
+    eq(dailyInspections.organizationId, user.organizationId),
+    eq(dailyInspections.id, id),
+  ));
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id, userName: user.name, action: "approve",
     entityType: "daily_inspection", entityId: id,
     summary: "Approved daily inspection",
