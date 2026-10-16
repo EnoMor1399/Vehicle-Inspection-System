@@ -68,7 +68,7 @@ export async function saveTrainingInstructorProfile(formData: FormData) {
       isActive: users.isActive,
     })
     .from(users)
-    .where(eq(users.id, data.userId))
+    .where(and(eq(users.organizationId, actor.organizationId), eq(users.id, data.userId)))
     .limit(1);
   if (!account || !canServeAsInternalTrainingInstructor(account)) {
     throw new Error("Internal Instructor profiles can only be assigned to active Driver Training & Assessment users");
@@ -79,7 +79,7 @@ export async function saveTrainingInstructorProfile(formData: FormData) {
     const [before] = await tx
       .select()
       .from(trainingInstructorProfiles)
-      .where(and(eq(trainingInstructorProfiles.organizationId, user.organizationId), eq(trainingInstructorProfiles.userId, data.userId)))
+      .where(and(eq(trainingInstructorProfiles.organizationId, actor.organizationId), eq(trainingInstructorProfiles.userId, data.userId)))
       .limit(1);
 
     const values = {
@@ -99,7 +99,7 @@ export async function saveTrainingInstructorProfile(formData: FormData) {
       const [updated] = await tx
         .update(trainingInstructorProfiles)
         .set(values)
-        .where(and(eq(trainingInstructorProfiles.organizationId, user.organizationId), eq(trainingInstructorProfiles.id, before.id)))
+        .where(and(eq(trainingInstructorProfiles.organizationId, actor.organizationId), eq(trainingInstructorProfiles.id, before.id)))
         .returning();
       return { action: "update" as const, before, after: updated };
     }
@@ -120,7 +120,7 @@ export async function saveTrainingInstructorProfile(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: result.action,
@@ -155,7 +155,7 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
   const [session] = await db
     .select()
     .from(trainingSessions)
-    .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId)))
+    .where(and(eq(trainingSessions.organizationId, actor.organizationId), eq(trainingSessions.id, data.sessionId)))
     .limit(1);
   if (!session) throw new Error("Training session not found");
   if (session.status === "completed" || session.status === "cancelled") {
@@ -175,7 +175,7 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
       db
         .select()
         .from(trainingInstructorProfiles)
-        .where(and(eq(trainingInstructorProfiles.organizationId, user.organizationId), eq(trainingInstructorProfiles.userId, session.instructorId)))
+        .where(and(eq(trainingInstructorProfiles.organizationId, actor.organizationId), eq(trainingInstructorProfiles.userId, session.instructorId)))
         .limit(1),
     ]);
     if (!account || !canServeAsInternalTrainingInstructor(account) || !profile || profile.status !== "active") {
@@ -194,7 +194,7 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
     const [before] = await tx
       .select()
       .from(trainingSessionReadiness)
-      .where(and(eq(trainingSessionReadiness.organizationId, user.organizationId), eq(trainingSessionReadiness.sessionId, data.sessionId)))
+      .where(and(eq(trainingSessionReadiness.organizationId, actor.organizationId), eq(trainingSessionReadiness.sessionId, data.sessionId)))
       .limit(1);
     const values = {
       status: evaluation.status,
@@ -217,7 +217,7 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
       const [updated] = await tx
         .update(trainingSessionReadiness)
         .set(values)
-        .where(and(eq(trainingSessionReadiness.organizationId, user.organizationId), eq(trainingSessionReadiness.id, before.id)))
+        .where(and(eq(trainingSessionReadiness.organizationId, actor.organizationId), eq(trainingSessionReadiness.id, before.id)))
         .returning();
       return { action: "update" as const, before, after: updated };
     }
@@ -230,7 +230,7 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: result.action,
