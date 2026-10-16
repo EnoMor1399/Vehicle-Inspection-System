@@ -26,8 +26,7 @@ export default async function InvitationPage({
     );
   }
 
-  const { invitation, organization } = row;
-  const expired = new Date(invitation.expiresAt).getTime() < Date.now();
+  const { invitation, organization, expired } = row;
   const unavailable = Boolean(invitation.acceptedAt || invitation.revokedAt || expired);
 
   return (
