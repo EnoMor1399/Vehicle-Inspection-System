@@ -118,6 +118,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
       .select({ id: trainingComplianceCases.id })
       .from(trainingComplianceCases)
       .where(and(
+        eq(trainingComplianceCases.organizationId, user.organizationId),
         eq(trainingComplianceCases.participantId, participant.id),
         eq(trainingComplianceCases.caseType, data.caseType),
         certificateCondition,
