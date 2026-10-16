@@ -128,6 +128,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
     if (existing) return { ok: false as const, error: "An unresolved compliance case already exists for this item" };
 
     const values = {
+      organizationId: user.organizationId,
       id,
       participantId: participant.id,
       certificateId: certificate?.id || null,
