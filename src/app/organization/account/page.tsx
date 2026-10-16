@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Building2, CreditCard, ShieldCheck, UsersRound } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requireOrganizationAccountManager } from "@/lib/require-auth";
@@ -99,9 +100,9 @@ export default async function OrganizationAccountPage() {
   );
 }
 
-function Summary({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: string; hint: string }) {
+function Summary({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
   return <Card className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-slate-400">{label}</p><p className="mt-1 text-xl font-semibold text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-500">{hint}</p></div><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700">{icon}</span></div></Card>;
 }
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-2 last:border-0"><span className="text-slate-500">{label}</span><span className="text-right font-medium text-slate-800">{children}</span></div>;
 }
