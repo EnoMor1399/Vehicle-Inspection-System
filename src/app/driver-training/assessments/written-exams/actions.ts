@@ -85,6 +85,7 @@ export async function recordWrittenExamScores(formData: FormData) {
       .select({ certificateNumber: trainingCertificates.certificateNumber })
       .from(trainingCertificates)
       .where(and(
+        eq(trainingCertificates.organizationId, user.organizationId),
         eq(trainingCertificates.participantId, assessment.participantId),
         eq(trainingCertificates.sessionId, assessment.sessionId),
         eq(trainingCertificates.status, "active"),
