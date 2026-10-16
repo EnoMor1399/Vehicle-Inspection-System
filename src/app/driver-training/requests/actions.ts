@@ -255,6 +255,7 @@ export async function scheduleApprovedTrainingRequest(formData: FormData) {
         .select({ id: trainingQuotations.id })
         .from(trainingQuotations)
         .where(and(
+          eq(trainingQuotations.organizationId, user.organizationId),
           eq(trainingQuotations.requestId, request.id),
           eq(trainingQuotations.status, "accepted"),
           gte(trainingQuotations.validUntil, today),
