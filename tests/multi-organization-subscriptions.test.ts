@@ -71,7 +71,7 @@ test("operational routes enforce subscription readiness centrally", () => {
   assert.match(source, /getOrganizationSubscriptionState/);
   assert.match(source, /requireWorkspaceUser/);
   assert.match(source, /redirect\("\/workspace-setup"\)/);
-  assert.match(source, /organization_owner.*organization\/account/s);
+  assert.match(source, /organization_owner[\s\S]*organization\/account/);
 });
 
 test("public invitation and subscription routes render without the authenticated app shell", () => {
