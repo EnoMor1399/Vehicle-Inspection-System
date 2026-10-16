@@ -212,7 +212,6 @@ export async function issueAssuredTrainingCertificate(formData: FormData) {
 
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "approve",
@@ -251,7 +250,6 @@ export async function revokeTrainingCertificate(formData: FormData) {
 
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "reject",
