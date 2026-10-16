@@ -7,7 +7,7 @@ test("reports CSV and XLSX exports reuse spreadsheet formula neutralization", ()
   assert.match(source, /neutralizeSpreadsheetFormula/);
   assert.match(source, /function csvCell\([\s\S]*neutralizeSpreadsheetFormula\(value\)/);
   assert.match(source, /function spreadsheetSafeRows\([\s\S]*neutralizeSpreadsheetFormula\(value\)/);
-  assert.match(source, /json_to_sheet\(spreadsheetSafeRows\(recentData\)\)/);
+  assert.match(source, /json_to_sheet\(spreadsheetSafeRows\(report\.rows\)\)/);
 });
 
 test("Power BI workspace derives its API destination only from trusted configuration", () => {
