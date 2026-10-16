@@ -59,6 +59,18 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
   return user;
 }
 
+export async function requirePlatformSuperAdmin() {
+  const user = await requireAuth();
+  if (user.role !== "super_admin") redirect("/");
+  return user;
+}
+
+export async function requireOrganizationAccountManager() {
+  const user = await requireAuth();
+  if (user.role !== "organization_owner" && user.role !== "super_admin") redirect("/");
+  return user;
+}
+
 export async function requireWorkspaceUser() {
   const user = await requireAuth();
   const organizationState = await getOrganizationSubscriptionState(user.organizationId);
