@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, MessageSquareText, ShieldAlert } from "lucide-react";
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -40,13 +40,14 @@ export default async function TrainingQualityPage() {
     db
       .select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber, serviceId: trainingSessions.serviceId, title: trainingSessions.title, status: trainingSessions.status, startAt: trainingSessions.startAt })
       .from(trainingSessions)
-      .where(inArray(trainingSessions.status, ["in_progress", "completed"]))
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), inArray(trainingSessions.status, ["in_progress", "completed"])))
       .orderBy(desc(trainingSessions.startAt))
       .limit(150),
     db
       .select({ id: trainingParticipants.id, fullName: trainingParticipants.fullName, sessionId: trainingParticipants.sessionId, sessionReference: trainingSessions.referenceNumber })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
+      .where(eq(trainingParticipants.organizationId, user.organizationId))
       .orderBy(desc(trainingParticipants.createdAt))
       .limit(400),
     db
@@ -69,6 +70,7 @@ export default async function TrainingQualityPage() {
         participantName: trainingParticipants.fullName,
       })
       .from(trainingSessionFeedback)
+      .where(eq(trainingSessionFeedback.organizationId, user.organizationId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingSessionFeedback.sessionId))
       .leftJoin(trainingParticipants, eq(trainingParticipants.id, trainingSessionFeedback.participantId))
       .orderBy(desc(trainingSessionFeedback.createdAt))
@@ -98,6 +100,7 @@ export default async function TrainingQualityPage() {
         ownerName: users.name,
       })
       .from(trainingQualityFindings)
+      .where(eq(trainingQualityFindings.organizationId, user.organizationId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingQualityFindings.sessionId))
       .leftJoin(trainingParticipants, eq(trainingParticipants.id, trainingQualityFindings.participantId))
       .leftJoin(users, eq(users.id, trainingQualityFindings.ownerId))
@@ -106,7 +109,7 @@ export default async function TrainingQualityPage() {
     db
       .select({ id: users.id, name: users.name, role: users.role, isActive: users.isActive })
       .from(users)
-      .where(eq(users.isActive, true))
+      .where(and(eq(users.organizationId, user.organizationId), eq(users.isActive, true)))
       .orderBy(users.name)
       .limit(300),
   ]);
