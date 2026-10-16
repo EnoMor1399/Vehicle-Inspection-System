@@ -68,14 +68,21 @@ export async function POST(request: Request) {
     })
     .from(trainingAssessments)
     .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingAssessments.participantId))
-    .where(eq(trainingAssessments.id, assessmentId))
+    .where(and(
+      eq(trainingAssessments.organizationId, user.organizationId),
+      eq(trainingParticipants.organizationId, user.organizationId),
+      eq(trainingAssessments.id, assessmentId),
+    ))
     .limit(1);
   if (!assessment) return failure("Driver assessment not found", 404);
 
   const [latestAssessment] = await db
     .select({ id: trainingAssessments.id })
     .from(trainingAssessments)
-    .where(eq(trainingAssessments.participantId, assessment.participantId))
+    .where(and(
+      eq(trainingAssessments.organizationId, user.organizationId),
+      eq(trainingAssessments.participantId, assessment.participantId),
+    ))
     .orderBy(desc(trainingAssessments.assessedAt), desc(trainingAssessments.createdAt))
     .limit(1);
   if (!latestAssessment || latestAssessment.id !== assessment.id) {
@@ -86,6 +93,7 @@ export async function POST(request: Request) {
     .select({ certificateNumber: trainingCertificates.certificateNumber })
     .from(trainingCertificates)
     .where(and(
+      eq(trainingCertificates.organizationId, user.organizationId),
       eq(trainingCertificates.participantId, assessment.participantId),
       eq(trainingCertificates.sessionId, assessment.sessionId),
       eq(trainingCertificates.status, "active"),
@@ -111,6 +119,7 @@ export async function POST(request: Request) {
   try {
     await db.insert(documents).values({
       id: documentId,
+      organizationId: user.organizationId,
       ownerType: WRITTEN_EXAM_OWNER_TYPE,
       ownerId: assessment.id,
       name: documentName,
@@ -126,6 +135,7 @@ export async function POST(request: Request) {
   }
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
