@@ -142,7 +142,6 @@ export async function createTrainingSession(formData: FormData) {
   await db.insert(trainingSessions).values(values);
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -183,7 +182,6 @@ export async function updateTrainingSessionStatus(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -274,7 +272,6 @@ export async function addTrainingParticipant(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -312,7 +309,6 @@ export async function updateTrainingAttendance(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -390,7 +386,6 @@ export async function recordTrainingAssessment(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "inspect",
@@ -478,7 +473,6 @@ export async function issueTrainingCertificate(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
   await logAudit({
    organizationId: user.organizationId,
-    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "approve",
