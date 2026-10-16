@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { ScrollText, UserCheck, Plus, Pencil, Trash2, ClipboardCheck, CheckCircle2 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
@@ -9,8 +9,13 @@ import { requirePermission } from "@/lib/require-auth";
 export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
-  await requirePermission("audit");
-  const logs = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(200);
+  const user = await requirePermission("audit");
+  const logs = await db
+    .select()
+    .from(auditLogs)
+    .where(eq(auditLogs.organizationId, user.organizationId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(200);
 
   return (
     <div className="p-6 lg:p-10">
