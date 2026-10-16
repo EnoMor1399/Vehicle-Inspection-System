@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { newId } from "@/lib/utils";
 import { hashPassword, validateEmail, validatePasswordStrength } from "@/lib/password";
+import { periodAllowsAccess } from "@/lib/organization-access";
 
 export const SUBSCRIBER_ADMIN_ROLES = [
   "vehicle_inspection_admin",
@@ -382,7 +383,7 @@ export async function createOrganizationAdministratorInvitation(input: {
       .where(eq(organizationSubscriptions.organizationId, input.organizationId))
       .orderBy(desc(organizationSubscriptions.createdAt))
       .limit(1);
-    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status)) {
+    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status) || !periodAllowsAccess(entitlement.subscription)) {
       throw new Error("An eligible organization subscription is required");
     }
 
@@ -503,7 +504,7 @@ export async function acceptOrganizationInvitation(input: {
       .orderBy(desc(organizationSubscriptions.createdAt))
       .limit(1);
 
-    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status)) {
+    if (!entitlement || !["trialing", "active", "grace"].includes(entitlement.subscription.status) || !periodAllowsAccess(entitlement.subscription)) {
       throw new Error("This organization does not have an eligible subscription");
     }
     if (invitation.role === "driver_training_admin" && !entitlement.plan.modules.includes("driver_training")) {
