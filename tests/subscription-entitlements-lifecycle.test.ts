@@ -21,7 +21,7 @@ test("navigation only exposes modules included in the organization plan", () => 
   assert.match(layout, /hasOrganizationModule\(organizationState, "vehicle_inspection"\)/);
   assert.match(layout, /hasOrganizationModule\(organizationState, "driver_training"\)/);
   assert.match(layout, /hasOrganizationModule\(organizationState, "reports"\)/);
-  assert.match(layout, /hasOrganizationModule\(organizationState, "api"\)/);
+  assert.match(layout, /hasPermission\(user, "settings"\) && hasOrganizationModule\(organizationState, "api"\)/);
   assert.match(shell, /resource: "api_module"/);
 });
 
