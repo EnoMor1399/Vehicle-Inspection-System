@@ -22,6 +22,7 @@ const APPOINTMENT_TYPES = new Set(["routine", "reinspection", "commercial", "pri
 const PRIORITIES = new Set(["normal", "high", "urgent"]);
 const ASSIGNABLE_ROLES = new Set([
   "super_admin",
+  "vehicle_inspection_admin",
   "admin",
   "operations_manager",
   "supervisor",
@@ -47,7 +48,7 @@ async function requireScheduler() {
 
 function appointmentNumber(id: string, scheduledAt: Date) {
   const stamp = scheduledAt.toISOString().slice(0, 10).replaceAll("-", "");
-  return `RSL-APT-${stamp}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+  return `VIMS-APT-${stamp}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 }
 
 function dayRange(value: Date) {
@@ -83,8 +84,14 @@ export async function createAppointment(input: AppointmentInput) {
   if (notes && notes.length > 2000) throw new Error("Appointment notes must not exceed 2000 characters");
 
   const [[vehicle], [station]] = await Promise.all([
-    db.select().from(vehicles).where(eq(vehicles.id, input.vehicleId)).limit(1),
-    db.select().from(locations).where(eq(locations.id, input.locationId)).limit(1),
+    db.select().from(vehicles).where(and(
+      eq(vehicles.organizationId, user.organizationId),
+      eq(vehicles.id, input.vehicleId),
+    )).limit(1),
+    db.select().from(locations).where(and(
+      eq(locations.organizationId, user.organizationId),
+      eq(locations.id, input.locationId),
+    )).limit(1),
   ]);
   if (!vehicle) throw new Error("Vehicle not found");
   if (vehicle.status === "decommissioned") throw new Error("A decommissioned vehicle cannot be scheduled");
@@ -96,7 +103,10 @@ export async function createAppointment(input: AppointmentInput) {
     [assignedInspector] = await db
       .select()
       .from(users)
-      .where(eq(users.id, input.assignedInspectorId))
+      .where(and(
+        eq(users.organizationId, user.organizationId),
+        eq(users.id, input.assignedInspectorId),
+      ))
       .limit(1);
     if (!assignedInspector || !assignedInspector.isActive || !ASSIGNABLE_ROLES.has(assignedInspector.role)) {
       throw new Error("Assigned inspector is not available for inspection scheduling");
@@ -116,6 +126,7 @@ export async function createAppointment(input: AppointmentInput) {
       .from(inspectionAppointments)
       .where(
         and(
+          eq(inspectionAppointments.organizationId, user.organizationId),
           eq(inspectionAppointments.locationId, station.id),
           gte(inspectionAppointments.scheduledAt, start),
           lt(inspectionAppointments.scheduledAt, end),
@@ -132,6 +143,7 @@ export async function createAppointment(input: AppointmentInput) {
       .from(inspectionAppointments)
       .where(
         and(
+          eq(inspectionAppointments.organizationId, user.organizationId),
           eq(inspectionAppointments.vehicleId, vehicle.id),
           gte(inspectionAppointments.scheduledAt, start),
           lt(inspectionAppointments.scheduledAt, end),
@@ -146,6 +158,7 @@ export async function createAppointment(input: AppointmentInput) {
 
     await tx.insert(inspectionAppointments).values({
       id,
+      organizationId: user.organizationId,
       appointmentNumber: number,
       vehicleId: vehicle.id,
       locationId: station.id,
@@ -162,6 +175,7 @@ export async function createAppointment(input: AppointmentInput) {
     if (assignedInspector) {
       await tx.insert(notifications).values({
         id: newId(),
+        organizationId: user.organizationId,
         userId: assignedInspector.id,
         type: "system",
         title: "Inspection appointment assigned",
@@ -175,6 +189,7 @@ export async function createAppointment(input: AppointmentInput) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -211,7 +226,11 @@ export async function updateAppointmentStatus(id: string, nextStatus: Appointmen
     .from(inspectionAppointments)
     .innerJoin(vehicles, eq(vehicles.id, inspectionAppointments.vehicleId))
     .leftJoin(locations, eq(locations.id, inspectionAppointments.locationId))
-    .where(eq(inspectionAppointments.id, id))
+    .where(and(
+      eq(inspectionAppointments.organizationId, user.organizationId),
+      eq(vehicles.organizationId, user.organizationId),
+      eq(inspectionAppointments.id, id),
+    ))
     .limit(1);
 
   if (!row) throw new Error("Appointment not found");
@@ -225,9 +244,13 @@ export async function updateAppointmentStatus(id: string, nextStatus: Appointmen
   await db
     .update(inspectionAppointments)
     .set({ status: nextStatus, updatedAt: new Date() })
-    .where(eq(inspectionAppointments.id, id));
+    .where(and(
+      eq(inspectionAppointments.organizationId, user.organizationId),
+      eq(inspectionAppointments.id, id),
+    ));
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
