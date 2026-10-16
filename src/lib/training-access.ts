@@ -11,11 +11,11 @@ type TrainingAccount = TrainingUser & {
 
 const TRAINING_VIEW_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
   "instructor",
-  "inspector",
   "data_entry",
   "auditor",
   "compliance_officer",
@@ -24,22 +24,24 @@ const TRAINING_VIEW_ROLES = new Set([
 // Operational management covers sessions, participants, instruction and assessment capture.
 const TRAINING_MANAGE_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
   "instructor",
-  "inspector",
   "data_entry",
 ]);
 
 // Account administration is intentionally narrower than operational management.
 const TRAINING_USER_ADMIN_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
 ]);
 
 const TRAINING_ASSESSMENT_REVIEW_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
@@ -47,12 +49,14 @@ const TRAINING_ASSESSMENT_REVIEW_ROLES = new Set([
 
 const TRAINING_COMMERCIAL_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
 ]);
 
 const TRAINING_CERTIFICATE_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
@@ -60,6 +64,7 @@ const TRAINING_CERTIFICATE_ROLES = new Set([
 
 const TRAINING_COMPLIANCE_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
@@ -68,6 +73,7 @@ const TRAINING_COMPLIANCE_ROLES = new Set([
 
 const TRAINING_GOVERNANCE_ROLES = new Set([
   "super_admin",
+  "driver_training_admin",
   "admin",
   "operations_manager",
   "supervisor",
@@ -103,7 +109,7 @@ export function canManageTrainingUsers(user: TrainingUser) {
   if (!canAccessDriverTraining(user) || !canViewTraining(user)) return false;
   const explicit = explicitPermission(user, "training_user_admin");
   if (explicit === false) return false;
-  if (explicit === true && (user.role === "super_admin" || user.role === "admin")) return true;
+  if (explicit === true && (user.role === "super_admin" || user.role === "driver_training_admin" || user.role === "admin")) return true;
   return TRAINING_USER_ADMIN_ROLES.has(user.role);
 }
 
@@ -141,12 +147,12 @@ export function trainingPermissionsForRole(role: string): Record<string, boolean
 
 export function canAdministrativelySelfReviewTrainingAssessment(user: TrainingUser) {
   if (!canReviewTrainingAssessments(user)) return false;
-  return user.role === "super_admin" || user.role === "admin";
+  return user.role === "super_admin" || user.role === "driver_training_admin" || user.role === "admin";
 }
 
 export function canCreateDriverTrainingUsers(user: TrainingUser) {
   if (!canManageTrainingUsers(user)) return false;
-  return user.role === "super_admin" || user.role === "admin";
+  return user.role === "super_admin" || user.role === "driver_training_admin" || user.role === "admin";
 }
 
 export function canServeAsInternalTrainingInstructor(user: TrainingAccount) {
