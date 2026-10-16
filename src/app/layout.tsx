@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "RSL — Vehicle Inspection Management System",
   description: "Road Safety Limited — secure vehicle inspection, compliance, reporting, and fleet operations management.",
-  manifest: "/manifest.json",
+  manifest: "/manifest.json?v=4",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -25,11 +25,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/pwa/icon/192", sizes: "192x192", type: "image/png" },
+      { url: "/pwa/icon/512", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa/icon/192", sizes: "192x192", type: "image/png" },
     ],
   },
   other: {
@@ -112,7 +112,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" href={settings.logoDataUrl || "/icons/icon-192.png"} />
+        <link rel="apple-touch-icon" href={settings.logoDataUrl || "/pwa/icon/192"} />
         <meta name="theme-color" content={settings.themeColor} />
         <style nonce={nonce}>{`:root { --brand-color: ${settings.themeColor}; --brand-accent: ${settings.accentColor}; }`}</style>
       </head>
