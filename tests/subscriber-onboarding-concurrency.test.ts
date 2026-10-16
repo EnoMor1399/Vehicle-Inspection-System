@@ -30,6 +30,7 @@ test("administrator invitations serialize seat reservation and block repeat emai
   assert.match(invite, /gt\(organizationInvitations.expiresAt, new Date\(\)\)/);
   assert.match(invite, /subscription user limit has been reached/);
   assert.match(invite, /requiredModule/);
+  assert.match(invite, /periodAllowsAccess\(entitlement.subscription\)/);
   assert.match(invite, /tokenHash: invitationHash\(token\)/);
 });
 
@@ -42,6 +43,7 @@ test("claiming an invitation rechecks current role, org and plan under a transac
   assert.match(accept, /organization.status === "suspended"/);
   assert.match(accept, /entitlement.plan.modules.includes\("driver_training"\)/);
   assert.match(accept, /entitlement.plan.modules.includes\("vehicle_inspection"\)/);
+  assert.match(accept, /periodAllowsAccess\(entitlement.subscription\)/);
   assert.match(accept, /const \[claimed\] = await tx/);
   assert.match(accept, /isNull\(organizationInvitations.acceptedAt\)/);
   assert.match(accept, /isNull\(organizationInvitations.revokedAt\)/);
