@@ -86,6 +86,7 @@ export async function createTrainingQuotation(formData: FormData) {
     const versionNumber = existing.reduce((max, quote) => Math.max(max, quote.versionNumber), 0) + 1;
     const quotationNumber = `TQT-${new Date().getUTCFullYear()}-${id.slice(0, 8).toUpperCase()}-V${versionNumber}`;
     const values = {
+      organizationId: user.organizationId,
       id,
       quotationNumber,
       requestId: request.id,
