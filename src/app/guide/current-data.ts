@@ -163,7 +163,9 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
           "Use browser Back carefully on unfinished forms; verify the record was submitted before leaving a transaction",
         ],
       },
-      "administration-boundaries": {
+    },
+    append: [
+      {
         id: "administration-boundaries",
         title: "Administration Domains & Responsibilities",
         content:
@@ -181,7 +183,7 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
           "Role or domain changes revoke active sessions so the user must sign in again under the new authorization boundary",
         ],
       },
-    },
+    ],
   },
   inspections: {
     replacements: {
