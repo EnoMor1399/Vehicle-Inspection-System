@@ -47,7 +47,11 @@ export async function updateUserAccess(input: {
     // last-Super-Administrator invariant or transporter/session updates.
     await tx.execute(sql`select pg_advisory_xact_lock(78654223)`);
 
-    const [target] = await tx.select().from(users).where(eq(users.id, input.userId)).limit(1);
+    const [target] = await tx
+      .select()
+      .from(users)
+      .where(and(eq(users.organizationId, actor.organizationId), eq(users.id, input.userId)))
+      .limit(1);
     if (!target) return { ok: false as const, error: "User account not found" };
     if (target.organizationId !== actor.organizationId) {
       return { ok: false as const, error: "Cross-organization user administration is not permitted" };
@@ -132,7 +136,10 @@ export async function updateUserAccess(input: {
 
     const locationId = vehicleInspectionAccess ? input.locationId || null : null;
     if (locationId) {
-      const [location] = await tx.select({ id: locations.id }).from(locations).where(eq(locations.id, locationId)).limit(1);
+      const [location] = await tx.select({ id: locations.id }).from(locations).where(and(
+        eq(locations.organizationId, actor.organizationId),
+        eq(locations.id, locationId),
+      )).limit(1);
       if (!location) return { ok: false as const, error: "Selected inspection station does not exist" };
     }
 
@@ -142,7 +149,10 @@ export async function updateUserAccess(input: {
       const [transporter] = await tx
         .select({ id: transporters.id, deletedAt: transporters.deletedAt })
         .from(transporters)
-        .where(eq(transporters.id, transporterId))
+        .where(and(
+          eq(transporters.organizationId, actor.organizationId),
+          eq(transporters.id, transporterId),
+        ))
         .limit(1);
       if (!transporter || transporter.deletedAt) {
         return { ok: false as const, error: "Selected transporter is unavailable" };
@@ -193,7 +203,7 @@ export async function updateUserAccess(input: {
     const [updated] = await tx
       .update(users)
       .set(patch)
-      .where(eq(users.id, target.id))
+      .where(and(eq(users.organizationId, actor.organizationId), eq(users.id, target.id)))
       .returning();
 
     if (!updated) return { ok: false as const, error: "User account update did not complete" };
@@ -204,7 +214,10 @@ export async function updateUserAccess(input: {
       const [profile] = await tx
         .select()
         .from(trainingInstructorProfiles)
-        .where(eq(trainingInstructorProfiles.userId, target.id))
+        .where(and(
+          eq(trainingInstructorProfiles.organizationId, actor.organizationId),
+          eq(trainingInstructorProfiles.userId, target.id),
+        ))
         .limit(1);
 
       if (profile) {
@@ -213,13 +226,17 @@ export async function updateUserAccess(input: {
           await tx
             .update(trainingInstructorProfiles)
             .set({ status: "active", updatedAt: new Date() })
-            .where(eq(trainingInstructorProfiles.id, profile.id));
+            .where(and(
+              eq(trainingInstructorProfiles.organizationId, actor.organizationId),
+              eq(trainingInstructorProfiles.id, profile.id),
+            ));
           instructorProfileEnsured = true;
         }
       } else {
         const profileId = newId();
         const instructorCode = `DTI-${new Date().getUTCFullYear()}-${profileId.slice(0, 8).toUpperCase()}`;
         await tx.insert(trainingInstructorProfiles).values({
+          organizationId: actor.organizationId,
           id: profileId,
           userId: target.id,
           instructorCode,
@@ -256,6 +273,7 @@ export async function updateUserAccess(input: {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
