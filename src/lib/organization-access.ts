@@ -11,6 +11,12 @@ export const RSL_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000101";
 
 export type OrganizationUser = Pick<typeof users.$inferSelect, "id" | "role" | "organizationId">;
 
+export type OrganizationModule =
+  | "vehicle_inspection"
+  | "driver_training"
+  | "reports"
+  | "api";
+
 export type SubscriptionAccessState = {
   organization: typeof organizations.$inferSelect | null;
   subscription: typeof organizationSubscriptions.$inferSelect | null;
@@ -120,6 +126,26 @@ export async function getOrganizationSubscriptionState(
       && Boolean(organization.dataIsolationVerifiedAt),
     reason,
   };
+}
+
+export function hasOrganizationModule(
+  state: Pick<SubscriptionAccessState, "plan">,
+  module: OrganizationModule,
+) {
+  return Boolean(state.plan?.modules.includes(module));
+}
+
+export function organizationModuleLabel(module: OrganizationModule) {
+  switch (module) {
+    case "vehicle_inspection":
+      return "Vehicle Inspection";
+    case "driver_training":
+      return "Driver Training & Assessment";
+    case "reports":
+      return "Reports & Analytics";
+    case "api":
+      return "API & Integrations";
+  }
 }
 
 export async function getOrganizationBySlug(slug: string) {
