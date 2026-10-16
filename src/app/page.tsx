@@ -19,7 +19,7 @@ import {
 import { requireVehicleInspectionUser } from "@/lib/require-auth";
 import { db } from "@/db";
 import { dailyInspections, vehicles } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import {
   computeDashboardStats,
   getMonthlyTrend,
@@ -47,7 +47,7 @@ import type { ReactNode } from "react";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  await requireVehicleInspectionUser();
+  const user = await requireVehicleInspectionUser();
   const today = new Date().toISOString().slice(0, 10);
   const [
     stats,
@@ -61,15 +61,15 @@ export default async function DashboardPage() {
     yearlyData,
     todaysDaily,
   ] = await Promise.all([
-    computeDashboardStats(),
-    getMonthlyTrend(),
-    getStationStats(),
-    getTransporterPerformance(),
-    getCommonDefects(),
-    getCategoryDistribution(),
-    getRegionalStats(),
-    getInspectorPerformance(),
-    getYearlyComparison(),
+    computeDashboardStats(user.organizationId),
+    getMonthlyTrend(user.organizationId),
+    getStationStats(user.organizationId),
+    getTransporterPerformance(user.organizationId),
+    getCommonDefects(user.organizationId),
+    getCategoryDistribution(user.organizationId),
+    getRegionalStats(user.organizationId),
+    getInspectorPerformance(user.organizationId),
+    getYearlyComparison(user.organizationId),
     db
       .select({
         id: dailyInspections.id,
@@ -83,7 +83,11 @@ export default async function DashboardPage() {
       })
       .from(dailyInspections)
       .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
-      .where(eq(dailyInspections.inspectionDate, today))
+      .where(and(
+        eq(dailyInspections.organizationId, user.organizationId),
+        eq(vehicles.organizationId, user.organizationId),
+        eq(dailyInspections.inspectionDate, today),
+      ))
       .orderBy(desc(dailyInspections.completedAt))
       .limit(5),
   ]);
