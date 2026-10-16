@@ -125,6 +125,13 @@ const requiredTenantTables = [
   ...requiredTrainingTenantTables,
 ];
 
+const requiredSubscriptionCapacityTriggers = [
+  "users_subscription_capacity_guard",
+  "locations_subscription_capacity_guard",
+  "vehicles_subscription_capacity_guard",
+  "inspections_subscription_capacity_guard",
+];
+
 const requiredTenantTriggers = [
   "users_tenant_reference_guard",
   "vehicle_tenant_reference_guard",
@@ -388,6 +395,18 @@ try {
     (name) => !presentTenantTriggers.has(name),
   );
 
+  const capacityTriggerResult = await client.query(
+    `SELECT tgname
+       FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname = ANY($1::text[])`,
+    [requiredSubscriptionCapacityTriggers],
+  );
+  const presentCapacityTriggers = new Set(capacityTriggerResult.rows.map((row) => row.tgname));
+  const missingCapacityTriggers = requiredSubscriptionCapacityTriggers.filter(
+    (name) => !presentCapacityTriggers.has(name),
+  );
+
   const assessmentColumnResult = await client.query(
     `SELECT column_name
        FROM information_schema.columns
@@ -517,6 +536,8 @@ try {
       tenantColumnsWithDefaults: tenantColumnsWithDefaults.length,
       tenantTriggersVerified: requiredTenantTriggers.length - missingTenantTriggers.length,
       tenantTriggersExpected: requiredTenantTriggers.length,
+      subscriptionCapacityTriggersVerified: requiredSubscriptionCapacityTriggers.length - missingCapacityTriggers.length,
+      subscriptionCapacityTriggersExpected: requiredSubscriptionCapacityTriggers.length,
     }),
   );
 
@@ -539,6 +560,7 @@ try {
     || nullableTenantColumns.length > 0
     || tenantColumnsWithDefaults.length > 0
     || missingTenantTriggers.length > 0
+    || missingCapacityTriggers.length > 0
   ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
@@ -558,6 +580,7 @@ try {
     if (nullableTenantColumns.length > 0) console.error(`Nullable organization_id columns: ${nullableTenantColumns.join(", ")}`);
     if (tenantColumnsWithDefaults.length > 0) console.error(`Tenant columns still using compatibility defaults: ${tenantColumnsWithDefaults.join(", ")}`);
     if (missingTenantTriggers.length > 0) console.error(`Missing tenant reference guards: ${missingTenantTriggers.join(", ")}`);
+    if (missingCapacityTriggers.length > 0) console.error(`Missing subscription capacity guards: ${missingCapacityTriggers.join(", ")}`);
     process.exitCode = 1;
   } else {
     console.log("Enterprise database upgrade verification passed.");
