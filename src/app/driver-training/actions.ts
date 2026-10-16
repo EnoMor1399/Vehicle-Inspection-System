@@ -141,6 +141,7 @@ export async function createTrainingSession(formData: FormData) {
 
   await db.insert(trainingSessions).values(values);
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
@@ -181,6 +182,7 @@ export async function updateTrainingSessionStatus(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
@@ -222,7 +224,7 @@ export async function addTrainingParticipant(formData: FormData) {
       return { ok: false as const, error: "Participants cannot be added to a completed or cancelled session" };
     }
 
-    const [capacity] = await tx.select({ n: count() }).from(trainingParticipants).where(eq(trainingParticipants.sessionId, data.sessionId));
+    const [capacity] = await tx.select({ n: count() }).from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.sessionId, data.sessionId)));
     if (Number(capacity?.n || 0) >= session.capacity) {
       return { ok: false as const, error: "Training session has reached its participant capacity" };
     }
@@ -271,6 +273,7 @@ export async function addTrainingParticipant(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
@@ -308,6 +311,7 @@ export async function updateTrainingAttendance(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
@@ -385,6 +389,7 @@ export async function recordTrainingAssessment(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
@@ -472,6 +477,7 @@ export async function issueTrainingCertificate(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+   organizationId: user.organizationId,
     organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
