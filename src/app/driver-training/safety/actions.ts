@@ -74,6 +74,7 @@ export async function createTrainingRiskAssessment(formData: FormData) {
     if (existing) return { ok: false as const, error: "This training session already has a risk assessment" };
     const values = {
       id,
+      organizationId: user.organizationId,
       sessionId: session.id,
       status: "draft",
       overallRisk: data.overallRisk,
@@ -123,6 +124,7 @@ export async function addTrainingSafetyHazard(formData: FormData) {
     if (!["draft", "blocked"].includes(assessment.status)) return { ok: false as const, error: "Hazards can only be changed while the risk assessment is draft or blocked" };
     const values = {
       id,
+      organizationId: user.organizationId,
       assessmentId: assessment.id,
       hazard: data.hazard,
       consequence: data.consequence,
@@ -204,6 +206,7 @@ export async function reportTrainingSafetyIncident(formData: FormData) {
     }
     const values = {
       id,
+      organizationId: user.organizationId,
       incidentNumber,
       sessionId: session.id,
       participantId: data.participantId || null,
