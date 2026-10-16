@@ -103,6 +103,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
     const [after] = await tx
       .insert(trainingAttendanceSignoffs)
       .values({
+        organizationId: actor.organizationId,
         id: newId(),
         participantId: context.participantId,
         sessionId: context.sessionId,
@@ -366,6 +367,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
     const [after] = await tx
       .insert(trainingEvidenceRecords)
       .values({
+        organizationId: actor.organizationId,
         id: newId(),
         sessionId: data.sessionId,
         participantId: data.participantId || null,
