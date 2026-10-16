@@ -10,6 +10,7 @@ import {
   date,
   pgEnum,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -321,6 +322,9 @@ export const dailyInspections = pgTable(
   "daily_inspections",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     vehicleId: varchar("vehicle_id", { length: 36 })
       .notNull()
       .references(() => vehicles.id, { onDelete: "cascade" }),
@@ -353,6 +357,8 @@ export const dailyInspections = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("daily_insp_organization_idx").on(t.organizationId),
+    organizationDateIdx: index("daily_insp_organization_date_idx").on(t.organizationId, t.inspectionDate.desc()),
     vehicleIdx: index("daily_insp_vehicle_idx").on(t.vehicleId),
     dateIdx: index("daily_insp_date_idx").on(t.inspectionDate),
     driverIdx: index("daily_insp_driver_idx").on(t.driverId),
@@ -434,6 +440,9 @@ export const webhooks = pgTable(
   "webhooks",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
     url: text("url").notNull(),
     events: jsonb("events").$type<string[]>().notNull().default([]),
@@ -445,6 +454,7 @@ export const webhooks = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("webhook_organization_idx").on(t.organizationId),
     userIdx: index("webhook_user_idx").on(t.userId),
   })
 );
@@ -456,8 +466,11 @@ export const locations = pgTable(
   "locations",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     name: varchar("name", { length: 200 }).notNull(),
-    code: varchar("code", { length: 20 }).notNull().unique(),
+    code: varchar("code", { length: 20 }).notNull(),
     region: varchar("region", { length: 100 }),
     district: varchar("district", { length: 100 }),
     address: text("address"),
@@ -472,6 +485,8 @@ export const locations = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("location_organization_idx").on(t.organizationId),
+    organizationCodeIdx: uniqueIndex("location_organization_code_uidx").on(t.organizationId, t.code),
     codeIdx: index("location_code_idx").on(t.code),
     regionIdx: index("location_region_idx").on(t.region),
   })
@@ -523,6 +538,9 @@ export const transporters = pgTable(
   "transporters",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     companyName: varchar("company_name", { length: 255 }).notNull(),
     registrationNumber: varchar("registration_number", { length: 100 }),
     tinNumber: varchar("tin_number", { length: 100 }),
@@ -545,6 +563,8 @@ export const transporters = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("transporter_organization_idx").on(t.organizationId),
+    organizationCompanyIdx: index("transporter_organization_company_idx").on(t.organizationId, t.companyName),
     companyIdx: index("transporter_company_idx").on(t.companyName),
     deletedIdx: index("transporter_deleted_idx").on(t.deletedAt),
     regionDeletedIdx: index("transporter_region_deleted_idx").on(t.region, t.deletedAt),
@@ -556,8 +576,11 @@ export const vehicles = pgTable(
   "vehicles",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     transporterId: varchar("transporter_id", { length: 36 }).references(() => transporters.id, { onDelete: "set null" }),
-    registrationNumber: varchar("registration_number", { length: 50 }).notNull().unique(),
+    registrationNumber: varchar("registration_number", { length: 50 }).notNull(),
     oldRegistrationNumber: varchar("old_registration_number", { length: 50 }),
     make: varchar("make", { length: 100 }).notNull(),
     model: varchar("model", { length: 100 }),
@@ -591,6 +614,9 @@ export const vehicles = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("vehicle_organization_idx").on(t.organizationId),
+    organizationRegIdx: uniqueIndex("vehicle_organization_reg_uidx").on(t.organizationId, t.registrationNumber),
+    organizationStatusIdx: index("vehicle_organization_status_idx").on(t.organizationId, t.status),
     regIdx: index("vehicle_reg_idx").on(t.registrationNumber),
     transporterIdx: index("vehicle_transporter_idx").on(t.transporterId),
     statusIdx: index("vehicle_status_idx").on(t.status),
@@ -603,7 +629,10 @@ export const rfidTags = pgTable(
   "rfid_tags",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
-    tagUid: varchar("tag_uid", { length: 128 }).notNull().unique(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    tagUid: varchar("tag_uid", { length: 128 }).notNull(),
     vehicleId: varchar("vehicle_id", { length: 36 }).notNull().references(() => vehicles.id, { onDelete: "cascade" }),
     status: varchar("status", { length: 20 }).notNull().default("active"),
     assignedBy: varchar("assigned_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
@@ -614,6 +643,8 @@ export const rfidTags = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("rfid_organization_idx").on(t.organizationId),
+    organizationTagIdx: uniqueIndex("rfid_organization_tag_uidx").on(t.organizationId, t.tagUid),
     tagIdx: index("rfid_tag_uid_idx").on(t.tagUid),
     vehicleIdx: index("rfid_vehicle_idx").on(t.vehicleId),
     statusIdx: index("rfid_status_idx").on(t.status),
@@ -625,7 +656,10 @@ export const inspections = pgTable(
   "inspections",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
-    inspectionNumber: varchar("inspection_number", { length: 50 }).notNull().unique(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    inspectionNumber: varchar("inspection_number", { length: 50 }).notNull(),
     vehicleId: varchar("vehicle_id", { length: 36 })
       .notNull()
       .references(() => vehicles.id, { onDelete: "cascade" }),
@@ -663,6 +697,10 @@ export const inspections = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("inspection_organization_idx").on(t.organizationId),
+    organizationNumberIdx: uniqueIndex("inspection_organization_number_uidx").on(t.organizationId, t.inspectionNumber),
+    organizationDateIdx: index("inspection_organization_date_idx").on(t.organizationId, t.inspectionDate.desc()),
+    organizationResultDateIdx: index("inspection_organization_result_date_idx").on(t.organizationId, t.overallResult, t.inspectionDate.desc()),
     vehicleIdx: index("inspection_vehicle_idx").on(t.vehicleId),
     numberIdx: index("inspection_number_idx").on(t.inspectionNumber),
     dateIdx: index("inspection_date_idx").on(t.inspectionDate),
@@ -713,7 +751,10 @@ export const inspectionAppointments = pgTable(
   "inspection_appointments",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
-    appointmentNumber: varchar("appointment_number", { length: 50 }).notNull().unique(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    appointmentNumber: varchar("appointment_number", { length: 50 }).notNull(),
     vehicleId: varchar("vehicle_id", { length: 36 })
       .notNull()
       .references(() => vehicles.id, { onDelete: "cascade" }),
@@ -735,6 +776,9 @@ export const inspectionAppointments = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("inspection_appointment_organization_idx").on(t.organizationId),
+    organizationNumberIdx: uniqueIndex("inspection_appointment_organization_number_uidx").on(t.organizationId, t.appointmentNumber),
+    organizationScheduledIdx: index("inspection_appointment_organization_scheduled_idx").on(t.organizationId, t.scheduledAt),
     scheduledIdx: index("inspection_appointment_scheduled_idx").on(t.scheduledAt),
     locationScheduledIdx: index("inspection_appointment_location_scheduled_idx").on(t.locationId, t.scheduledAt),
     statusScheduledIdx: index("inspection_appointment_status_scheduled_idx").on(t.status, t.scheduledAt),
@@ -749,6 +793,9 @@ export const documents = pgTable(
   "documents",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     ownerType: varchar("owner_type", { length: 20 }).notNull(),
     ownerId: varchar("owner_id", { length: 36 }).notNull(),
     name: varchar("name", { length: 255 }).notNull(),
@@ -762,6 +809,8 @@ export const documents = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("document_organization_idx").on(t.organizationId),
+    organizationOwnerIdx: index("document_organization_owner_idx").on(t.organizationId, t.ownerType, t.ownerId),
     ownerIdx: index("doc_owner_idx").on(t.ownerType, t.ownerId),
     expiryIdx: index("doc_expiry_idx").on(t.expiryDate),
     ownerExpiryIdx: index("doc_owner_expiry_idx").on(t.ownerType, t.ownerId, t.expiryDate),
@@ -773,6 +822,9 @@ export const auditLogs = pgTable(
   "audit_logs",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
     userName: varchar("user_name", { length: 200 }),
     action: auditActionEnum("action").notNull(),
@@ -788,6 +840,8 @@ export const auditLogs = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("audit_organization_idx").on(t.organizationId),
+    organizationCreatedIdx: index("audit_organization_created_idx").on(t.organizationId, t.createdAt.desc()),
     entityIdx: index("audit_entity_idx").on(t.entityType, t.entityId),
     userIdx: index("audit_user_idx").on(t.userId),
     createdIdx: index("audit_created_idx").on(t.createdAt),
@@ -802,6 +856,9 @@ export const notifications = pgTable(
   "notifications",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }),
     type: notificationTypeEnum("type").notNull(),
     title: varchar("title", { length: 255 }).notNull(),
@@ -815,6 +872,8 @@ export const notifications = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("notification_organization_idx").on(t.organizationId),
+    organizationCreatedIdx: index("notification_organization_created_idx").on(t.organizationId, t.createdAt.desc()),
     userIdx: index("notif_user_idx").on(t.userId),
     typeIdx: index("notif_type_idx").on(t.type),
     dueIdx: index("notif_due_idx").on(t.dueDate),
@@ -829,6 +888,9 @@ export const importJobs = pgTable(
   "import_jobs",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     fileName: varchar("file_name", { length: 255 }).notNull(),
     fileType: varchar("file_type", { length: 20 }).notNull(), // xlsx, xls, csv
     entityType: varchar("entity_type", { length: 50 }).notNull(), // vehicles, transporters, inspections
@@ -845,6 +907,8 @@ export const importJobs = pgTable(
     completedAt: timestamp("completed_at"),
   },
   (t) => ({
+    organizationIdx: index("import_organization_idx").on(t.organizationId),
+    organizationCreatedIdx: index("import_organization_created_idx").on(t.organizationId, t.createdAt.desc()),
     statusIdx: index("import_status_idx").on(t.status),
     createdIdx: index("import_created_idx").on(t.createdAt),
   })
@@ -855,6 +919,9 @@ export const apiKeys = pgTable(
   "api_keys",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 200 }).notNull(),
     keyHash: varchar("key_hash", { length: 128 }).notNull().unique(),
@@ -866,6 +933,7 @@ export const apiKeys = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("api_key_organization_idx").on(t.organizationId),
     userHashIdx: index("api_key_user_idx").on(t.userId),
   })
 );
@@ -875,6 +943,9 @@ export const signatures = pgTable(
   "signatures",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     inspectionId: varchar("inspection_id", { length: 36 })
       .notNull()
       .references(() => inspections.id, { onDelete: "cascade" }),
@@ -886,6 +957,7 @@ export const signatures = pgTable(
     ipAddress: varchar("ip_address", { length: 50 }),
   },
   (t) => ({
+    organizationIdx: index("signature_organization_idx").on(t.organizationId),
     inspIdx: index("sig_inspection_idx").on(t.inspectionId),
   })
 );
@@ -939,6 +1011,9 @@ export const securityEvents = pgTable(
   "security_events",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
     eventType: varchar("event_type", { length: 50 }).notNull(), // login_failed, login_success, password_change, 2fa_enabled, etc.
     severity: varchar("severity", { length: 20 }).notNull().default("info"), // info, warning, critical
@@ -952,6 +1027,8 @@ export const securityEvents = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("security_event_organization_idx").on(t.organizationId),
+    organizationCreatedIdx: index("security_event_organization_created_idx").on(t.organizationId, t.createdAt.desc()),
     userEventIdx: index("security_event_user_idx").on(t.userId),
     eventTypeIdx: index("security_event_type_idx").on(t.eventType),
     severityIdx: index("security_event_severity_idx").on(t.severity),
