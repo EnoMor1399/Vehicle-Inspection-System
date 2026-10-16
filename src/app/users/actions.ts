@@ -16,6 +16,7 @@ import {
 } from "@/lib/system-access";
 import { isUserRole, validateDelegatedRoleChange } from "@/lib/user-access-policy";
 import { newId } from "@/lib/utils";
+import { extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
 
 export async function updateUserAccess(input: {
   userId: string;
@@ -42,7 +43,9 @@ export async function updateUserAccess(input: {
   }
   if (!input.userId || input.userId.length > 64) throw new Error("Invalid user account identifier");
 
-  const result = await db.transaction(async (tx) => {
+  let result;
+  try {
+    result = await db.transaction(async (tx) => {
     // Serialize access mutations so concurrent role changes cannot race the
     // last-Super-Administrator invariant or transporter/session updates.
     await tx.execute(sql`select pg_advisory_xact_lock(78654223)`);
@@ -268,7 +271,12 @@ export async function updateUserAccess(input: {
       instructorProfileId,
       instructorProfileEnsured,
     };
-  });
+    });
+  } catch (error) {
+    const capacityMessage = extractSubscriptionCapacityError(error);
+    if (capacityMessage) throw new Error(capacityMessage);
+    throw error;
+  }
 
   if (!result.ok) throw new Error(result.error);
 

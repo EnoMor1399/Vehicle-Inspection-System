@@ -15,6 +15,7 @@ import {
 } from "@/lib/inspection-evidence";
 import type { InspectionDocument, InspectionSectionData } from "@/db/schema";
 import { emitWebhookEvent } from "@/lib/webhook-delivery";
+import { assertSubscriptionCapacityAvailable, extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
 
 async function requireEditor() {
   const user = await getCurrentUser();
@@ -178,6 +179,8 @@ export async function createInspection(data: InspectionFormData) {
     throw new Error("Inspector digital signature is required before submission");
   }
 
+  await assertSubscriptionCapacityAvailable(user.organizationId, "monthly_inspections", inspectedAt);
+
   const id = newId();
   const number = inspectionNumber(id, inspectedAt);
   const workflowStatus = "completed" as const;
@@ -213,8 +216,9 @@ export async function createInspection(data: InspectionFormData) {
     status: "completed",
   } as const;
 
-  await db.transaction(async (tx) => {
-    await tx.insert(inspections).values(payload as any);
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(inspections).values(payload as any);
     if (data.inspectorSignature) {
       await tx.insert(signatures).values({
         id: newId(),
@@ -253,7 +257,12 @@ export async function createInspection(data: InspectionFormData) {
       .update(vehicles)
       .set({ status: newStatus as any, updatedAt: new Date() })
       .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, data.vehicleId)));
-  });
+    });
+  } catch (error) {
+    const capacityMessage = extractSubscriptionCapacityError(error);
+    if (capacityMessage) throw new Error(capacityMessage);
+    throw error;
+  }
 
   await logAudit({
     organizationId: user.organizationId,

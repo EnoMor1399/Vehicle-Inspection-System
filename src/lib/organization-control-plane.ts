@@ -160,7 +160,10 @@ export async function getOrganizationAccountSnapshot(organizationId: string) {
   const [[organization], subscription, [userCountRow], pendingInvitations] = await Promise.all([
     db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1),
     getLatestOrganizationSubscription(organizationId),
-    db.select({ n: count() }).from(users).where(eq(users.organizationId, organizationId)),
+    db
+      .select({ n: count() })
+      .from(users)
+      .where(and(eq(users.organizationId, organizationId), eq(users.isActive, true))),
     db
       .select({ id: organizationInvitations.id })
       .from(organizationInvitations)

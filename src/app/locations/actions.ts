@@ -8,6 +8,7 @@ import { getCurrentUser, canManageLocations } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { newId } from "@/lib/utils";
 import { adminValidationMessage, stationAdminSchema } from "@/lib/admin-entity-policy";
+import { assertSubscriptionCapacityAvailable, extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
 
 export type StationInput = {
   id?: string;
@@ -71,10 +72,19 @@ export async function saveStation(input: StationInput) {
       .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)))
       .limit(1);
     if (!before) throw new Error("Station not found");
-    await db
-      .update(locations)
-      .set(values)
-      .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)));
+    if (before.status === "inactive" && status !== "inactive") {
+      await assertSubscriptionCapacityAvailable(user.organizationId, "stations");
+    }
+    try {
+      await db
+        .update(locations)
+        .set(values)
+        .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)));
+    } catch (error) {
+      const capacityMessage = extractSubscriptionCapacityError(error);
+      if (capacityMessage) throw new Error(capacityMessage);
+      throw error;
+    }
     await logAudit({
       organizationId: user.organizationId,
       userId: user.id,
@@ -88,8 +98,17 @@ export async function saveStation(input: StationInput) {
       after: values,
     });
   } else {
+    if (status !== "inactive") {
+      await assertSubscriptionCapacityAvailable(user.organizationId, "stations");
+    }
     const id = newId();
-    await db.insert(locations).values({ id, organizationId: user.organizationId, ...values });
+    try {
+      await db.insert(locations).values({ id, organizationId: user.organizationId, ...values });
+    } catch (error) {
+      const capacityMessage = extractSubscriptionCapacityError(error);
+      if (capacityMessage) throw new Error(capacityMessage);
+      throw error;
+    }
     await logAudit({
       organizationId: user.organizationId,
       userId: user.id,

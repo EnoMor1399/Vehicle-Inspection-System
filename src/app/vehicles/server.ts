@@ -10,6 +10,7 @@ import { getCurrentUser, canEditVehicles, canAccessTransporterScope } from "@/li
 import { adminValidationMessage, vehicleAdminSchema } from "@/lib/admin-entity-policy";
 import { validateGenericVehicleStatusTransition } from "@/lib/vehicle-lifecycle";
 import { emitWebhookEvent } from "@/lib/webhook-delivery";
+import { assertSubscriptionCapacityAvailable, extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
 
 export type VehicleFormData = {
   transporterId?: string | null;
@@ -119,6 +120,8 @@ export async function createVehicle(data: VehicleFormData) {
     throw new Error("New vehicles can start only as active or suspended");
   }
 
+  await assertSubscriptionCapacityAvailable(user.organizationId, "vehicles");
+
   const transporterId = await validateTransporterReference(user.organizationId, parsed.transporterId);
   const id = newId();
   const payload = {
@@ -131,6 +134,8 @@ export async function createVehicle(data: VehicleFormData) {
   try {
     await db.insert(vehicles).values(payload);
   } catch (error) {
+    const capacityMessage = extractSubscriptionCapacityError(error);
+    if (capacityMessage) throw new Error(capacityMessage);
     const message = error instanceof Error ? error.message : "";
     if (/unique|duplicate/i.test(message)) throw new Error("Vehicle registration already exists");
     throw new Error("Vehicle could not be created");

@@ -17,6 +17,7 @@ import {
 import { isUserRole } from "@/lib/user-access-policy";
 import { newId } from "@/lib/utils";
 import { getOrganizationAccountSnapshot } from "@/lib/organization-control-plane";
+import { extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
 
 const TRAINING_ACCOUNT_ROLES = new Set([
   "driver_training_admin",
@@ -191,6 +192,8 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
     if (error instanceof Error && error.message === DUPLICATE_EMAIL_MESSAGE) {
       redirectWithFormError(DUPLICATE_EMAIL_MESSAGE);
     }
+    const capacityMessage = extractSubscriptionCapacityError(error);
+    if (capacityMessage) redirectWithFormError(capacityMessage);
     throw error;
   }
 
