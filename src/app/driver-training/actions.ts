@@ -78,13 +78,13 @@ export async function createTrainingSession(formData: FormData) {
     const [transporter] = await db
       .select({ id: transporters.id, deletedAt: transporters.deletedAt })
       .from(transporters)
-      .where(eq(transporters.id, data.transporterId))
+      .where(and(eq(transporters.organizationId, user.organizationId), eq(transporters.id, data.transporterId)))
       .limit(1);
     if (!transporter || transporter.deletedAt) throw new Error("Selected transporter is unavailable");
   }
 
   if (data.locationId) {
-    const [location] = await db.select({ id: locations.id }).from(locations).where(eq(locations.id, data.locationId)).limit(1);
+    const [location] = await db.select({ id: locations.id }).from(locations).where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.locationId))).limit(1);
     if (!location) throw new Error("Selected station does not exist");
   }
 
@@ -98,12 +98,15 @@ export async function createTrainingSession(formData: FormData) {
           isActive: users.isActive,
         })
         .from(users)
-        .where(eq(users.id, data.instructorId))
+        .where(and(eq(users.organizationId, user.organizationId), eq(users.id, data.instructorId)))
         .limit(1),
       db
         .select({ status: trainingInstructorProfiles.status })
         .from(trainingInstructorProfiles)
-        .where(eq(trainingInstructorProfiles.userId, data.instructorId))
+        .where(and(
+          eq(trainingInstructorProfiles.organizationId, user.organizationId),
+          eq(trainingInstructorProfiles.userId, data.instructorId),
+        ))
         .limit(1),
     ]);
     if (!instructor || !canServeAsInternalTrainingInstructor(instructor) || profile?.status !== "active") {
@@ -116,6 +119,7 @@ export async function createTrainingSession(formData: FormData) {
   const service = DRIVER_TRAINING_SERVICES.find((item) => item.id === data.serviceId);
   const values = {
     id,
+    organizationId: user.organizationId,
     referenceNumber,
     serviceId: data.serviceId,
     title: data.title,
@@ -137,6 +141,7 @@ export async function createTrainingSession(formData: FormData) {
 
   await db.insert(trainingSessions).values(values);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -161,7 +166,7 @@ export async function updateTrainingSessionStatus(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.sessionId}))`);
-    const [before] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [before] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!before) return { ok: false as const, error: "Training session not found" };
     if (!canTransitionTrainingSession(before.status, data.status)) {
       return { ok: false as const, error: `Training session cannot move from ${before.status} to ${data.status}` };
@@ -170,12 +175,13 @@ export async function updateTrainingSessionStatus(formData: FormData) {
     await tx
       .update(trainingSessions)
       .set({ status: data.status, updatedAt: new Date() })
-      .where(eq(trainingSessions.id, data.sessionId));
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId)));
     return { ok: true as const, before };
   });
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -210,7 +216,7 @@ export async function addTrainingParticipant(formData: FormData) {
   const id = newId();
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.sessionId}))`);
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status === "completed" || session.status === "cancelled") {
       return { ok: false as const, error: "Participants cannot be added to a completed or cancelled session" };
@@ -226,6 +232,7 @@ export async function addTrainingParticipant(formData: FormData) {
         .select({ id: trainingParticipants.id })
         .from(trainingParticipants)
         .where(and(
+        eq(trainingParticipants.organizationId, user.organizationId),
           eq(trainingParticipants.sessionId, data.sessionId),
           eq(trainingParticipants.driverLicenseNumber, data.driverLicenseNumber),
         ))
@@ -244,6 +251,7 @@ export async function addTrainingParticipant(formData: FormData) {
 
     const values = {
       id,
+      organizationId: user.organizationId,
       sessionId: data.sessionId,
       fullName: data.fullName,
       companyName: data.companyName || null,
@@ -263,6 +271,7 @@ export async function addTrainingParticipant(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -287,18 +296,19 @@ export async function updateTrainingAttendance(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.participantId}))`);
-    const [before] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+    const [before] = await tx.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId))).limit(1);
     if (!before) return { ok: false as const, error: "Training participant not found" };
 
     await tx
       .update(trainingParticipants)
       .set({ attendanceStatus: data.status, updatedAt: new Date() })
-      .where(eq(trainingParticipants.id, data.participantId));
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId)));
     return { ok: true as const, before };
   });
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -334,9 +344,9 @@ export async function recordTrainingAssessment(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.participantId}))`);
-    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+    const [participant] = await tx.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId))).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, participant.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, participant.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status === "cancelled") return { ok: false as const, error: "Cancelled training sessions cannot be assessed" };
     if (participant.attendanceStatus === "absent" || participant.attendanceStatus === "withdrawn") {
@@ -345,6 +355,7 @@ export async function recordTrainingAssessment(formData: FormData) {
 
     const assessment = {
       id,
+      organizationId: user.organizationId,
       participantId: participant.id,
       sessionId: participant.sessionId,
       assessorId: user.id,
@@ -368,12 +379,13 @@ export async function recordTrainingAssessment(formData: FormData) {
         riskLevel: data.riskLevel || participant.riskLevel,
         updatedAt: new Date(),
       })
-      .where(eq(trainingParticipants.id, participant.id));
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participant.id)));
     return { ok: true as const, participant, session, assessment };
   });
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "inspect",
@@ -407,15 +419,17 @@ export async function issueTrainingCertificate(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.participantId}))`);
-    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+    const [participant] = await tx.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId))).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, participant.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, participant.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
 
     const [passingAssessment] = await tx
       .select({ id: trainingAssessments.id, result: trainingAssessments.result })
       .from(trainingAssessments)
       .where(and(
+        eq(trainingAssessments.organizationId, user.organizationId),
+        eq(trainingParticipants.organizationId, user.organizationId),
         eq(trainingAssessments.participantId, participant.id),
         inArray(trainingAssessments.result, [...PASSING_RESULTS]),
       ))
@@ -429,6 +443,7 @@ export async function issueTrainingCertificate(formData: FormData) {
       .select({ id: trainingCertificates.id, certificateNumber: trainingCertificates.certificateNumber })
       .from(trainingCertificates)
       .where(and(
+        eq(trainingCertificates.organizationId, user.organizationId),
         eq(trainingCertificates.participantId, participant.id),
         eq(trainingCertificates.sessionId, participant.sessionId),
         eq(trainingCertificates.status, "active"),
@@ -440,6 +455,7 @@ export async function issueTrainingCertificate(formData: FormData) {
 
     const certificate = {
       id,
+      organizationId: user.organizationId,
       certificateNumber,
       verificationCode,
       participantId: participant.id,
@@ -456,6 +472,7 @@ export async function issueTrainingCertificate(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "approve",
