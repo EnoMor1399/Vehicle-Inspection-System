@@ -4,7 +4,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "crypto";
-import { and, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
 import {
   billingInvoices,
@@ -514,8 +514,19 @@ async function fetchPaystackVerification(reference: string) {
   return body.data;
 }
 
-export async function verifyPaystackPayment(reference: string) {
+export async function verifyPaystackPayment(
+  reference: string,
+  expectedOrganizationId?: string,
+) {
   const safeReference = reference.trim().slice(0, 160);
+  const conditions = [
+    eq(billingPayments.provider, "paystack"),
+    eq(billingPayments.reference, safeReference),
+  ];
+  if (expectedOrganizationId) {
+    conditions.push(eq(billingPayments.organizationId, expectedOrganizationId));
+  }
+
   const [row] = await db
     .select({ payment: billingPayments, invoice: billingInvoices })
     .from(billingPayments)
@@ -523,10 +534,7 @@ export async function verifyPaystackPayment(reference: string) {
       eq(billingInvoices.id, billingPayments.invoiceId),
       eq(billingInvoices.organizationId, billingPayments.organizationId),
     ))
-    .where(and(
-      eq(billingPayments.provider, "paystack"),
-      eq(billingPayments.reference, safeReference),
-    ))
+    .where(and(...conditions))
     .limit(1);
   if (!row) throw new Error("Payment reference not found");
 
