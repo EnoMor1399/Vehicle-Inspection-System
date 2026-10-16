@@ -33,7 +33,7 @@ import {
   X,
 } from "lucide-react";
 
-const NO_SHELL_PATHS = ["/login"];
+const NO_SHELL_PATHS = ["/login", "/subscribe"];
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Administrator",
@@ -197,7 +197,12 @@ export function AppShell({
     return null;
   })();
 
-  if (NO_SHELL_PATHS.includes(pathname) || pathname.startsWith("/verify") || pathname.startsWith("/certificate")) {
+  if (
+    NO_SHELL_PATHS.includes(pathname)
+    || pathname.startsWith("/invite/")
+    || pathname.startsWith("/verify")
+    || pathname.startsWith("/certificate")
+  ) {
     return <>{children}{appearanceControl}</>;
   }
 
