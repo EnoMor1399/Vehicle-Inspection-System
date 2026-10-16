@@ -9,7 +9,7 @@ import {
   listSubscriptionPlans,
 } from "@/lib/organization-control-plane";
 import { OnboardingApprovalForm } from "./PlatformOrganizationActions";
-import { changeOrganizationStatus } from "./actions";
+import { activateSubscriberWorkspace, changeOrganizationStatus } from "./actions";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -115,17 +115,31 @@ export default async function PlatformOrganizationsPage() {
                     </td>
                     <td className="py-3 pr-4"><Badge tone={organization.status === "active" ? "emerald" : organization.status === "suspended" ? "red" : "amber"}>{organization.status}</Badge></td>
                     <td className="py-3">
-                      <form action={changeOrganizationStatus} className="flex items-center gap-2">
-                        <input type="hidden" name="organizationId" value={organization.id} />
-                        <select name="status" defaultValue={organization.status} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
-                          <option value="pending">Pending</option>
-                          <option value="provisioning">Provisioning</option>
-                          <option value="active">Active</option>
-                          <option value="suspended">Suspended</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                        <button type="submit" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Save</button>
-                      </form>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <form action={changeOrganizationStatus} className="flex items-center gap-2">
+                          <input type="hidden" name="organizationId" value={organization.id} />
+                          <select name="status" defaultValue={organization.status} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
+                            <option value="pending">Pending</option>
+                            <option value="provisioning">Provisioning</option>
+                            <option value="active">Active</option>
+                            <option value="suspended">Suspended</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                          <button type="submit" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Save</button>
+                        </form>
+                        {!organization.operationalAccessEnabled && organization.status !== "cancelled" && organization.status !== "suspended" && (
+                          <form action={activateSubscriberWorkspace}>
+                            <input type="hidden" name="organizationId" value={organization.id} />
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+                              title="Checks subscription, required administrators, tenant columns and database guard triggers before enabling operations"
+                            >
+                              Verify & activate
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
