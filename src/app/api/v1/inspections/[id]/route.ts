@@ -1,7 +1,7 @@
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { inspections, vehicles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "inspections" });
@@ -11,7 +11,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .select({ inspection: inspections, vehicle: vehicles })
     .from(inspections)
     .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
-    .where(eq(inspections.id, id));
+    .where(and(
+      eq(inspections.organizationId, auth.user.organizationId),
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(inspections.id, id),
+    ));
   if (!row) return apiError(404, "Inspection not found");
   return json({ data: row });
 }
