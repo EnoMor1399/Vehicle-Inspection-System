@@ -18,10 +18,13 @@ test("capacity policy measures active plan usage per organization", () => {
   assert.match(policy, /Subscription limit reached/);
 });
 
-test("vehicle station and inspection creation run friendly capacity preflight checks", () => {
+test("vehicle station inspection and user flows surface capacity limits cleanly", () => {
   const vehicles = source("src/app/vehicles/server.ts");
   const stations = source("src/app/locations/actions.ts");
   const inspections = source("src/app/inspections/server.ts");
+  const users = source("src/app/users/actions.ts");
+  const trainingUsers = source("src/app/driver-training/users/actions.ts");
+  const invitations = source("src/app/invite/[token]/actions.ts");
 
   assert.match(vehicles, /assertSubscriptionCapacityAvailable\(user\.organizationId, "vehicles"\)/);
   assert.match(stations, /assertSubscriptionCapacityAvailable\(user\.organizationId, "stations"\)/);
@@ -29,6 +32,10 @@ test("vehicle station and inspection creation run friendly capacity preflight ch
   assert.match(vehicles, /extractSubscriptionCapacityError/);
   assert.match(stations, /extractSubscriptionCapacityError/);
   assert.match(inspections, /extractSubscriptionCapacityError/);
+  assert.match(stations, /before\.status === "inactive" && status !== "inactive"/);
+  assert.match(users, /extractSubscriptionCapacityError/);
+  assert.match(trainingUsers, /extractSubscriptionCapacityError/);
+  assert.match(invitations, /extractSubscriptionCapacityError/);
 });
 
 test("database capacity guards protect all billable resources under concurrency", () => {
@@ -59,4 +66,12 @@ test("database verifier requires all capacity guard triggers", () => {
   assert.match(verifier, /vehicles_subscription_capacity_guard/);
   assert.match(verifier, /inspections_subscription_capacity_guard/);
   assert.match(verifier, /missingCapacityTriggers/);
+});
+
+
+test("organization seat snapshots count active accounts and reserve pending invitations", () => {
+  const control = source("src/lib/organization-control-plane.ts");
+  assert.match(control, /eq\(users\.isActive, true\)/);
+  assert.match(control, /pendingInvitationCount/);
+  assert.match(control, /userCount \+ snapshot\.pendingInvitationCount >= snapshot\.subscription\.plan\.maxUsers/);
 });
