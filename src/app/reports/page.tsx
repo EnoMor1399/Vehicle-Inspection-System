@@ -95,7 +95,7 @@ export default async function ReportsPage() {
           </div>
           <div className="rounded-2xl bg-white p-3 text-slate-900 shadow-lg ring-1 ring-white/20">
             <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Export report</p>
-            <ReportsActions recentData={recent} stats={stats} />
+            <ReportsActions />
           </div>
         </div>
       </section>
