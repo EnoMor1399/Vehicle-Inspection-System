@@ -77,9 +77,10 @@ export async function createTrainingResource(formData: FormData) {
   const createdAt = new Date();
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-resource:${data.resourceCode}`}))`);
-    const [existing] = await tx.select({ id: trainingResources.id }).from(trainingResources).where(eq(trainingResources.resourceCode, data.resourceCode)).limit(1);
+    const [existing] = await tx.select({ id: trainingResources.id }).from(trainingResources).where(and(eq(trainingResources.organizationId, user.organizationId), eq(trainingResources.resourceCode, data.resourceCode))).limit(1);
     if (existing) throw new Error("A training resource with this code already exists");
     const [created] = await tx.insert(trainingResources).values({
+      organizationId: user.organizationId,
       id,
       resourceCode: data.resourceCode,
       name: data.name,
@@ -101,6 +102,7 @@ export async function createTrainingResource(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -126,14 +128,15 @@ export async function updateTrainingResourceStatus(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-resource:${data.resourceId}`}))`);
-    const [before] = await tx.select().from(trainingResources).where(eq(trainingResources.id, data.resourceId)).limit(1);
+    const [before] = await tx.select().from(trainingResources).where(and(eq(trainingResources.organizationId, user.organizationId), eq(trainingResources.id, data.resourceId))).limit(1);
     if (!before) throw new Error("Training resource not found");
     if (before.status === "retired" && data.status !== "retired") throw new Error("Retired training resources cannot be returned to service");
-    const [after] = await tx.update(trainingResources).set({ status: data.status, updatedAt }).where(eq(trainingResources.id, before.id)).returning();
+    const [after] = await tx.update(trainingResources).set({ status: data.status, updatedAt }).where(and(eq(trainingResources.organizationId, user.organizationId), eq(trainingResources.id, before.id))).returning();
     return { before, after };
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -161,9 +164,9 @@ export async function reserveTrainingResource(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-resource-allocation:${data.resourceId}`}))`);
-    const [resource] = await tx.select().from(trainingResources).where(eq(trainingResources.id, data.resourceId)).limit(1);
+    const [resource] = await tx.select().from(trainingResources).where(and(eq(trainingResources.organizationId, user.organizationId), eq(trainingResources.id, data.resourceId))).limit(1);
     if (!resource) throw new Error("Training resource not found");
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!session) throw new Error("Training session not found");
 
     const resourceState = trainingResourceOperationalState(resource, allocatedAt);
@@ -208,6 +211,7 @@ export async function reserveTrainingResource(formData: FormData) {
     }
 
     const [allocation] = await tx.insert(trainingResourceAllocations).values({
+      organizationId: user.organizationId,
       id: newId(),
       resourceId: resource.id,
       sessionId: session.id,
@@ -222,6 +226,7 @@ export async function reserveTrainingResource(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -246,7 +251,7 @@ export async function updateTrainingResourceAllocationStatus(formData: FormData)
   const updatedAt = new Date();
 
   const result = await db.transaction(async (tx) => {
-    const [before] = await tx.select().from(trainingResourceAllocations).where(eq(trainingResourceAllocations.id, data.allocationId)).limit(1);
+    const [before] = await tx.select().from(trainingResourceAllocations).where(and(eq(trainingResourceAllocations.organizationId, user.organizationId), eq(trainingResourceAllocations.id, data.allocationId))).limit(1);
     if (!before) throw new Error("Training resource allocation not found");
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-resource-allocation:${before.resourceId}`}))`);
     if (!canTransitionTrainingResourceAllocation(before.status, data.status)) {
@@ -254,8 +259,8 @@ export async function updateTrainingResourceAllocationStatus(formData: FormData)
     }
 
     if (data.status === "confirmed") {
-      const [resource] = await tx.select().from(trainingResources).where(eq(trainingResources.id, before.resourceId)).limit(1);
-      const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, before.sessionId)).limit(1);
+      const [resource] = await tx.select().from(trainingResources).where(and(eq(trainingResources.organizationId, user.organizationId), eq(trainingResources.id, before.resourceId))).limit(1);
+      const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, before.sessionId))).limit(1);
       if (!resource || !session) throw new Error("Resource or training session is unavailable");
       const state = trainingResourceOperationalState(resource, updatedAt);
       if (!["ready", "attention"].includes(state)) throw new Error(`Resource cannot be confirmed while ${state}`);
@@ -265,12 +270,13 @@ export async function updateTrainingResourceAllocationStatus(formData: FormData)
     const [after] = await tx
       .update(trainingResourceAllocations)
       .set({ status: data.status, notes: data.note || before.notes, updatedAt })
-      .where(eq(trainingResourceAllocations.id, before.id))
+      .where(and(eq(trainingResourceAllocations.organizationId, user.organizationId), eq(trainingResourceAllocations.id, before.id)))
       .returning();
     return { before, after };
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
