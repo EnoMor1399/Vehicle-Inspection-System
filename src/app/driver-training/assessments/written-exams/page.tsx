@@ -72,6 +72,7 @@ export default async function WrittenExamScoresPage() {
       .from(trainingAssessments)
       .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingAssessments.participantId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingAssessments.sessionId))
+      .where(eq(trainingAssessments.organizationId, user.organizationId))
       .orderBy(desc(trainingAssessments.assessedAt), desc(trainingAssessments.createdAt))
       .limit(200),
     db
