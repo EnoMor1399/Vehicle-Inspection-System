@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { dailyInspections, inspections, transporters, vehicles } from "@/db/schema";
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import {
@@ -52,7 +52,10 @@ export default async function PortalPage({
         contactPerson: transporters.contactPerson,
       })
       .from(transporters)
-      .where(isNull(transporters.deletedAt))
+      .where(and(
+        eq(transporters.organizationId, user.organizationId),
+        isNull(transporters.deletedAt),
+      ))
       .orderBy(asc(transporters.companyName));
 
     return (
@@ -60,7 +63,7 @@ export default async function PortalPage({
         <PageHeader
           eyebrow="Super Administrator"
           title="Transporter Portal Directory"
-          description="Open any transporter workspace for scoped operational analytics and administrative oversight."
+          description="Open transporter workspaces within your organization for scoped operational analytics and administrative oversight."
         />
 
         <Card className="mb-6 border-amber-200 bg-amber-50/70 p-5">
@@ -116,7 +119,13 @@ export default async function PortalPage({
     );
   }
 
-  const [matchedTransporter] = await db.select().from(transporters).where(eq(transporters.id, transporterId));
+  const [matchedTransporter] = await db
+    .select()
+    .from(transporters)
+    .where(and(
+      eq(transporters.organizationId, user.organizationId),
+      eq(transporters.id, transporterId),
+    ));
   if (!matchedTransporter || matchedTransporter.deletedAt) {
     return (
       <div className="p-6 lg:p-10">
@@ -125,7 +134,13 @@ export default async function PortalPage({
     );
   }
 
-  const fleet = await db.select().from(vehicles).where(eq(vehicles.transporterId, matchedTransporter.id));
+  const fleet = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, user.organizationId),
+      eq(vehicles.transporterId, matchedTransporter.id),
+    ));
   const vehicleIds = fleet.map((vehicle) => vehicle.id);
 
   const [technicalInspections, preTripInspections] = vehicleIds.length
@@ -134,13 +149,21 @@ export default async function PortalPage({
           .select({ inspection: inspections, vehicle: vehicles })
           .from(inspections)
           .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
-          .where(eq(vehicles.transporterId, matchedTransporter.id))
+          .where(and(
+            eq(inspections.organizationId, user.organizationId),
+            eq(vehicles.organizationId, user.organizationId),
+            eq(vehicles.transporterId, matchedTransporter.id),
+          ))
           .orderBy(desc(inspections.inspectionDate)),
         db
           .select({ inspection: dailyInspections, vehicle: vehicles })
           .from(dailyInspections)
           .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
-          .where(eq(vehicles.transporterId, matchedTransporter.id))
+          .where(and(
+            eq(dailyInspections.organizationId, user.organizationId),
+            eq(vehicles.organizationId, user.organizationId),
+            eq(vehicles.transporterId, matchedTransporter.id),
+          ))
           .orderBy(desc(dailyInspections.inspectionDate), desc(dailyInspections.completedAt)),
       ])
     : [[], []];
