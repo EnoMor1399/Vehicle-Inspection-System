@@ -364,20 +364,60 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
         id: "apps-overview",
         title: "Available Platforms",
         content:
-          "RSL VIMS is delivered as a responsive web application and installable Progressive Web App (PWA). The installed PWA provides an app-like launch experience, but protected business data is still served through the authenticated online application.",
+          "RSL VIMS is delivered as a responsive web application and installable Progressive Web App (PWA) for supported mobile and desktop browsers. The App Access page detects the current device/browser and provides either a direct Install VIMS action or the correct manual installation steps.",
+        tips: [
+          "Use Access & Support → App Access to install VIMS",
+          "The interface adapts automatically across phones, tablets, laptops and desktop monitors",
+          "The installed PWA launches in an app-like window while continuing to use the secure online VIMS application",
+        ],
       },
       "offline-mode": {
         id: "offline-mode",
         title: "Offline & Connectivity Behavior",
         content:
-          "The PWA can present an offline shell, but authenticated inspection records are not cached for offline editing and the current release does not perform background record synchronization. Protected transactions require an active connection.",
+          "The installed PWA can present a secure offline shell, but authenticated inspection records are not cached for offline editing and the current release does not perform background record synchronization. Protected transactions require an active connection.",
         warnings: [
-          "Inspection creation, edits, photo uploads, submissions, and authenticated record access require connectivity",
+          "Inspection creation, edits, photo uploads, submissions, approvals, and authenticated record access require connectivity",
           "Do not close an unfinished inspection expecting it to synchronize automatically later",
           "After connectivity returns, verify the server record state before repeating a submission or upload",
         ],
       },
     },
+    append: [
+      {
+        id: "install-mobile",
+        title: "Installing VIMS on Android, iPhone & iPad",
+        content:
+          "The App Access page provides mobile installation guidance that adapts to the detected device and browser.",
+        steps: [
+          "Open Access & Support → App Access",
+          "On Android Chrome or a supported Chromium browser, choose Install VIMS when the button is available; otherwise open the browser menu and choose Install app or Add to Home screen",
+          "On iPhone or iPad, open VIMS in Safari, tap Share, choose Add to Home Screen, confirm the name RSL VIMS, and tap Add",
+          "Launch VIMS from the new app icon and sign in normally",
+        ],
+        tips: [
+          "On iPhone/iPad, Safari provides the most reliable Add to Home Screen workflow",
+          "Installation adds an app launcher; it does not remove the requirement for a live connection to protected VIMS records",
+        ],
+      },
+      {
+        id: "install-desktop",
+        title: "Installing VIMS on Windows, macOS & Linux",
+        content:
+          "Supported desktop browsers can install VIMS into a dedicated app window. The App Access page detects the current desktop platform and shows the appropriate route.",
+        steps: [
+          "Open Access & Support → App Access",
+          "On Windows with Microsoft Edge, use Install VIMS or Settings and more → Apps → Install this site as an app",
+          "On Windows, macOS or Linux with Chrome/Chromium, use Install VIMS, the address-bar install icon, or the browser menu → Install VIMS",
+          "On supported macOS Safari versions, choose File → Add to Dock",
+          "Confirm the installation, then launch VIMS from the operating system app launcher, Dock, Start menu, taskbar or desktop shortcut",
+        ],
+        tips: [
+          "If Firefox does not offer desktop PWA installation, use a current Chrome, Edge or Chromium browser for the installed-app experience",
+          "Installed VIMS receives production web updates without requiring users to download a separate application package",
+        ],
+      },
+    ],
   },
   troubleshooting: {
     replacements: {
