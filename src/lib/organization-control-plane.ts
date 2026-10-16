@@ -307,6 +307,7 @@ export async function getInvitationByToken(token: string) {
     .select({
       invitation: organizationInvitations,
       organization: organizations,
+      expired: sql<boolean>`${organizationInvitations.expiresAt} < now()`,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
@@ -326,7 +327,7 @@ export async function acceptOrganizationInvitation(input: {
   const { invitation, organization } = row;
   if (invitation.acceptedAt) throw new Error("Invitation has already been accepted");
   if (invitation.revokedAt) throw new Error("Invitation has been revoked");
-  if (new Date(invitation.expiresAt).getTime() < Date.now()) throw new Error("Invitation has expired");
+  if (row.expired) throw new Error("Invitation has expired");
   if (organization.status === "cancelled") throw new Error("Organization account is no longer available");
 
   const name = input.name.trim().slice(0, 200);
@@ -382,7 +383,10 @@ export async function acceptOrganizationInvitation(input: {
 
 export async function listOrganizationInvitations(organizationId: string) {
   return db
-    .select()
+    .select({
+      invitation: organizationInvitations,
+      expired: sql<boolean>`${organizationInvitations.expiresAt} < now()`,
+    })
     .from(organizationInvitations)
     .where(eq(organizationInvitations.organizationId, organizationId))
     .orderBy(desc(organizationInvitations.createdAt));
