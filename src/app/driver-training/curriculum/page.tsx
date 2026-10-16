@@ -36,20 +36,25 @@ export default async function TrainingCurriculumPage() {
   const canManage = canManageTraining(user);
 
   const [curricula, versions, sessions, bindings, matrix, internalUsers] = await Promise.all([
-    db.select().from(trainingCurricula).orderBy(asc(trainingCurricula.code)).limit(200),
+    db.select().from(trainingCurricula).where(eq(trainingCurricula.organizationId, user.organizationId)).orderBy(asc(trainingCurricula.code)).limit(200),
     db
       .select({ version: trainingCurriculumVersions, curriculum: trainingCurricula })
       .from(trainingCurriculumVersions)
       .innerJoin(trainingCurricula, eq(trainingCurricula.id, trainingCurriculumVersions.curriculumId))
+      .where(eq(trainingCurriculumVersions.organizationId, user.organizationId))
       .orderBy(desc(trainingCurriculumVersions.createdAt))
       .limit(400),
-    db.select().from(trainingSessions).orderBy(desc(trainingSessions.startAt)).limit(250),
-    db.select().from(trainingSessionCurricula).limit(500),
-    db.select().from(trainingMatrixRequirements).orderBy(asc(trainingMatrixRequirements.scopeType), asc(trainingMatrixRequirements.serviceId)).limit(300),
+    db.select().from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)).orderBy(desc(trainingSessions.startAt)).limit(250),
+    db.select().from(trainingSessionCurricula).where(eq(trainingSessionCurricula.organizationId, user.organizationId)).limit(500),
+    db.select().from(trainingMatrixRequirements).where(eq(trainingMatrixRequirements.organizationId, user.organizationId)).orderBy(asc(trainingMatrixRequirements.scopeType), asc(trainingMatrixRequirements.serviceId)).limit(300),
     db
       .select({ id: users.id, name: users.name, role: users.role })
       .from(users)
-      .where(and(eq(users.isActive, true), ne(users.role, "transporter_user")))
+      .where(and(
+        eq(users.organizationId, user.organizationId),
+        eq(users.isActive, true),
+        ne(users.role, "transporter_user"),
+      ))
       .orderBy(asc(users.name))
       .limit(300),
   ]);
