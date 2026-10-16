@@ -1,5 +1,3 @@
-ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'organization_owner';
-
 -- VIMS multi-organization subscription control plane.
 -- Existing production records are assigned to the legacy RSL organization.
 -- New subscriber organizations remain operationally locked until tenant data
