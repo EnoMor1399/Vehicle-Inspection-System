@@ -79,6 +79,7 @@ export async function checkInTrainingParticipant(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
+        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -140,6 +141,7 @@ export async function checkOutTrainingParticipant(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
+        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -195,6 +197,7 @@ export async function confirmTrainingAttendance(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
+        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -261,6 +264,7 @@ export async function disputeTrainingAttendance(formData: FormData) {
       .select()
       .from(trainingAttendanceSignoffs)
       .where(and(
+        eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
         eq(trainingAttendanceSignoffs.participantId, context.participantId),
         eq(trainingAttendanceSignoffs.sessionId, context.sessionId),
       ))
@@ -345,6 +349,7 @@ export async function addTrainingEvidenceRecord(formData: FormData) {
       .select({ id: trainingEvidenceRecords.id })
       .from(trainingEvidenceRecords)
       .where(and(
+        eq(trainingEvidenceRecords.organizationId, user.organizationId),
         eq(trainingEvidenceRecords.sessionId, data.sessionId),
         eq(trainingEvidenceRecords.reference, data.reference),
         data.participantId
