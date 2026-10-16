@@ -1,6 +1,7 @@
 import { AuthForm } from "./AuthForm";
 import { getSettings } from "@/lib/settings";
-import { CheckCircle2, ClipboardCheck, QrCode, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Building2, CheckCircle2, ClipboardCheck, QrCode, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,26 @@ export default async function LoginPage() {
             </div>
 
             <AuthForm allowSignUp={allowPublicSignup} />
+
+            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--vims-ink)]">Need VIMS for another company?</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--vims-ink-muted)]">
+                    Request a dedicated organization subscription with its own branding, administrators, plan limits and controlled tenant provisioning.
+                  </p>
+                  <Link
+                    href="/subscribe"
+                    className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
+                  >
+                    Subscribe your company
+                  </Link>
+                </div>
+              </div>
+            </div>
 
             <p className="mt-7 text-center text-[11px] leading-5 text-[var(--vims-ink-muted)]">
               By signing in, you are accessing a controlled business system. Activity may be logged for security and audit purposes.
