@@ -48,6 +48,7 @@ test("administration-domain migrations create explicit roles and database isolat
   assert.match(administrationAssignmentMigration, /users_single_operational_domain_chk/);
   assert.match(administrationAssignmentMigration, /users_role_domain_chk/);
   assert.match(administrationAssignmentMigration, /UPDATE sessions/);
+  assert.match(administrationAssignmentMigration, /permissions = COALESCE\(permissions, '\{\}'::jsonb\) - '\*'/);
   assert.match(administrationAssignmentMigration, /vehicle_inspection_admin.*driver_training_admin/s);
   assert.match(administrationAssignmentMigration, /RAISE EXCEPTION/);
 });
