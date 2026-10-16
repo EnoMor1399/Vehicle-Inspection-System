@@ -78,6 +78,7 @@ export async function upsertTrainingCommunicationPreference(formData: FormData) 
   const now = new Date();
   const [existing] = await db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), eq(trainingCommunicationPreferences.participantId, participant.id))).limit(1);
   const values = {
+    organizationId: user.organizationId,
     emailOptIn: effective.emailOptIn,
     smsOptIn: effective.smsOptIn,
     whatsappOptIn: effective.whatsappOptIn,
@@ -137,6 +138,7 @@ export async function createTrainingOutboundMessage(formData: FormData) {
   if (!recipientAddress) throw new Error(`Participant has no usable ${data.channel === "email" ? "email address" : "phone number"} for this channel`);
   const id = newId();
   const values = {
+    organizationId: user.organizationId,
     id,
     participantId: participant.id,
     sessionId: data.sessionId || participant.sessionId,
