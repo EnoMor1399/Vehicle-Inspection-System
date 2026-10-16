@@ -10,6 +10,7 @@ import { getCurrentUser, canEditVehicles, canAccessTransporterScope } from "@/li
 import { adminValidationMessage, vehicleAdminSchema } from "@/lib/admin-entity-policy";
 import { validateGenericVehicleStatusTransition } from "@/lib/vehicle-lifecycle";
 import { emitWebhookEvent } from "@/lib/webhook-delivery";
+import { assertOrganizationModuleAccess, assertOrganizationQuota } from "@/lib/organization-access";
 
 export type VehicleFormData = {
   transporterId?: string | null;
@@ -48,6 +49,7 @@ export type VehicleFormData = {
 async function requireEditor() {
   const user = await getCurrentUser();
   if (!canEditVehicles(user)) throw new Error("Not authorised");
+  await assertOrganizationModuleAccess(user.organizationId, "vehicle_inspection");
   return user;
 }
 
@@ -113,6 +115,7 @@ function buildVehiclePayload(data: ReturnType<typeof parseVehicleInput>, transpo
 
 export async function createVehicle(data: VehicleFormData) {
   const user = await requireEditor();
+  await assertOrganizationQuota(user.organizationId, "vehicles");
   const parsed = parseVehicleInput(data);
   const status = parsed.status || "active";
   if (status !== "active" && status !== "suspended") {
