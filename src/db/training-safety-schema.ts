@@ -8,13 +8,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingParticipants, trainingSessions } from "./training-schema";
 
 export const trainingRiskAssessments = pgTable(
   "training_risk_assessments",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -31,6 +35,7 @@ export const trainingRiskAssessments = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_risk_assessments_organization_idx").on(t.organizationId),
     sessionIdx: uniqueIndex("training_risk_assessment_session_uidx").on(t.sessionId),
     statusIdx: index("training_risk_assessment_status_idx").on(t.status),
     overallRiskIdx: index("training_risk_assessment_overall_risk_idx").on(t.overallRisk),
@@ -42,6 +47,9 @@ export const trainingSafetyHazards = pgTable(
   "training_safety_hazards",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     assessmentId: varchar("assessment_id", { length: 36 })
       .notNull()
       .references(() => trainingRiskAssessments.id, { onDelete: "cascade" }),
@@ -61,6 +69,7 @@ export const trainingSafetyHazards = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_safety_hazards_organization_idx").on(t.organizationId),
     assessmentStatusIdx: index("training_safety_hazard_assessment_status_idx").on(t.assessmentId, t.status),
     residualRiskIdx: index("training_safety_hazard_residual_risk_idx").on(t.residualRiskScore),
     ownerIdx: index("training_safety_hazard_owner_idx").on(t.ownerId),
@@ -71,6 +80,9 @@ export const trainingSafetyIncidents = pgTable(
   "training_safety_incidents",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     incidentNumber: varchar("incident_number", { length: 40 }).notNull(),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
@@ -96,7 +108,8 @@ export const trainingSafetyIncidents = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    numberIdx: uniqueIndex("training_safety_incident_number_uidx").on(t.incidentNumber),
+    organizationIdx: index("training_safety_incidents_organization_idx").on(t.organizationId),
+    numberIdx: uniqueIndex("training_safety_incident_number_uidx").on(t.organizationId, t.incidentNumber),
     sessionStatusIdx: index("training_safety_incident_session_status_idx").on(t.sessionId, t.status),
     severityIdx: index("training_safety_incident_severity_idx").on(t.severity),
     occurredIdx: index("training_safety_incident_occurred_idx").on(t.occurredAt),
