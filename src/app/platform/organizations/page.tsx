@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Building2, Clock3, ShieldCheck, UsersRound } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
@@ -137,7 +138,7 @@ export default async function PlatformOrganizationsPage() {
   );
 }
 
-function Metric({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
+function Metric({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
