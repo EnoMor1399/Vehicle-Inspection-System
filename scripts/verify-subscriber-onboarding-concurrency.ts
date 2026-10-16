@@ -44,13 +44,16 @@ try {
   assert.equal(approved.length, 1, "Exactly one concurrent company approval must succeed");
   assert.equal(approvals.filter((x) => x.status === "rejected").length, 1, "Duplicate approval must be rejected");
 
+  assert.ok(approved[0]);
   const organizationId = approved[0].value.organizationId;
   const invitationToken = approved[0].value.invitationToken;
   const [record] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  assert.ok(record);
   assert.equal(record.operationalAccessEnabled, false, "New subscriber remains fail-closed");
 
   const [request] = await db.select({status:organizationOnboardingRequests.status}).from(organizationOnboardingRequests)
     .where(eq(organizationOnboardingRequests.id, requestId)).limit(1);
+  assert.ok(request);
   assert.equal(request.status, "converted", "Onboarding request is converted once");
 
   const password = "E2eOnly!Passw0rd2026";
@@ -64,18 +67,21 @@ try {
     acceptOrganizationInvitation(acceptInput),
     acceptOrganizationInvitation(acceptInput),
   ]);
-  assert.equal(acceptances.filter((x) => x.status === "fulfilled").length, 1, "One-time invitation may only be accepted once");
+  const accepted = acceptances.filter((x): x is PromiseFulfilledResult<Awaited<ReturnType<typeof acceptOrganizationInvitation>>> => x.status === "fulfilled");
+  assert.equal(accepted.length, 1, "One-time invitation may only be accepted once");
+  assert.ok(accepted[0]);
   assert.equal(acceptances.filter((x) => x.status === "rejected").length, 1, "Replayed invitation must fail");
 
   const [ownerCount] = await db.select({n:count()}).from(users)
     .where(and(eq(users.organizationId,organizationId),eq(users.email,ownerEmail)));
+  assert.ok(ownerCount);
   assert.equal(Number(ownerCount.n), 1, "Exactly one Organization Owner account must exist");
 
   // Starter allows 10 active users; with one owner, only 9 new invitations
   // can reserve capacity even when submissions arrive concurrently.
   const inviteRequests = Array.from({length: 12}, (_, index) => createOrganizationAdministratorInvitation({
     organizationId,
-    actorUserId: approved[0].value.organizationId, // account creator is metadata only in this E2E fixture
+    actorUserId: accepted[0].value.userId,
     email: `onboarding.admin.${index}.${suffix}@vims.local`,
     role: "vehicle_inspection_admin" as const,
   }));
@@ -89,6 +95,7 @@ try {
     isNull(organizationInvitations.revokedAt),
     gt(organizationInvitations.expiresAt,new Date()),
   ));
+  assert.ok(pending);
   assert.equal(Number(pending.n), 9, "The database must hold exactly nine live pending invitations");
 
   console.log("Subscriber onboarding concurrency: PASS (approval, token reuse, nine-seat reservation, tenant lock)");
