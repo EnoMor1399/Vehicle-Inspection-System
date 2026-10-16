@@ -158,6 +158,22 @@ export const onboardingRequestStatusEnum = pgEnum("onboarding_request_status", [
   "converted",
 ]);
 
+export const billingInvoiceStatusEnum = pgEnum("billing_invoice_status", [
+  "draft",
+  "open",
+  "paid",
+  "overdue",
+  "void",
+]);
+
+export const billingPaymentStatusEnum = pgEnum("billing_payment_status", [
+  "pending",
+  "success",
+  "failed",
+  "reversed",
+  "refunded",
+]);
+
 // ============ MULTI-ORGANIZATION CONTROL PLANE ============
 export const organizations = pgTable(
   "organizations",
@@ -259,6 +275,102 @@ export const organizationSubscriptions = pgTable(
     organizationIdx: index("organization_subscription_org_idx").on(t.organizationId, t.createdAt.desc()),
     statusIdx: index("organization_subscription_status_idx").on(t.status),
     providerIdx: index("organization_subscription_provider_idx").on(t.provider, t.providerSubscriptionId),
+  }),
+);
+
+export const billingInvoices = pgTable(
+  "billing_invoices",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    subscriptionId: varchar("subscription_id", { length: 36 })
+      .notNull()
+      .references(() => organizationSubscriptions.id, { onDelete: "restrict" }),
+    invoiceNumber: varchar("invoice_number", { length: 80 }).notNull(),
+    status: billingInvoiceStatusEnum("status").notNull().default("open"),
+    periodStart: timestamp("period_start").notNull(),
+    periodEnd: timestamp("period_end"),
+    issuedAt: timestamp("issued_at").notNull().defaultNow(),
+    dueAt: timestamp("due_at"),
+    subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+    discount: numeric("discount", { precision: 12, scale: 2 }).notNull().default("0"),
+    tax: numeric("tax", { precision: 12, scale: 2 }).notNull().default("0"),
+    total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    lineItems: jsonb("line_items")
+      .$type<Array<{ description: string; quantity: number; unitAmount: string; amount: string }>>()
+      .notNull()
+      .default([]),
+    notes: text("notes"),
+    paidAt: timestamp("paid_at"),
+    voidedAt: timestamp("voided_at"),
+    createdBy: varchar("created_by", { length: 36 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    organizationIdx: index("billing_invoice_organization_idx").on(t.organizationId, t.createdAt.desc()),
+    organizationNumberIdx: uniqueIndex("billing_invoice_organization_number_uidx").on(
+      t.organizationId,
+      t.invoiceNumber,
+    ),
+    statusDueIdx: index("billing_invoice_status_due_idx").on(t.status, t.dueAt),
+    subscriptionIdx: index("billing_invoice_subscription_idx").on(t.subscriptionId, t.periodStart.desc()),
+  }),
+);
+
+export const billingPayments = pgTable(
+  "billing_payments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    invoiceId: varchar("invoice_id", { length: 36 })
+      .notNull()
+      .references(() => billingInvoices.id, { onDelete: "restrict" }),
+    provider: varchar("provider", { length: 40 }).notNull().default("manual"),
+    reference: varchar("reference", { length: 160 }).notNull(),
+    providerTransactionId: varchar("provider_transaction_id", { length: 100 }),
+    status: billingPaymentStatusEnum("status").notNull().default("pending"),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    channel: varchar("channel", { length: 80 }),
+    paidAt: timestamp("paid_at"),
+    failureReason: text("failure_reason"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: varchar("created_by", { length: 36 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    organizationIdx: index("billing_payment_organization_idx").on(t.organizationId, t.createdAt.desc()),
+    invoiceIdx: index("billing_payment_invoice_idx").on(t.invoiceId, t.createdAt.desc()),
+    providerReferenceIdx: uniqueIndex("billing_payment_provider_reference_uidx").on(t.provider, t.reference),
+    statusIdx: index("billing_payment_status_idx").on(t.status),
+  }),
+);
+
+export const billingWebhookEvents = pgTable(
+  "billing_webhook_events",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    provider: varchar("provider", { length: 40 }).notNull(),
+    eventType: varchar("event_type", { length: 100 }).notNull(),
+    reference: varchar("reference", { length: 160 }),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    processedAt: timestamp("processed_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    providerPayloadIdx: uniqueIndex("billing_webhook_provider_payload_uidx").on(t.provider, t.payloadHash),
+    organizationIdx: index("billing_webhook_organization_idx").on(t.organizationId, t.createdAt.desc()),
+    referenceIdx: index("billing_webhook_reference_idx").on(t.reference),
   }),
 );
 
