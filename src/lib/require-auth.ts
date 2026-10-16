@@ -5,9 +5,16 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
-import { canAccessVehicleInspection } from "@/lib/system-access";
+import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 
-const PRIVILEGED_2FA_ROLES = new Set(["super_admin", "admin", "operations_manager", "supervisor"]);
+const PRIVILEGED_2FA_ROLES = new Set([
+  "super_admin",
+  "vehicle_inspection_admin",
+  "driver_training_admin",
+  "admin",
+  "operations_manager",
+  "supervisor",
+]);
 
 type RequireAuthOptions = {
   allowPendingPrivileged2FA?: boolean;
@@ -59,6 +66,12 @@ export async function requireInternalUser() {
 export async function requireVehicleInspectionUser() {
   const user = await requireInternalUser();
   if (!canAccessVehicleInspection(user)) redirect("/driver-training");
+  return user;
+}
+
+export async function requireDriverTrainingUser() {
+  const user = await requireInternalUser();
+  if (!canAccessDriverTraining(user)) redirect("/");
   return user;
 }
 
