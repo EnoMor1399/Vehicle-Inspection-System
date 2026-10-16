@@ -6,7 +6,7 @@ import { getVehicleDetail, updateVehicle, decommissionVehicle, createVehicle, Ve
 import { canEditVehicles, getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { transporters } from "@/db/schema";
-import { isNull, asc } from "drizzle-orm";
+import { and, isNull, asc, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +76,10 @@ export default async function VehicleFormPage({ params }: { params: Promise<{ id
   const transporterList = await db
     .select({ id: transporters.id, companyName: transporters.companyName })
     .from(transporters)
-    .where(isNull(transporters.deletedAt))
+    .where(and(
+      eq(transporters.organizationId, user.organizationId),
+      isNull(transporters.deletedAt),
+    ))
     .orderBy(asc(transporters.companyName));
 
   async function submitAction(formData: FormData) {
