@@ -80,12 +80,18 @@ export default async function TrainingEvidencePage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-      .where(eq(trainingParticipants.organizationId, user.organizationId))
       .leftJoin(
         trainingAttendanceSignoffs,
-        eq(trainingAttendanceSignoffs.participantId, trainingParticipants.id),
+        and(
+          eq(trainingAttendanceSignoffs.organizationId, user.organizationId),
+          eq(trainingAttendanceSignoffs.participantId, trainingParticipants.id),
+        ),
       )
-      .where(inArray(trainingSessions.status, ["scheduled", "in_progress", "completed"]))
+      .where(and(
+        eq(trainingParticipants.organizationId, user.organizationId),
+        eq(trainingSessions.organizationId, user.organizationId),
+        inArray(trainingSessions.status, ["scheduled", "in_progress", "completed"]),
+      ))
       .orderBy(desc(trainingSessions.startAt), trainingParticipants.fullName)
       .limit(300),
     db
@@ -105,9 +111,21 @@ export default async function TrainingEvidencePage() {
         participantName: trainingParticipants.fullName,
       })
       .from(trainingEvidenceRecords)
+      .innerJoin(
+        trainingSessions,
+        and(
+          eq(trainingSessions.organizationId, user.organizationId),
+          eq(trainingSessions.id, trainingEvidenceRecords.sessionId),
+        ),
+      )
+      .leftJoin(
+        trainingParticipants,
+        and(
+          eq(trainingParticipants.organizationId, user.organizationId),
+          eq(trainingParticipants.id, trainingEvidenceRecords.participantId),
+        ),
+      )
       .where(eq(trainingEvidenceRecords.organizationId, user.organizationId))
-      .innerJoin(trainingSessions, eq(trainingSessions.id, trainingEvidenceRecords.sessionId))
-      .leftJoin(trainingParticipants, eq(trainingParticipants.id, trainingEvidenceRecords.participantId))
       .orderBy(desc(trainingEvidenceRecords.capturedAt))
       .limit(250),
     db
