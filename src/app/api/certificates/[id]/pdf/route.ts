@@ -12,7 +12,7 @@ import {
   users,
   type InspectionSectionData,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/require-auth";
 import { canAccessTransporterScope, hasPermission } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -40,10 +40,22 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   const currentUser = await requireAuth();
   const { id } = await context.params;
 
-  const [inspection] = await db.select().from(inspections).where(eq(inspections.id, id));
+  const [inspection] = await db
+    .select()
+    .from(inspections)
+    .where(and(
+      eq(inspections.organizationId, currentUser.organizationId),
+      eq(inspections.id, id),
+    ));
   if (!inspection) return new Response("Certificate not found", { status: 404 });
 
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, inspection.vehicleId));
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, currentUser.organizationId),
+      eq(vehicles.id, inspection.vehicleId),
+    ));
   if (!vehicle || !canAccessTransporterScope(currentUser, vehicle.transporterId)) {
     return new Response("Certificate not found", { status: 404 });
   }
@@ -52,19 +64,34 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   }
 
   const [transporter] = vehicle.transporterId
-    ? await db.select().from(transporters).where(eq(transporters.id, vehicle.transporterId))
+    ? await db.select().from(transporters).where(and(
+        eq(transporters.organizationId, currentUser.organizationId),
+        eq(transporters.id, vehicle.transporterId),
+      ))
     : [];
   const [location] = inspection.locationId
-    ? await db.select().from(locations).where(eq(locations.id, inspection.locationId))
+    ? await db.select().from(locations).where(and(
+        eq(locations.organizationId, currentUser.organizationId),
+        eq(locations.id, inspection.locationId),
+      ))
     : [];
   const [inspectorUser] = inspection.inspectorId
-    ? await db.select().from(users).where(eq(users.id, inspection.inspectorId))
+    ? await db.select().from(users).where(and(
+        eq(users.organizationId, currentUser.organizationId),
+        eq(users.id, inspection.inspectorId),
+      ))
     : [];
 
-  const sigs = await db.select().from(signatures).where(eq(signatures.inspectionId, id));
+  const sigs = await db
+    .select()
+    .from(signatures)
+    .where(and(
+      eq(signatures.organizationId, currentUser.organizationId),
+      eq(signatures.inspectionId, id),
+    ));
   const inspectorSig = sigs.find((sig) => sig.type === "inspector");
   const supervisorSig = sigs.find((sig) => sig.type === "supervisor");
-  const settings = await getSettings();
+  const settings = await getSettings(currentUser.organizationId);
 
   const sections = (inspection.sectionData || []) as InspectionSectionData[];
   const items = sections.flatMap((section) => section.items || []);
