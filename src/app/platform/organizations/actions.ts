@@ -10,6 +10,10 @@ import {
   updateOrganizationSubscriptionLifecycle,
 } from "@/lib/organization-control-plane";
 import { logAudit } from "@/lib/audit";
+import {
+  createSubscriptionInvoice,
+  recordManualInvoicePayment,
+} from "@/lib/subscription-billing";
 
 export type PlatformOrganizationActionState = {
   ok: boolean;
@@ -195,5 +199,123 @@ export async function updateSubscriberSubscription(
       ok: false,
       message: error instanceof Error ? error.message : "Unable to update the subscription.",
     };
+  }
+}
+
+
+export type SubscriberBillingActionState = {
+  ok: boolean;
+  message: string;
+  invoiceId?: string;
+};
+
+export async function issueSubscriberInvoice(
+  _previous: SubscriberBillingActionState,
+  formData: FormData,
+): Promise<SubscriberBillingActionState> {
+  const actor = await requirePlatformSuperAdmin();
+  const parsed = z.object({
+    organizationId: z.string().uuid(),
+    tax: z.string().trim().max(30).optional(),
+    discount: z.string().trim().max(30).optional(),
+    notes: z.string().trim().max(4000).optional(),
+  }).safeParse({
+    organizationId: formData.get("organizationId"),
+    tax: typeof formData.get("tax") === "string" ? formData.get("tax") : undefined,
+    discount: typeof formData.get("discount") === "string" ? formData.get("discount") : undefined,
+    notes: typeof formData.get("notes") === "string" ? formData.get("notes") : undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message || "Invalid invoice request." };
+  }
+
+  try {
+    const dueAt = optionalDate(formData.get("dueAt"));
+    const invoice = await createSubscriptionInvoice({
+      organizationId: parsed.data.organizationId,
+      actorUserId: actor.id,
+      dueAt,
+      tax: parsed.data.tax || null,
+      discount: parsed.data.discount || null,
+      notes: parsed.data.notes || null,
+    });
+
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "create",
+      entityType: "subscription_invoice",
+      entityId: invoice.id,
+      entityLabel: invoice.invoiceNumber,
+      summary: `Issued subscription invoice ${invoice.invoiceNumber}`,
+      after: {
+        subscriberOrganizationId: invoice.organizationId,
+        total: invoice.total,
+        currency: invoice.currency,
+        dueAt: invoice.dueAt,
+      },
+    });
+
+    revalidatePath(`/platform/organizations/${parsed.data.organizationId}`);
+    revalidatePath("/organization/billing");
+    return { ok: true, message: `Invoice ${invoice.invoiceNumber} is ready.`, invoiceId: invoice.id };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Unable to issue invoice." };
+  }
+}
+
+export async function recordSubscriberManualPayment(
+  _previous: SubscriberBillingActionState,
+  formData: FormData,
+): Promise<SubscriberBillingActionState> {
+  const actor = await requirePlatformSuperAdmin();
+  const parsed = z.object({
+    organizationId: z.string().uuid(),
+    invoiceId: z.string().uuid(),
+    reference: z.string().trim().min(3).max(160),
+    channel: z.string().trim().max(80).optional(),
+    notes: z.string().trim().max(1000).optional(),
+  }).safeParse({
+    organizationId: formData.get("organizationId"),
+    invoiceId: formData.get("invoiceId"),
+    reference: formData.get("reference"),
+    channel: typeof formData.get("channel") === "string" ? formData.get("channel") : undefined,
+    notes: typeof formData.get("notes") === "string" ? formData.get("notes") : undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message || "Invalid payment record." };
+  }
+
+  try {
+    await recordManualInvoicePayment({
+      organizationId: parsed.data.organizationId,
+      invoiceId: parsed.data.invoiceId,
+      actorUserId: actor.id,
+      reference: parsed.data.reference,
+      channel: parsed.data.channel || "bank_transfer",
+      notes: parsed.data.notes || null,
+    });
+
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "update",
+      entityType: "subscription_invoice",
+      entityId: parsed.data.invoiceId,
+      summary: `Recorded verified manual subscription payment ${parsed.data.reference}`,
+      after: {
+        subscriberOrganizationId: parsed.data.organizationId,
+        paymentReference: parsed.data.reference,
+        channel: parsed.data.channel || "bank_transfer",
+      },
+    });
+
+    revalidatePath(`/platform/organizations/${parsed.data.organizationId}`);
+    revalidatePath("/organization/billing");
+    return { ok: true, message: "Payment recorded and invoice settled.", invoiceId: parsed.data.invoiceId };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Unable to record payment." };
   }
 }
