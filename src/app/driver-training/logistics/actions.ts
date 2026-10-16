@@ -181,6 +181,7 @@ export async function reserveTrainingResource(formData: FormData) {
       .select({ id: trainingResourceAllocations.id })
       .from(trainingResourceAllocations)
       .where(and(
+        eq(trainingResourceAllocations.organizationId, user.organizationId),
         eq(trainingResourceAllocations.resourceId, resource.id),
         eq(trainingResourceAllocations.sessionId, session.id),
         inArray(trainingResourceAllocations.status, [...ACTIVE_ALLOCATION_STATUSES]),
@@ -193,6 +194,8 @@ export async function reserveTrainingResource(formData: FormData) {
       .from(trainingResourceAllocations)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingResourceAllocations.sessionId))
       .where(and(
+        eq(trainingResourceAllocations.organizationId, user.organizationId),
+        eq(trainingSessions.organizationId, user.organizationId),
         eq(trainingResourceAllocations.resourceId, resource.id),
         inArray(trainingResourceAllocations.status, [...ACTIVE_ALLOCATION_STATUSES]),
         inArray(trainingSessions.status, [...ACTIVE_SESSION_STATUSES]),
