@@ -15,10 +15,12 @@ import {
 } from "@/lib/inspection-evidence";
 import type { InspectionDocument, InspectionSectionData } from "@/db/schema";
 import { emitWebhookEvent } from "@/lib/webhook-delivery";
+import { assertOrganizationModuleAccess, assertOrganizationQuota } from "@/lib/organization-access";
 
 async function requireEditor() {
   const user = await getCurrentUser();
   if (!canManageInspections(user)) throw new Error("Not authorised to manage inspections");
+  await assertOrganizationModuleAccess(user.organizationId, "vehicle_inspection");
   return user;
 }
 
@@ -115,6 +117,7 @@ function validateSections(sectionData: InspectionSectionData[]) {
 
 export async function createInspection(data: InspectionFormData) {
   const user = await requireEditor();
+  await assertOrganizationQuota(user.organizationId, "inspections_monthly");
   const settings = await getSettings(user.organizationId);
 
   if (!data.vehicleId) throw new Error("Vehicle is required");
@@ -291,6 +294,7 @@ export async function createInspection(data: InspectionFormData) {
 export async function approveInspection(id: string, input: { remarks?: string; signature?: string }) {
   const user = await getCurrentUser();
   if (!canApprove(user)) throw new Error("You do not have permission to approve inspections");
+  await assertOrganizationModuleAccess(user.organizationId, "vehicle_inspection");
   if (!id || id.length > 64) throw new Error("Inspection reference is invalid");
   if (input.signature) validateSignatureDataUrl(input.signature, "Supervisor signature");
 
