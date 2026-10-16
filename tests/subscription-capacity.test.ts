@@ -73,5 +73,7 @@ test("organization seat snapshots count active accounts and reserve pending invi
   const control = source("src/lib/organization-control-plane.ts");
   assert.match(control, /eq\(users\.isActive, true\)/);
   assert.match(control, /pendingInvitationCount/);
-  assert.match(control, /userCount \+ snapshot\.pendingInvitationCount >= snapshot\.subscription\.plan\.maxUsers/);
+  assert.match(control, /Number\(existingUsers\?\.n \|\| 0\) \+ Number\(outstanding\?\.n \|\| 0\) >= entitlement\.plan\.maxUsers/);
+  assert.match(control, /pg_advisory_xact_lock\(hashtext\(\$\{input.organizationId\}\)\)/);
+  assert.match(control, /gt\(organizationInvitations.expiresAt, new Date\(\)\)/);
 });
