@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { inspections, vehicles } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { PageHeader } from "@/components/ui";
 import { canManageInspections } from "@/lib/auth";
 import { requirePermission } from "@/lib/require-auth";
@@ -26,6 +26,10 @@ export default async function InspectionsPage() {
     })
     .from(inspections)
     .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
+    .where(and(
+      eq(inspections.organizationId, user.organizationId),
+      eq(vehicles.organizationId, user.organizationId),
+    ))
     .orderBy(desc(inspections.inspectionDate));
 
   return (
