@@ -273,6 +273,7 @@ export async function transitionTrainingQuotation(formData: FormData) {
         return { ok: false as const, error: "Expired quotations cannot be accepted" };
       }
       const [otherAccepted] = await tx.select({ id: trainingQuotations.id }).from(trainingQuotations).where(and(
+        eq(trainingQuotations.organizationId, user.organizationId),
         eq(trainingQuotations.requestId, quote.requestId),
         eq(trainingQuotations.status, "accepted"),
         ne(trainingQuotations.id, quote.id),
