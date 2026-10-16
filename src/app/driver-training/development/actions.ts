@@ -79,6 +79,7 @@ export async function createTrainingDevelopmentPlan(formData: FormData) {
 
   const id = newId();
   const values = {
+    organizationId: user.organizationId,
     id,
     participantId: participant.id,
     sourceAssessmentId: data.sourceAssessmentId || null,
@@ -127,6 +128,7 @@ export async function addTrainingDevelopmentAction(formData: FormData) {
       return { ok: false as const, error: "New remediation actions can only be added to open or in-progress plans" };
     }
     const values = {
+      organizationId: user.organizationId,
       id,
       planId: plan.id,
       actionType: data.actionType,
