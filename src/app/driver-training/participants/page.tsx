@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { ClipboardCheck, UserPlus, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import { trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -36,7 +36,7 @@ export default async function TrainingParticipantsPage() {
         status: trainingSessions.status,
       })
       .from(trainingSessions)
-      .where(inArray(trainingSessions.status, ["scheduled", "in_progress"]))
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), inArray(trainingSessions.status, ["scheduled", "in_progress"])))
       .orderBy(trainingSessions.startAt)
       .limit(100),
     db
@@ -61,6 +61,7 @@ export default async function TrainingParticipantsPage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
+      .where(eq(trainingParticipants.organizationId, user.organizationId))
       .orderBy(desc(trainingParticipants.createdAt))
       .limit(200),
   ]);
