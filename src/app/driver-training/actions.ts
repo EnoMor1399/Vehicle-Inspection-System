@@ -244,7 +244,11 @@ export async function addTrainingParticipant(formData: FormData) {
       const [duplicateEmail] = await tx
         .select({ id: trainingParticipants.id })
         .from(trainingParticipants)
-        .where(and(eq(trainingParticipants.sessionId, data.sessionId), eq(trainingParticipants.email, data.email.toLowerCase())))
+        .where(and(
+          eq(trainingParticipants.organizationId, user.organizationId),
+          eq(trainingParticipants.sessionId, data.sessionId),
+          eq(trainingParticipants.email, data.email.toLowerCase()),
+        ))
         .limit(1);
       if (duplicateEmail) return { ok: false as const, error: "This email is already registered for the session" };
     }
@@ -429,7 +433,6 @@ export async function issueTrainingCertificate(formData: FormData) {
       .from(trainingAssessments)
       .where(and(
         eq(trainingAssessments.organizationId, user.organizationId),
-        eq(trainingParticipants.organizationId, user.organizationId),
         eq(trainingAssessments.participantId, participant.id),
         inArray(trainingAssessments.result, [...PASSING_RESULTS]),
       ))
