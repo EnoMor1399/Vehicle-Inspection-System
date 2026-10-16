@@ -71,7 +71,7 @@ test("platform subscription management exposes plan, status and billing lifecycl
   const registry = readFileSync("src/app/platform/organizations/page.tsx", "utf8");
 
   assert.match(actions, /updateSubscriberSubscription/);
-  assert.match(actions, /trialing.*active.*past_due.*grace.*suspended.*cancelled.*expired/s);
+  assert.match(actions, /trialing[\s\S]*active[\s\S]*past_due[\s\S]*grace[\s\S]*suspended[\s\S]*cancelled[\s\S]*expired/);
   assert.match(detail, /Subscription lifecycle/);
   assert.match(detail, /Downgrade protection/);
   assert.match(form, /cancelAtPeriodEnd/);
