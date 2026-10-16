@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { dailyInspections, vehicles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -42,7 +42,11 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
     })
     .from(dailyInspections)
     .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
-    .where(eq(dailyInspections.id, id));
+    .where(and(
+      eq(dailyInspections.organizationId, user.organizationId),
+      eq(vehicles.organizationId, user.organizationId),
+      eq(dailyInspections.id, id),
+    ));
 
   if (!row || !canAccessTransporterScope(user, row.vehicle.transporterId)) notFound();
 
