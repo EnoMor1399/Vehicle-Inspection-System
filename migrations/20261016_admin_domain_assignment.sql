@@ -13,6 +13,24 @@ BEGIN
 END
 $$;
 
+-- Remove any legacy wildcard grant from ordinary accounts before applying the
+-- domain constraints. Wildcard authority is reserved for Super Administrator.
+-- Revoke those sessions first so the narrower authorization is immediate.
+UPDATE sessions
+   SET is_active = false
+ WHERE user_id IN (
+   SELECT id
+     FROM users
+    WHERE role <> 'super_admin'
+      AND COALESCE((permissions->>'*')::boolean, false) = true
+ );
+
+UPDATE users
+   SET permissions = COALESCE(permissions, '{}'::jsonb) - '*',
+       updated_at = now()
+ WHERE role <> 'super_admin'
+   AND COALESCE((permissions->>'*')::boolean, false) = true;
+
 -- Existing training-only administrators become Driver Training Administrators.
 UPDATE users
    SET role = 'driver_training_admin',
