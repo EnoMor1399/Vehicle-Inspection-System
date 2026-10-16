@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { asc, desc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { BadgeDollarSign, CheckCircle2, Clock3, FileText, Send, XCircle } from "lucide-react";
 import { db } from "@/db";
 import { trainingQuotationItems, trainingQuotations } from "@/db/training-commercial-schema";
@@ -26,9 +26,9 @@ export default async function TrainingCommercialsPage() {
   const canManage = canManageTrainingCommercials(user);
 
   const [requests, quotations, items] = await Promise.all([
-    db.select().from(trainingRequests).orderBy(desc(trainingRequests.createdAt)).limit(500),
-    db.select().from(trainingQuotations).orderBy(desc(trainingQuotations.createdAt)).limit(500),
-    db.select().from(trainingQuotationItems).orderBy(asc(trainingQuotationItems.createdAt)).limit(3000),
+    db.select().from(trainingRequests).where(eq(trainingRequests.organizationId, user.organizationId)).orderBy(desc(trainingRequests.createdAt)).limit(500),
+    db.select().from(trainingQuotations).where(eq(trainingQuotations.organizationId, user.organizationId)).orderBy(desc(trainingQuotations.createdAt)).limit(500),
+    db.select().from(trainingQuotationItems).where(eq(trainingQuotationItems.organizationId, user.organizationId)).orderBy(asc(trainingQuotationItems.createdAt)).limit(3000),
   ]);
 
   const requestById = new Map(requests.map((request) => [request.id, request]));

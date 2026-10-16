@@ -17,7 +17,7 @@ export async function getReportExportData(input: {
   if (!canViewReports(user)) throw new Error("You do not have permission to export reports");
 
   const range = validateReportDateRange(input);
-  const conditions = [];
+  const conditions = [eq(inspections.organizationId, user.organizationId)];
   if (range.start) conditions.push(gte(inspections.inspectionDate, range.start));
   if (range.endExclusive) conditions.push(lt(inspections.inspectionDate, range.endExclusive));
   const whereClause = and(...conditions);

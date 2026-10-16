@@ -122,11 +122,18 @@ async function deliverTarget(target: DeliveryTarget, envelope: WebhookEnvelope, 
  */
 export async function emitWebhookEvent(event: WebhookEvent, data: Record<string, unknown>): Promise<void> {
   try {
+    const organizationId = typeof data.organizationId === "string" ? data.organizationId : "";
+    if (!organizationId) {
+      console.warn(`[webhook] dropped ${event} without organization context`);
+      return;
+    }
+
     const targets = await db.select({
       id: webhooks.id,
       url: webhooks.url,
       secret: webhooks.secret,
     }).from(webhooks).where(and(
+      eq(webhooks.organizationId, organizationId),
       eq(webhooks.isActive, true),
       sql`${webhooks.events} @> ${JSON.stringify([event])}::jsonb`
     ));

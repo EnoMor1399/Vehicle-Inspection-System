@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
 import { getCurrentUser } from "@/lib/auth";
@@ -125,17 +125,18 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${participantId}))`);
-    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, participantId)).limit(1);
+    const [participant] = await tx.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participantId))).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
     if (participant.attendanceStatus === "absent" || participant.attendanceStatus === "withdrawn") {
       return { ok: false as const, error: "Absent or withdrawn participants cannot receive a practical driver assessment" };
     }
 
-    const [session] = await tx.select().from(trainingSessions).where(eq(trainingSessions.id, participant.sessionId)).limit(1);
+    const [session] = await tx.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, participant.sessionId))).limit(1);
     if (!session) return { ok: false as const, error: "Training session not found" };
     if (session.status === "cancelled") return { ok: false as const, error: "Cancelled training sessions cannot be assessed" };
 
     const assessment = {
+      organizationId: user.organizationId,
       id,
       participantId: participant.id,
       sessionId: participant.sessionId,
@@ -177,7 +178,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
         riskLevel: provisionalOutcome.riskLevel,
         updatedAt: new Date(),
       })
-      .where(eq(trainingParticipants.id, participant.id));
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participant.id)));
 
     return { ok: true as const, participant, session, assessment };
   });
@@ -193,10 +194,11 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     await db
       .update(trainingAssessments)
       .set({ assessorSignature: storedAssessorSignature.value })
-      .where(eq(trainingAssessments.id, id));
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, id)));
   }
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "inspect",
@@ -240,11 +242,11 @@ export async function reviewDriverAssessment(formData: FormData) {
   if (decision === "approved" && !reviewerSignature) throw new Error("Reviewer digital signature is required before approval");
 
   const result = await db.transaction(async (tx) => {
-    const [initial] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
+    const [initial] = await tx.select().from(trainingAssessments).where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessmentId))).limit(1);
     if (!initial) return { ok: false as const, error: "Driver assessment not found" };
 
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${initial.participantId}))`);
-    const [assessment] = await tx.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
+    const [assessment] = await tx.select().from(trainingAssessments).where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessmentId))).limit(1);
     if (!assessment) return { ok: false as const, error: "Driver assessment not found" };
     if (assessment.reviewStatus !== "pending_review") return { ok: false as const, error: "This assessment has already been reviewed" };
     if (decision === "approved" && !assessment.assessorSignature) {
@@ -263,14 +265,14 @@ export async function reviewDriverAssessment(formData: FormData) {
     const [latestAssessment] = await tx
       .select({ id: trainingAssessments.id })
       .from(trainingAssessments)
-      .where(eq(trainingAssessments.participantId, assessment.participantId))
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.participantId, assessment.participantId)))
       .orderBy(desc(trainingAssessments.assessedAt), desc(trainingAssessments.createdAt))
       .limit(1);
     if (!latestAssessment || latestAssessment.id !== assessment.id) {
       return { ok: false as const, error: "A newer assessment exists for this driver. Review the latest assessment instead" };
     }
 
-    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, assessment.participantId)).limit(1);
+    const [participant] = await tx.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, assessment.participantId))).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
 
     const writtenScoresComplete = assessment.theoryScore !== null
@@ -309,7 +311,7 @@ export async function reviewDriverAssessment(formData: FormData) {
         reviewComments: reviewComments || null,
         reviewedAt,
       })
-      .where(eq(trainingAssessments.id, assessment.id));
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessment.id)));
 
     await tx
       .update(trainingParticipants)
@@ -319,7 +321,7 @@ export async function reviewDriverAssessment(formData: FormData) {
         riskLevel: assessment.riskLevel,
         updatedAt: reviewedAt,
       })
-      .where(eq(trainingParticipants.id, participant.id));
+      .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participant.id)));
 
     return { ok: true as const, assessment, participant, certificateEligible, administrativeSelfReviewOverride };
   });
@@ -333,10 +335,11 @@ export async function reviewDriverAssessment(formData: FormData) {
     await db
       .update(trainingAssessments)
       .set({ reviewerSignature: storedReviewerSignature.value })
-      .where(eq(trainingAssessments.id, assessmentId));
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessmentId)));
   }
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: decision === "approved" ? "approve" : "reject",

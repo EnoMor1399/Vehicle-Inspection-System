@@ -11,13 +11,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingSessions } from "./training-schema";
 
 export const trainingCurricula = pgTable(
   "training_curricula",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     code: varchar("code", { length: 40 }).notNull(),
     serviceId: varchar("service_id", { length: 80 }).notNull(),
     title: varchar("title", { length: 220 }).notNull(),
@@ -29,7 +33,8 @@ export const trainingCurricula = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    codeIdx: uniqueIndex("training_curriculum_code_uidx").on(t.code),
+    organizationIdx: index("training_curricula_organization_idx").on(t.organizationId),
+    codeIdx: uniqueIndex("training_curriculum_code_uidx").on(t.organizationId, t.code),
     serviceIdx: index("training_curriculum_service_idx").on(t.serviceId),
     statusIdx: index("training_curriculum_status_idx").on(t.status),
     ownerIdx: index("training_curriculum_owner_idx").on(t.ownerId),
@@ -40,6 +45,9 @@ export const trainingCurriculumVersions = pgTable(
   "training_curriculum_versions",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     curriculumId: varchar("curriculum_id", { length: 36 })
       .notNull()
       .references(() => trainingCurricula.id, { onDelete: "cascade" }),
@@ -62,6 +70,7 @@ export const trainingCurriculumVersions = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_curriculum_versions_organization_idx").on(t.organizationId),
     versionIdx: uniqueIndex("training_curriculum_version_uidx").on(t.curriculumId, t.versionNumber),
     curriculumStatusIdx: index("training_curriculum_version_status_idx").on(t.curriculumId, t.status),
     reviewIdx: index("training_curriculum_review_due_idx").on(t.reviewDueDate),
@@ -73,6 +82,9 @@ export const trainingSessionCurricula = pgTable(
   "training_session_curricula",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -83,6 +95,7 @@ export const trainingSessionCurricula = pgTable(
     assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_session_curricula_organization_idx").on(t.organizationId),
     sessionIdx: uniqueIndex("training_session_curriculum_session_uidx").on(t.sessionId),
     versionIdx: index("training_session_curriculum_version_idx").on(t.curriculumVersionId),
   })
@@ -92,6 +105,9 @@ export const trainingMatrixRequirements = pgTable(
   "training_matrix_requirements",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     requirementKey: varchar("requirement_key", { length: 420 }).notNull(),
     scopeType: varchar("scope_type", { length: 20 }).notNull().default("global"),
     clientName: varchar("client_name", { length: 220 }),
@@ -106,7 +122,8 @@ export const trainingMatrixRequirements = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    keyIdx: uniqueIndex("training_matrix_requirement_key_uidx").on(t.requirementKey),
+    organizationIdx: index("training_matrix_requirements_organization_idx").on(t.organizationId),
+    keyIdx: uniqueIndex("training_matrix_requirement_key_uidx").on(t.organizationId, t.requirementKey),
     serviceIdx: index("training_matrix_service_idx").on(t.serviceId),
     scopeIdx: index("training_matrix_scope_idx").on(t.scopeType, t.clientName, t.jobRole),
   })

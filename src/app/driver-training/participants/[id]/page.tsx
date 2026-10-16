@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Award, ClipboardCheck, FileWarning, GraduationCap, ShieldAlert, UserRound } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -31,21 +31,21 @@ export default async function TrainingParticipantDossierPage({ params }: { param
     .select({ participant: trainingParticipants, session: trainingSessions })
     .from(trainingParticipants)
     .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-    .where(eq(trainingParticipants.id, id))
+    .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, id)))
     .limit(1);
   if (!participant) notFound();
 
   const [assessments, certificates, cases] = await Promise.all([
-    db.select().from(trainingAssessments).where(eq(trainingAssessments.participantId, id)).orderBy(desc(trainingAssessments.assessedAt)),
-    db.select().from(trainingCertificates).where(eq(trainingCertificates.participantId, id)).orderBy(desc(trainingCertificates.issuedAt)),
-    db.select().from(trainingComplianceCases).where(eq(trainingComplianceCases.participantId, id)).orderBy(desc(trainingComplianceCases.updatedAt)),
+    db.select().from(trainingAssessments).where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.participantId, id))).orderBy(desc(trainingAssessments.assessedAt)),
+    db.select().from(trainingCertificates).where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.participantId, id))).orderBy(desc(trainingCertificates.issuedAt)),
+    db.select().from(trainingComplianceCases).where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.participantId, id))).orderBy(desc(trainingComplianceCases.updatedAt)),
   ]);
   const caseIds = cases.map((item) => item.id);
   const events = caseIds.length > 0
     ? await db
         .select()
         .from(trainingComplianceEvents)
-        .where(eq(trainingComplianceEvents.caseId, caseIds[0]))
+        .where(and(eq(trainingComplianceEvents.organizationId, user.organizationId), eq(trainingComplianceEvents.caseId, caseIds[0])))
         .orderBy(desc(trainingComplianceEvents.createdAt))
         .limit(20)
     : [];

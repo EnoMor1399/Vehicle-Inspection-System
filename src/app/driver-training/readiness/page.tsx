@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, ShieldAlert } from "lucide-react";
 import { db } from "@/db";
 import { trainingSessions } from "@/db/training-schema";
@@ -82,7 +82,7 @@ export default async function TrainingReadinessPage() {
     .from(trainingSessions)
     .leftJoin(trainingSessionReadiness, eq(trainingSessionReadiness.sessionId, trainingSessions.id))
     .leftJoin(trainingInstructorProfiles, eq(trainingInstructorProfiles.userId, trainingSessions.instructorId))
-    .where(inArray(trainingSessions.status, ["scheduled", "in_progress"]))
+    .where(and(eq(trainingSessions.organizationId, user.organizationId), inArray(trainingSessions.status, ["scheduled", "in_progress"])))
     .orderBy(asc(trainingSessions.startAt))
     .limit(200);
 

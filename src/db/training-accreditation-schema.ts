@@ -9,13 +9,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingSessions } from "./training-schema";
 
 export const trainingRegulatoryRequirements = pgTable(
   "training_regulatory_requirements",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     requirementCode: varchar("requirement_code", { length: 50 }).notNull(),
     serviceId: varchar("service_id", { length: 80 }),
     title: varchar("title", { length: 240 }).notNull(),
@@ -31,7 +35,8 @@ export const trainingRegulatoryRequirements = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    codeIdx: uniqueIndex("training_regulatory_requirement_code_uidx").on(t.requirementCode),
+    organizationIdx: index("training_regulatory_requirements_organization_idx").on(t.organizationId),
+    codeIdx: uniqueIndex("training_regulatory_requirement_code_uidx").on(t.organizationId, t.requirementCode),
     serviceStatusIdx: index("training_regulatory_requirement_service_status_idx").on(t.serviceId, t.status),
     reviewIdx: index("training_regulatory_requirement_review_idx").on(t.reviewDueDate),
   })
@@ -41,6 +46,9 @@ export const trainingAccreditationRecords = pgTable(
   "training_accreditation_records",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     requirementId: varchar("requirement_id", { length: 36 })
       .notNull()
       .references(() => trainingRegulatoryRequirements.id, { onDelete: "cascade" }),
@@ -59,6 +67,7 @@ export const trainingAccreditationRecords = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_accreditation_records_organization_idx").on(t.organizationId),
     requirementIdx: index("training_accreditation_requirement_idx").on(t.requirementId),
     statusValidityIdx: index("training_accreditation_status_validity_idx").on(t.status, t.validUntil),
     credentialIdx: index("training_accreditation_credential_idx").on(t.credentialNumber),
@@ -69,6 +78,9 @@ export const trainingSessionComplianceReviews = pgTable(
   "training_session_compliance_reviews",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -80,6 +92,7 @@ export const trainingSessionComplianceReviews = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_session_compliance_reviews_organization_idx").on(t.organizationId),
     sessionIdx: uniqueIndex("training_session_compliance_session_uidx").on(t.sessionId),
     statusIdx: index("training_session_compliance_status_idx").on(t.status),
     reviewedIdx: index("training_session_compliance_reviewed_idx").on(t.reviewedAt),

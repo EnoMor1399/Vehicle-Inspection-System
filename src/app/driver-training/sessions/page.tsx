@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { CalendarDays, CheckCircle2, Clock3, Plus, UsersRound, XCircle } from "lucide-react";
 import { db } from "@/db";
 import { locations, transporters, users } from "@/db/schema";
@@ -43,16 +43,17 @@ export default async function TrainingSessionsPage() {
         instructorName: trainingSessions.instructorName,
         capacity: trainingSessions.capacity,
         status: trainingSessions.status,
-        participantCount: sql<number>`(select count(*)::int from ${trainingParticipants} p where p.session_id = ${trainingSessions.id})`,
+        participantCount: sql<number>`(select count(*)::int from ${trainingParticipants} p where p.session_id = ${trainingSessions.id} and p.organization_id = ${user.organizationId})`,
       })
       .from(trainingSessions)
+      .where(eq(trainingSessions.organizationId, user.organizationId))
       .orderBy(desc(trainingSessions.startAt))
       .limit(100),
-    db.select({ id: locations.id, name: locations.name }).from(locations).orderBy(locations.name),
+    db.select({ id: locations.id, name: locations.name }).from(locations).where(eq(locations.organizationId, user.organizationId)).orderBy(locations.name),
     db
       .select({ id: transporters.id, companyName: transporters.companyName })
       .from(transporters)
-      .where(isNull(transporters.deletedAt))
+      .where(and(eq(transporters.organizationId, user.organizationId), isNull(transporters.deletedAt)))
       .orderBy(transporters.companyName),
     db
       .select({
@@ -65,6 +66,7 @@ export default async function TrainingSessionsPage() {
       })
       .from(trainingInstructorProfiles)
       .innerJoin(users, eq(users.id, trainingInstructorProfiles.userId))
+      .where(eq(trainingInstructorProfiles.organizationId, user.organizationId))
       .orderBy(users.name),
   ]);
 

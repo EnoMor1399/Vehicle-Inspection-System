@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { documents, users } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { AlertTriangle, Clock, ShieldCheck } from "lucide-react";
 import { DocumentsList } from "./DocumentsList";
@@ -9,7 +9,7 @@ import { requirePermission } from "@/lib/require-auth";
 export const dynamic = "force-dynamic";
 
 export default async function DocumentsPage() {
-  await requirePermission("documents");
+  const user = await requirePermission("documents");
   
   const rows = await db
     .select({
@@ -27,7 +27,11 @@ export default async function DocumentsPage() {
       uploadedBy: users.name,
     })
     .from(documents)
-    .leftJoin(users, eq(users.id, documents.uploadedBy))
+    .leftJoin(users, and(
+      eq(users.id, documents.uploadedBy),
+      eq(users.organizationId, user.organizationId),
+    ))
+    .where(eq(documents.organizationId, user.organizationId))
     .orderBy(desc(documents.createdAt));
 
   const now = new Date();

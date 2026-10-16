@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { AlertTriangle, ClipboardCheck, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -51,6 +51,7 @@ export default async function DriverAssessmentsPage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
+      .where(eq(trainingParticipants.organizationId, user.organizationId))
       .orderBy(desc(trainingParticipants.createdAt))
       .limit(300),
     db
@@ -70,6 +71,7 @@ export default async function DriverAssessmentsPage() {
       .from(trainingAssessments)
       .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingAssessments.participantId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
+      .where(eq(trainingAssessments.organizationId, user.organizationId))
       .orderBy(desc(trainingAssessments.assessedAt))
       .limit(30),
   ]);

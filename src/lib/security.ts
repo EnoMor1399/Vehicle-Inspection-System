@@ -209,6 +209,7 @@ export async function logSecurityEvent(
   eventType: string,
   severity: "info" | "warning" | "critical" = "info",
   metadata: {
+    organizationId?: string;
     userId?: string;
     ipAddress?: string;
     userAgent?: string;
@@ -218,9 +219,27 @@ export async function logSecurityEvent(
 ): Promise<void> {
   try {
     const safeEventType = boundedText(eventType, 50) || "security_event";
+    const safeUserId = boundedText(metadata.userId, 36);
+    let organizationId = boundedText(metadata.organizationId, 36);
+
+    if (!organizationId && safeUserId) {
+      const [owner] = await db
+        .select({ organizationId: users.organizationId })
+        .from(users)
+        .where(eq(users.id, safeUserId))
+        .limit(1);
+      organizationId = owner?.organizationId || null;
+    }
+
+    if (!organizationId) {
+      warnTelemetryFailure("security-event persistence", new Error("Organization context unavailable"));
+      return;
+    }
+
     await db.insert(securityEvents).values({
       id: randomBytes(16).toString("hex"),
-      userId: boundedText(metadata.userId, 36),
+      organizationId,
+      userId: safeUserId,
       eventType: safeEventType,
       severity,
       ipAddress: metadata.ipAddress ? normalizeClientIp(metadata.ipAddress) : null,

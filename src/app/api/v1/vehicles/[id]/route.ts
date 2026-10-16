@@ -11,7 +11,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "vehicles" });
   if (!auth.ok) return apiError(auth.status, auth.message);
   const { id } = await params;
-  const [row] = await db.select().from(vehicles).where(eq(vehicles.id, id));
+  const [row] = await db.select().from(vehicles).where(and(
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(vehicles.id, id),
+    ));
   if (!row) return apiError(404, "Vehicle not found");
   return json({ data: row });
 }
@@ -20,7 +23,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const auth = await authenticateApiRequest({ scopes: ["write"], permission: "vehicles" });
   if (!auth.ok) return apiError(auth.status, auth.message);
   const { id } = await params;
-  const [existing] = await db.select().from(vehicles).where(eq(vehicles.id, id));
+  const [existing] = await db.select().from(vehicles).where(and(
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(vehicles.id, id),
+    ));
   if (!existing) return apiError(404, "Vehicle not found");
   if (existing.status === "decommissioned") {
     return apiError(409, "A decommissioned vehicle cannot be edited through the generic vehicle API");
@@ -64,7 +70,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           const [transporter] = await tx
             .select({ id: transporters.id })
             .from(transporters)
-            .where(and(eq(transporters.id, body.transporter_id), isNull(transporters.deletedAt)))
+            .where(and(
+              eq(transporters.organizationId, auth.user.organizationId),
+              eq(transporters.id, body.transporter_id),
+              isNull(transporters.deletedAt),
+            ))
             .limit(1);
           if (!transporter) return { ok: false as const, reason: "transporter_not_found" as const };
           updates.transporterId = transporter.id;
@@ -74,7 +84,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const [updated] = await tx
         .update(vehicles)
         .set(updates)
-        .where(eq(vehicles.id, id))
+        .where(and(
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(vehicles.id, id),
+    ))
         .returning();
       return { ok: true as const, updated };
     });
@@ -84,6 +97,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const { logAudit } = await import("@/lib/audit");
     await logAudit({
+      organizationId: auth.user.organizationId,
       userId: auth.user.id,
       userName: auth.user.name,
       action: "update",
@@ -96,6 +110,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
 
     await emitWebhookEvent("vehicle.updated", {
+      organizationId: auth.user.organizationId,
       id,
       registrationNumber: updateResult.updated.registrationNumber,
       transporterId: updateResult.updated.transporterId,
@@ -115,7 +130,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const auth = await authenticateApiRequest({ scopes: ["write"], permission: "vehicles" });
   if (!auth.ok) return apiError(auth.status, auth.message);
   const { id } = await params;
-  const [existing] = await db.select().from(vehicles).where(eq(vehicles.id, id));
+  const [existing] = await db.select().from(vehicles).where(and(
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(vehicles.id, id),
+    ));
   if (!existing) return apiError(404, "Vehicle not found");
 
   if (existing.status === "decommissioned") {
@@ -126,7 +144,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const [updated] = await db
     .update(vehicles)
     .set({ status: "decommissioned", updatedAt: new Date() })
-    .where(eq(vehicles.id, id))
+    .where(and(
+      eq(vehicles.organizationId, auth.user.organizationId),
+      eq(vehicles.id, id),
+    ))
     .returning();
 
   const { logAudit } = await import("@/lib/audit");
@@ -143,6 +164,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   });
 
   await emitWebhookEvent("vehicle.updated", {
+    organizationId: auth.user.organizationId,
     id,
     registrationNumber: existing.registrationNumber,
     transporterId: existing.transporterId,

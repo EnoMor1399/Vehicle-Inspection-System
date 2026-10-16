@@ -15,7 +15,8 @@ test("new audit events are tamper-evident and serialized", () => {
   assert.match(audit, /hashAuditPayload/);
   assert.match(audit, /isNotNull\(auditLogs\.eventHash\)/);
   assert.match(audit, /previousTime \+ 1/);
-  assert.match(audit, /pg_advisory_xact_lock\(78654229\)/);
+  assert.match(audit, /pg_advisory_xact_lock\(hashtext\(\$\{organizationId\}\)\)/);
+  assert.match(audit, /eq\(auditLogs\.organizationId, organizationId\)/);
   assert.match(audit, /previousHash/);
   assert.match(audit, /eventHash/);
   assert.match(schema, /previousHash: varchar\("previous_hash"/);
@@ -24,6 +25,9 @@ test("new audit events are tamper-evident and serialized", () => {
   assert.match(migration, /audit_event_hash_idx/);
   assert.match(verifier, /Previous hash mismatch/);
   assert.match(verifier, /Event hash mismatch/);
+  assert.match(verifier, /organization_id/);
+  assert.match(verifier, /states = new Map/);
+  assert.match(verifier, /organizationsVerified/);
   assert.match(verifier, /Unchained audit event after chain start/);
   assert.match(packageJson, /"audit:verify"/);
 });

@@ -1,7 +1,7 @@
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { transporters } from "@/db/schema";
-import { desc, sql, isNull, and } from "drizzle-orm";
+import { desc, eq, sql, isNull, and } from "drizzle-orm";
 import { parseApiPagination } from "@/lib/api-pagination";
 import { formatServerTiming, timeOperation } from "@/lib/performance";
 
@@ -17,7 +17,10 @@ export async function GET(request: Request) {
   const region = url.searchParams.get("region")?.trim() || null;
   if (region && region.length > 100) return apiError(400, "region is too long");
 
-  const where = [isNull(transporters.deletedAt)];
+  const where = [
+    eq(transporters.organizationId, auth.user.organizationId),
+    isNull(transporters.deletedAt),
+  ];
   if (region) where.push(sql`${transporters.region} = ${region}`);
   const predicate = and(...where);
 

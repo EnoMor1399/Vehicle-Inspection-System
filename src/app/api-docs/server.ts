@@ -61,6 +61,7 @@ export async function generateApiKeyAction(input: {
 
   try {
     const issued = await issueApiKey({
+      organizationId: user.organizationId,
       userId: user.id,
       name,
       scopes,
@@ -68,6 +69,7 @@ export async function generateApiKeyAction(input: {
     });
 
     await logAudit({
+      organizationId: user.organizationId,
       userId: user.id,
       userName: user.name,
       action: "create",
@@ -124,7 +126,11 @@ export async function revokeApiKeyAction(id: string): Promise<{ ok: boolean; err
       isActive: apiKeys.isActive,
     })
     .from(apiKeys)
-    .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, user.id)))
+    .where(and(
+      eq(apiKeys.id, id),
+      eq(apiKeys.organizationId, user.organizationId),
+      eq(apiKeys.userId, user.id),
+    ))
     .limit(1);
 
   if (!key) {

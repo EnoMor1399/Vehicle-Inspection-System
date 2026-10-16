@@ -79,3 +79,23 @@ test("public invitation and subscription routes render without the authenticated
   assert.match(source, /"\/subscribe"/);
   assert.match(source, /pathname\.startsWith\("\/invite\/"\)/);
 });
+
+
+test("subscriber workspace activation verifies tenant data plane and required administrators before enabling operations", () => {
+  const control = readFileSync("src/lib/organization-control-plane.ts", "utf8");
+  const actions = readFileSync("src/app/platform/organizations/actions.ts", "utf8");
+  const page = readFileSync("src/app/platform/organizations/page.tsx", "utf8");
+
+  assert.match(control, /verifyTenantDataPlaneReadiness/);
+  assert.match(control, /information_schema\.columns/);
+  assert.match(control, /pg_trigger/);
+  assert.match(control, /organization_owner/);
+  assert.match(control, /vehicle_inspection_admin/);
+  assert.match(control, /driver_training_admin/);
+  assert.match(control, /operationalAccessEnabled: true/);
+  assert.match(control, /dataIsolationVerifiedAt: now/);
+  assert.match(control, /onboardingStage: "complete"/);
+  assert.match(actions, /activateOrganizationWorkspace/);
+  assert.match(actions, /entityType: "organization_workspace"/);
+  assert.match(page, /Verify & activate/);
+});

@@ -8,13 +8,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { locations, users } from "./schema";
+import { locations, users, organizations
+} from "./schema";
 import { trainingSessions } from "./training-schema";
 
 export const trainingRequests = pgTable(
   "training_requests",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     requestNumber: varchar("request_number", { length: 40 }).notNull(),
     requestType: varchar("request_type", { length: 20 }).notNull().default("client"),
     serviceId: varchar("service_id", { length: 80 }).notNull(),
@@ -43,7 +47,8 @@ export const trainingRequests = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    requestNumberIdx: uniqueIndex("training_request_number_uidx").on(t.requestNumber),
+    organizationIdx: index("training_requests_organization_idx").on(t.organizationId),
+    requestNumberIdx: uniqueIndex("training_request_number_uidx").on(t.organizationId, t.requestNumber),
     statusCreatedIdx: index("training_request_status_created_idx").on(t.status, t.createdAt),
     serviceIdx: index("training_request_service_idx").on(t.serviceId),
     clientIdx: index("training_request_client_idx").on(t.clientName),
@@ -56,6 +61,9 @@ export const trainingRequestEvents = pgTable(
   "training_request_events",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     requestId: varchar("request_id", { length: 36 })
       .notNull()
       .references(() => trainingRequests.id, { onDelete: "cascade" }),
@@ -67,6 +75,7 @@ export const trainingRequestEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_request_events_organization_idx").on(t.organizationId),
     requestCreatedIdx: index("training_request_event_request_created_idx").on(t.requestId, t.createdAt),
   })
 );

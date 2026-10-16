@@ -1,12 +1,13 @@
-import { desc, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs } from "@/db/schema";
+import { auditLogs, users } from "@/db/schema";
 import { newId } from "./utils";
 import { normalizeClientIp } from "./request-context";
 import { sanitizeAuditPayload, sanitizeAuditText } from "./audit-sanitizer";
 import { hashAuditPayload } from "./audit-chain";
 
 export type AuditInput = {
+  organizationId?: string | null;
   userId?: string | null;
   userName?: string | null;
   action: "create" | "update" | "delete" | "restore" | "archive" | "inspect" | "approve" | "reject" | "import" | "export" | "login" | "logout" | "login_failed";
@@ -24,13 +25,29 @@ export async function logAudit(input: AuditInput) {
     const id = newId();
 
     await db.transaction(async (tx) => {
-      // Serialize writers and only chain to already-hashed records. Legacy
-      // rows remain readable but cannot reset or fork the protected chain.
-      await tx.execute(sql`select pg_advisory_xact_lock(78654229)`);
+      let organizationId = sanitizeAuditText(input.organizationId, 36);
+      const sanitizedUserId = sanitizeAuditText(input.userId, 36);
+
+      if (!organizationId && sanitizedUserId) {
+        const [owner] = await tx
+          .select({ organizationId: users.organizationId })
+          .from(users)
+          .where(eq(users.id, sanitizedUserId))
+          .limit(1);
+        organizationId = owner?.organizationId || null;
+      }
+
+      if (!organizationId) {
+        throw new Error("Organization context is required for tenant audit records");
+      }
+
+      // Chain audit events inside each organization independently. This avoids
+      // coupling one subscriber's audit throughput or hash history to another.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${organizationId}))`);
       const [previous] = await tx
         .select({ eventHash: auditLogs.eventHash, createdAt: auditLogs.createdAt })
         .from(auditLogs)
-        .where(isNotNull(auditLogs.eventHash))
+        .where(and(eq(auditLogs.organizationId, organizationId), isNotNull(auditLogs.eventHash)))
         .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
         .limit(1);
 
@@ -39,7 +56,8 @@ export async function logAudit(input: AuditInput) {
       const createdAt = new Date(Math.max(Date.now(), previousTime + 1));
       const sanitized = {
         id,
-        userId: sanitizeAuditText(input.userId, 36),
+        organizationId,
+        userId: sanitizedUserId,
         userName: sanitizeAuditText(input.userName, 200),
         action: input.action,
         entityType: sanitizeAuditText(input.entityType, 100) || "unknown",

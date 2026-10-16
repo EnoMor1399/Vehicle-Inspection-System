@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { locations, users, inspections } from "@/db/schema";
-import { eq, sql, asc } from "drizzle-orm";
+import { and, eq, sql, asc } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { StationEditor } from "./StationEditor";
 import { MapPin, Users, Wrench, Phone, Mail } from "lucide-react";
@@ -13,17 +13,27 @@ export default async function LocationsPage() {
   const user = await requirePermission("locations");
   const canManage = canManageLocations(user);
 
-  const allLocations = await db.select().from(locations).orderBy(asc(locations.name));
+  const allLocations = await db
+    .select()
+    .from(locations)
+    .where(eq(locations.organizationId, user.organizationId))
+    .orderBy(asc(locations.name));
   const rows = await Promise.all(
     allLocations.map(async (loc) => {
       const [inspectorCount] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(users)
-        .where(eq(users.locationId, loc.id));
+        .where(and(
+          eq(users.organizationId, user.organizationId),
+          eq(users.locationId, loc.id),
+        ));
       const [inspectionCount] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(inspections)
-        .where(eq(inspections.locationId, loc.id));
+        .where(and(
+          eq(inspections.organizationId, user.organizationId),
+          eq(inspections.locationId, loc.id),
+        ));
       return {
         ...loc,
         inspectorCount: inspectorCount?.count || 0,
@@ -37,7 +47,7 @@ export default async function LocationsPage() {
       <PageHeader
         eyebrow="Network"
         title="Inspection Stations"
-        description="Multi-site network across Ghana. Each station maintains its own inspectors, vehicles, equipment and daily schedules."
+        description="Inspection stations assigned to your organization. Each site maintains its own inspectors, equipment and operating schedules."
         action={canManage ? <StationEditor /> : undefined}
       />
 

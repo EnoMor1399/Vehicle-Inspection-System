@@ -61,12 +61,16 @@ function integerOrNull(value: string | undefined) {
   return value ? Number(value) : null;
 }
 
-async function validateTransporterReference(transporterId: string | null | undefined) {
+async function validateTransporterReference(organizationId: string, transporterId: string | null | undefined) {
   if (!transporterId) return null;
   const [row] = await db
     .select({ id: transporters.id })
     .from(transporters)
-    .where(and(eq(transporters.id, transporterId), isNull(transporters.deletedAt)))
+    .where(and(
+      eq(transporters.organizationId, organizationId),
+      eq(transporters.id, transporterId),
+      isNull(transporters.deletedAt),
+    ))
     .limit(1);
   if (!row) throw new Error("Selected transporter was not found or is inactive");
   return row.id;
@@ -115,10 +119,11 @@ export async function createVehicle(data: VehicleFormData) {
     throw new Error("New vehicles can start only as active or suspended");
   }
 
-  const transporterId = await validateTransporterReference(parsed.transporterId);
+  const transporterId = await validateTransporterReference(user.organizationId, parsed.transporterId);
   const id = newId();
   const payload = {
     id,
+    organizationId: user.organizationId,
     ...buildVehiclePayload(parsed, transporterId),
     status,
   };
@@ -132,6 +137,7 @@ export async function createVehicle(data: VehicleFormData) {
   }
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -143,6 +149,7 @@ export async function createVehicle(data: VehicleFormData) {
   });
 
   await emitWebhookEvent("vehicle.created", {
+    organizationId: user.organizationId,
     id,
     registrationNumber: payload.registrationNumber,
     transporterId,
@@ -158,7 +165,11 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
   if (!id || id.length > 64) throw new Error("Vehicle reference is invalid");
   const parsed = parseVehicleInput(data);
 
-  const [before] = await db.select().from(vehicles).where(eq(vehicles.id, id)).limit(1);
+  const [before] = await db
+    .select()
+    .from(vehicles)
+    .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, id)))
+    .limit(1);
   if (!before) throw new Error("Vehicle not found");
   if (before.status === "decommissioned") {
     throw new Error("A decommissioned vehicle cannot be edited");
@@ -168,7 +179,7 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
   const transition = validateGenericVehicleStatusTransition(before.status, requestedStatus);
   if (!transition.ok) throw new Error(transition.message);
 
-  const transporterId = await validateTransporterReference(parsed.transporterId);
+  const transporterId = await validateTransporterReference(user.organizationId, parsed.transporterId);
   const payload = {
     ...buildVehiclePayload(parsed, transporterId),
     status: requestedStatus,
@@ -176,7 +187,10 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
   };
 
   try {
-    await db.update(vehicles).set(payload).where(eq(vehicles.id, id));
+    await db
+      .update(vehicles)
+      .set(payload)
+      .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, id)));
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/unique|duplicate/i.test(message)) throw new Error("Vehicle registration already exists");
@@ -184,6 +198,7 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
   }
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -196,6 +211,7 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
   });
 
   await emitWebhookEvent("vehicle.updated", {
+    organizationId: user.organizationId,
     id,
     registrationNumber: payload.registrationNumber,
     transporterId,
@@ -209,12 +225,17 @@ export async function updateVehicle(id: string, data: VehicleFormData) {
 export async function decommissionVehicle(id: string) {
   const user = await requireEditor();
   if (!id || id.length > 64) throw new Error("Vehicle reference is invalid");
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id)).limit(1);
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, id)))
+    .limit(1);
   if (!vehicle) return { decommissioned: false, notFound: true };
   if (vehicle.status === "decommissioned") return { decommissioned: true, alreadyDecommissioned: true };
 
-  await db.update(vehicles).set({ status: "decommissioned", updatedAt: new Date() }).where(eq(vehicles.id, id));
+  await db.update(vehicles).set({ status: "decommissioned", updatedAt: new Date() }).where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, id)));
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "archive",
@@ -227,6 +248,7 @@ export async function decommissionVehicle(id: string) {
   });
 
   await emitWebhookEvent("vehicle.updated", {
+    organizationId: user.organizationId,
     id,
     registrationNumber: vehicle.registrationNumber,
     transporterId: vehicle.transporterId,
@@ -242,12 +264,19 @@ export async function getVehicleDetail(id: string) {
   const user = await getCurrentUser();
   if (user.role !== "transporter_user" && !canEditVehicles(user)) return null;
   if (!id || id.length > 64) return null;
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id)).limit(1);
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, id)))
+    .limit(1);
   if (!vehicle || !canAccessTransporterScope(user, vehicle.transporterId)) return null;
   const inspectionRows = await db
     .select()
     .from(inspections)
-    .where(eq(inspections.vehicleId, id))
+    .where(and(
+      eq(inspections.organizationId, user.organizationId),
+      eq(inspections.vehicleId, id),
+    ))
     .orderBy(desc(inspections.inspectionDate));
   return { vehicle, inspections: inspectionRows };
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   AlertTriangle,
   Award,
@@ -53,18 +53,18 @@ export default async function DriverTrainingPage() {
         total: sql<number>`count(*)::int`,
         active: sql<number>`count(*) filter (where ${trainingSessions.status} in ('scheduled','in_progress'))::int`,
       })
-      .from(trainingSessions),
+      .from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)),
     db
       .select({
         total: sql<number>`count(*)::int`,
         highRisk: sql<number>`count(*) filter (where ${trainingParticipants.riskLevel} in ('high','critical'))::int`,
       })
-      .from(trainingParticipants),
+      .from(trainingParticipants).where(eq(trainingParticipants.organizationId, user.organizationId)),
     db
       .select({
         active: sql<number>`count(*) filter (where ${trainingCertificates.status} = 'active')::int`,
       })
-      .from(trainingCertificates),
+      .from(trainingCertificates).where(eq(trainingCertificates.organizationId, user.organizationId)),
     db
       .select({
         id: trainingSessions.id,
@@ -76,7 +76,7 @@ export default async function DriverTrainingPage() {
         status: trainingSessions.status,
       })
       .from(trainingSessions)
-      .where(inArray(trainingSessions.status, ["scheduled", "in_progress"]))
+      .where(and(eq(trainingSessions.organizationId, user.organizationId), inArray(trainingSessions.status, ["scheduled", "in_progress"])))
       .orderBy(trainingSessions.startAt)
       .limit(6),
   ] as const);

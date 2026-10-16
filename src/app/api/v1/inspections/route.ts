@@ -32,7 +32,13 @@ export async function POST(request: Request) {
       return apiError(403, "Approval permission is required to create an approved inspection");
     }
 
-    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, body.vehicleId));
+    const [vehicle] = await db
+      .select()
+      .from(vehicles)
+      .where(and(
+        eq(vehicles.organizationId, auth.user.organizationId),
+        eq(vehicles.id, body.vehicleId),
+      ));
     if (!vehicle) return apiError(404, "Vehicle not found");
     if (vehicle.status === "decommissioned") {
       return apiError(409, "A decommissioned vehicle cannot be inspected");
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const settings = await getSettings();
+    const settings = await getSettings(auth.user.organizationId);
     const nextVehicleStatus = deriveVehicleStatusAfterInspection(
       body.overallResult,
       body.workflowStatus,
@@ -78,6 +84,7 @@ export async function POST(request: Request) {
     await db.transaction(async (tx) => {
       await tx.insert(inspections).values({
         id,
+        organizationId: auth.user.organizationId,
         inspectionNumber,
         vehicleId: body.vehicleId,
         inspectionDate: now,
@@ -92,11 +99,15 @@ export async function POST(request: Request) {
       if (nextVehicleStatus) {
         await tx.update(vehicles)
           .set({ status: nextVehicleStatus as any, updatedAt: new Date() })
-          .where(eq(vehicles.id, body.vehicleId));
+          .where(and(
+            eq(vehicles.organizationId, auth.user.organizationId),
+            eq(vehicles.id, body.vehicleId),
+          ));
       }
     });
 
     await logAudit({
+      organizationId: auth.user.organizationId,
       userId: auth.user.id,
       userName: auth.user.name,
       action: "create",
@@ -115,6 +126,7 @@ export async function POST(request: Request) {
 
     const event = body.overallResult === "fail" ? "inspection.failed" : "inspection.completed";
     await emitWebhookEvent(event, {
+      organizationId: auth.user.organizationId,
       id,
       inspectionNumber,
       vehicleId: body.vehicleId,
@@ -146,7 +158,7 @@ export async function GET(request: Request) {
   if (result && !RESULTS.has(result)) return apiError(400, "Invalid inspection result");
   if (vehicleId && vehicleId.length > 64) return apiError(400, "vehicle_id is too long");
 
-  const where = [];
+  const where = [eq(inspections.organizationId, auth.user.organizationId)];
   if (result) where.push(eq(inspections.overallResult, result as "pass" | "conditional_pass" | "reinspection_required" | "fail"));
   if (vehicleId) where.push(eq(inspections.vehicleId, vehicleId));
   const predicate = where.length ? and(...where) : undefined;

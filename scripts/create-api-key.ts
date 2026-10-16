@@ -20,7 +20,7 @@ if (!scopes.length || scopes.some((scope) => !allowed.has(scope))) {
 const [user] = await db.select().from(users).where(eq(users.email, email));
 if (!user || !user.isActive) throw new Error("Active user not found");
 
-const issued = await issueApiKey({ userId: user.id, name: nameArg, scopes });
+const issued = await issueApiKey({ organizationId: user.organizationId, userId: user.id, name: nameArg, scopes });
 console.log("API key created. Copy it now; it will not be stored in plaintext:");
 console.log(issued.raw);
 await pool.end();

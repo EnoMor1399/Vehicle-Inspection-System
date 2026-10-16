@@ -11,12 +11,16 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { locations, transporters, users } from "./schema";
+import { locations, transporters, users, organizations
+} from "./schema";
 
 export const trainingSessions = pgTable(
   "training_sessions",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     referenceNumber: varchar("reference_number", { length: 40 }).notNull(),
     serviceId: varchar("service_id", { length: 80 }).notNull(),
     title: varchar("title", { length: 220 }).notNull(),
@@ -37,7 +41,8 @@ export const trainingSessions = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    referenceIdx: uniqueIndex("training_session_reference_uidx").on(t.referenceNumber),
+    organizationIdx: index("training_sessions_organization_idx").on(t.organizationId),
+    referenceIdx: uniqueIndex("training_session_reference_uidx").on(t.organizationId, t.referenceNumber),
     serviceIdx: index("training_session_service_idx").on(t.serviceId),
     statusStartIdx: index("training_session_status_start_idx").on(t.status, t.startAt),
     transporterIdx: index("training_session_transporter_idx").on(t.transporterId),
@@ -49,6 +54,9 @@ export const trainingParticipants = pgTable(
   "training_participants",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -70,6 +78,7 @@ export const trainingParticipants = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_participants_organization_idx").on(t.organizationId),
     sessionIdx: index("training_participant_session_idx").on(t.sessionId),
     licenseIdx: index("training_participant_license_idx").on(t.driverLicenseNumber),
     emailIdx: index("training_participant_email_idx").on(t.email),
@@ -81,6 +90,9 @@ export const trainingAssessments = pgTable(
   "training_assessments",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     participantId: varchar("participant_id", { length: 36 })
       .notNull()
       .references(() => trainingParticipants.id, { onDelete: "cascade" }),
@@ -127,6 +139,7 @@ export const trainingAssessments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_assessments_organization_idx").on(t.organizationId),
     participantIdx: index("training_assessment_participant_idx").on(t.participantId, t.assessedAt),
     sessionIdx: index("training_assessment_session_idx").on(t.sessionId),
     resultIdx: index("training_assessment_result_idx").on(t.result),
@@ -141,6 +154,9 @@ export const trainingCertificates = pgTable(
   "training_certificates",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     certificateNumber: varchar("certificate_number", { length: 50 }).notNull(),
     verificationCode: varchar("verification_code", { length: 64 }).notNull(),
     participantId: varchar("participant_id", { length: 36 })
@@ -159,7 +175,8 @@ export const trainingCertificates = pgTable(
     revocationReason: text("revocation_reason"),
   },
   (t) => ({
-    certificateNumberIdx: uniqueIndex("training_certificate_number_uidx").on(t.certificateNumber),
+    organizationIdx: index("training_certificates_organization_idx").on(t.organizationId),
+    certificateNumberIdx: uniqueIndex("training_certificate_number_uidx").on(t.organizationId, t.certificateNumber),
     verificationIdx: uniqueIndex("training_certificate_verification_uidx").on(t.verificationCode),
     participantIdx: index("training_certificate_participant_idx").on(t.participantId),
     sessionIdx: index("training_certificate_session_idx").on(t.sessionId),
@@ -171,6 +188,9 @@ export const trainingComplianceCases = pgTable(
   "training_compliance_cases",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     participantId: varchar("participant_id", { length: 36 })
       .notNull()
       .references(() => trainingParticipants.id, { onDelete: "cascade" }),
@@ -190,6 +210,7 @@ export const trainingComplianceCases = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_compliance_cases_organization_idx").on(t.organizationId),
     participantIdx: index("training_compliance_participant_idx").on(t.participantId),
     certificateIdx: index("training_compliance_certificate_idx").on(t.certificateId),
     statusDueIdx: index("training_compliance_status_due_idx").on(t.status, t.dueDate),
@@ -201,6 +222,9 @@ export const trainingComplianceEvents = pgTable(
   "training_compliance_events",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     caseId: varchar("case_id", { length: 36 })
       .notNull()
       .references(() => trainingComplianceCases.id, { onDelete: "cascade" }),
@@ -211,6 +235,7 @@ export const trainingComplianceEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_compliance_events_organization_idx").on(t.organizationId),
     caseCreatedIdx: index("training_compliance_event_case_created_idx").on(t.caseId, t.createdAt),
   })
 );

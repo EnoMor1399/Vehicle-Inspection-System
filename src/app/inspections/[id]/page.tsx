@@ -16,10 +16,10 @@ export const dynamic = "force-dynamic";
 
 export default async function InspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [row, user, settings] = await Promise.all([
+  const user = await getCurrentUser();
+  const [row, settings] = await Promise.all([
     getInspectionDetail(id),
-    getCurrentUser(),
-    getSettings(),
+    getSettings(user.organizationId),
   ]);
   if (!row) notFound();
   const { inspection: i, vehicle: v } = row;

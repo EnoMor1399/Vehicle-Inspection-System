@@ -17,6 +17,7 @@ export function legacyApiKeyHash(value: string): string {
 }
 
 export async function issueApiKey(input: {
+  organizationId: string;
   userId: string;
   name: string;
   scopes: string[];
@@ -26,6 +27,7 @@ export async function issueApiKey(input: {
   const id = newId();
   await db.insert(apiKeys).values({
     id,
+    organizationId: input.organizationId,
     userId: input.userId,
     name: input.name.trim(),
     keyHash: hashApiKey(raw),

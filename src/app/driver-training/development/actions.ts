@@ -63,13 +63,13 @@ export async function createTrainingDevelopmentPlan(formData: FormData) {
   if (!parsed.success) throw new Error(trainingDevelopmentValidationMessage(parsed.error));
   const data = parsed.data;
 
-  const [participant] = await db.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+  const [participant] = await db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId))).limit(1);
   if (!participant) throw new Error("Training participant not found");
   if (data.sourceAssessmentId) {
     const [assessment] = await db
       .select({ id: trainingAssessments.id, participantId: trainingAssessments.participantId })
       .from(trainingAssessments)
-      .where(eq(trainingAssessments.id, data.sourceAssessmentId))
+      .where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, data.sourceAssessmentId)))
       .limit(1);
     if (!assessment || assessment.participantId !== participant.id) {
       throw new Error("Source assessment must belong to the selected participant");
@@ -79,6 +79,7 @@ export async function createTrainingDevelopmentPlan(formData: FormData) {
 
   const id = newId();
   const values = {
+    organizationId: user.organizationId,
     id,
     participantId: participant.id,
     sourceAssessmentId: data.sourceAssessmentId || null,
@@ -93,6 +94,7 @@ export async function createTrainingDevelopmentPlan(formData: FormData) {
   } as const;
   await db.insert(trainingDevelopmentPlans).values(values);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -120,12 +122,13 @@ export async function addTrainingDevelopmentAction(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-development:${data.planId}`}))`);
-    const [plan] = await tx.select().from(trainingDevelopmentPlans).where(eq(trainingDevelopmentPlans.id, data.planId)).limit(1);
+    const [plan] = await tx.select().from(trainingDevelopmentPlans).where(and(eq(trainingDevelopmentPlans.organizationId, user.organizationId), eq(trainingDevelopmentPlans.id, data.planId))).limit(1);
     if (!plan) return { ok: false as const, error: "Development plan not found" };
     if (!["open", "in_progress"].includes(plan.status)) {
       return { ok: false as const, error: "New remediation actions can only be added to open or in-progress plans" };
     }
     const values = {
+      organizationId: user.organizationId,
       id,
       planId: plan.id,
       actionType: data.actionType,
@@ -142,6 +145,7 @@ export async function addTrainingDevelopmentAction(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -167,14 +171,14 @@ export async function transitionTrainingDevelopmentAction(formData: FormData) {
   if (data.status === "completed" && !data.evidenceReference) throw new Error("Completed development actions require evidence reference");
   if (data.status === "waived" && !data.notes) throw new Error("Waived development actions require a reason");
 
-  const [lookup] = await db.select({ planId: trainingDevelopmentActions.planId }).from(trainingDevelopmentActions).where(eq(trainingDevelopmentActions.id, data.actionId)).limit(1);
+  const [lookup] = await db.select({ planId: trainingDevelopmentActions.planId }).from(trainingDevelopmentActions).where(and(eq(trainingDevelopmentActions.organizationId, user.organizationId), eq(trainingDevelopmentActions.id, data.actionId))).limit(1);
   if (!lookup) throw new Error("Development action not found");
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-development:${lookup.planId}`}))`);
-    const [action] = await tx.select().from(trainingDevelopmentActions).where(eq(trainingDevelopmentActions.id, data.actionId)).limit(1);
+    const [action] = await tx.select().from(trainingDevelopmentActions).where(and(eq(trainingDevelopmentActions.organizationId, user.organizationId), eq(trainingDevelopmentActions.id, data.actionId))).limit(1);
     if (!action) return { ok: false as const, error: "Development action not found" };
-    const [plan] = await tx.select().from(trainingDevelopmentPlans).where(eq(trainingDevelopmentPlans.id, action.planId)).limit(1);
+    const [plan] = await tx.select().from(trainingDevelopmentPlans).where(and(eq(trainingDevelopmentPlans.organizationId, user.organizationId), eq(trainingDevelopmentPlans.id, action.planId))).limit(1);
     if (!plan) return { ok: false as const, error: "Development plan not found" };
     if (["completed", "cancelled"].includes(plan.status)) return { ok: false as const, error: "Closed development plans cannot be changed" };
     if (!canTransitionTrainingDevelopmentAction(action.status, data.status)) {
@@ -190,12 +194,13 @@ export async function transitionTrainingDevelopmentAction(formData: FormData) {
       completedBy: data.status === "completed" ? user.id : action.completedBy,
       updatedAt: now,
     } as const;
-    await tx.update(trainingDevelopmentActions).set(patch).where(eq(trainingDevelopmentActions.id, action.id));
+    await tx.update(trainingDevelopmentActions).set(patch).where(and(eq(trainingDevelopmentActions.organizationId, user.organizationId), eq(trainingDevelopmentActions.id, action.id)));
     return { ok: true as const, action, plan, patch };
   });
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -224,15 +229,16 @@ export async function transitionTrainingDevelopmentPlan(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-development:${data.planId}`}))`);
-    const [plan] = await tx.select().from(trainingDevelopmentPlans).where(eq(trainingDevelopmentPlans.id, data.planId)).limit(1);
+    const [plan] = await tx.select().from(trainingDevelopmentPlans).where(and(eq(trainingDevelopmentPlans.organizationId, user.organizationId), eq(trainingDevelopmentPlans.id, data.planId))).limit(1);
     if (!plan) return { ok: false as const, error: "Development plan not found" };
     if (!canTransitionTrainingDevelopmentPlan(plan.status, data.status)) {
       return { ok: false as const, error: `Development plan cannot move from ${plan.status} to ${data.status}` };
     }
 
     if (data.status === "verification" || data.status === "completed") {
-      const [totalRow] = await tx.select({ n: count() }).from(trainingDevelopmentActions).where(eq(trainingDevelopmentActions.planId, plan.id));
+      const [totalRow] = await tx.select({ n: count() }).from(trainingDevelopmentActions).where(and(eq(trainingDevelopmentActions.organizationId, user.organizationId), eq(trainingDevelopmentActions.planId, plan.id)));
       const [openRow] = await tx.select({ n: count() }).from(trainingDevelopmentActions).where(and(
+        eq(trainingDevelopmentActions.organizationId, user.organizationId),
         eq(trainingDevelopmentActions.planId, plan.id),
         inArray(trainingDevelopmentActions.status, ["pending", "in_progress"]),
       ));
@@ -248,12 +254,13 @@ export async function transitionTrainingDevelopmentPlan(formData: FormData) {
       completedBy: data.status === "completed" ? user.id : plan.completedBy,
       updatedAt: now,
     } as const;
-    await tx.update(trainingDevelopmentPlans).set(patch).where(eq(trainingDevelopmentPlans.id, plan.id));
+    await tx.update(trainingDevelopmentPlans).set(patch).where(and(eq(trainingDevelopmentPlans.organizationId, user.organizationId), eq(trainingDevelopmentPlans.id, plan.id)));
     return { ok: true as const, plan, patch };
   });
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: data.status === "completed" ? "approve" : "update",

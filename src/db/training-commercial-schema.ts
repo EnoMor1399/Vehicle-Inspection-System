@@ -9,13 +9,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingRequests } from "./training-request-schema";
 
 export const trainingQuotations = pgTable(
   "training_quotations",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     quotationNumber: varchar("quotation_number", { length: 50 }).notNull(),
     requestId: varchar("request_id", { length: 36 })
       .notNull()
@@ -43,7 +47,8 @@ export const trainingQuotations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    numberIdx: uniqueIndex("training_quotation_number_uidx").on(t.quotationNumber),
+    organizationIdx: index("training_quotations_organization_idx").on(t.organizationId),
+    numberIdx: uniqueIndex("training_quotation_number_uidx").on(t.organizationId, t.quotationNumber),
     requestVersionIdx: uniqueIndex("training_quotation_request_version_uidx").on(t.requestId, t.versionNumber),
     requestStatusIdx: index("training_quotation_request_status_idx").on(t.requestId, t.status),
     validUntilIdx: index("training_quotation_valid_until_idx").on(t.validUntil),
@@ -54,6 +59,9 @@ export const trainingQuotationItems = pgTable(
   "training_quotation_items",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     quotationId: varchar("quotation_id", { length: 36 })
       .notNull()
       .references(() => trainingQuotations.id, { onDelete: "cascade" }),
@@ -65,6 +73,7 @@ export const trainingQuotationItems = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_quotation_items_organization_idx").on(t.organizationId),
     quotationIdx: index("training_quotation_item_quotation_idx").on(t.quotationId),
     typeIdx: index("training_quotation_item_type_idx").on(t.itemType),
   })

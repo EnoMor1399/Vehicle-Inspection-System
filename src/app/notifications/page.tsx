@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Bell, Calendar, Mail, MessageSquare, CheckCircle2, AlertTriangle, ShieldAlert, FileText, Activity } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -11,7 +11,14 @@ export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
   const user = await requirePermission("notifications");
-  const all = await db.select().from(notifications).where(eq(notifications.userId, user.id)).orderBy(desc(notifications.createdAt)).limit(100);
+  const all = await db
+    .select()
+    .from(notifications)
+    .where(and(
+      eq(notifications.organizationId, user.organizationId),
+      eq(notifications.userId, user.id),
+    ))
+    .orderBy(desc(notifications.createdAt)).limit(100);
   const unread = all.filter((n) => !n.readAt).length;
   const byType: Record<string, number> = {};
   all.forEach((n) => { byType[n.type] = (byType[n.type] || 0) + 1; });

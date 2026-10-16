@@ -29,7 +29,7 @@ import { ScheduleAppointmentForm } from "./ScheduleAppointmentForm";
 export const dynamic = "force-dynamic";
 
 const ACTIVE_STATUSES: AppointmentStatus[] = ["scheduled", "confirmed", "checked_in", "in_progress"];
-const ASSIGNABLE_ROLES = ["super_admin", "admin", "operations_manager", "supervisor", "inspector"] as const;
+const ASSIGNABLE_ROLES = ["super_admin", "vehicle_inspection_admin", "admin", "operations_manager", "supervisor", "inspector"] as const;
 
 function toneForStatus(status: AppointmentStatus): "slate" | "blue" | "amber" | "emerald" | "red" | "violet" {
   if (status === "scheduled") return "slate";
@@ -86,7 +86,11 @@ export default async function SchedulePage() {
       .innerJoin(vehicles, eq(vehicles.id, inspectionAppointments.vehicleId))
       .leftJoin(locations, eq(locations.id, inspectionAppointments.locationId))
       .leftJoin(users, eq(users.id, inspectionAppointments.assignedInspectorId))
-      .where(gte(inspectionAppointments.scheduledAt, listStart))
+      .where(and(
+        eq(inspectionAppointments.organizationId, user.organizationId),
+        eq(vehicles.organizationId, user.organizationId),
+        gte(inspectionAppointments.scheduledAt, listStart),
+      ))
       .orderBy(asc(inspectionAppointments.scheduledAt))
       .limit(250),
     db
@@ -98,7 +102,10 @@ export default async function SchedulePage() {
         region: locations.region,
       })
       .from(locations)
-      .where(eq(locations.status, "active"))
+      .where(and(
+        eq(locations.organizationId, user.organizationId),
+        eq(locations.status, "active"),
+      ))
       .orderBy(asc(locations.name)),
     db
       .select({
@@ -108,13 +115,20 @@ export default async function SchedulePage() {
         model: vehicles.model,
       })
       .from(vehicles)
-      .where(ne(vehicles.status, "decommissioned"))
+      .where(and(
+        eq(vehicles.organizationId, user.organizationId),
+        ne(vehicles.status, "decommissioned"),
+      ))
       .orderBy(asc(vehicles.registrationNumber)),
     db
       .select({ id: users.id, name: users.name, role: users.role })
       .from(users)
       .where(
-        and(eq(users.isActive, true), inArray(users.role, [...ASSIGNABLE_ROLES])),
+        and(
+          eq(users.organizationId, user.organizationId),
+          eq(users.isActive, true),
+          inArray(users.role, [...ASSIGNABLE_ROLES]),
+        ),
       )
       .orderBy(asc(users.name)),
   ]);

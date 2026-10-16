@@ -9,13 +9,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingSessions } from "./training-schema";
 
 export const trainingInstructorProfiles = pgTable(
   "training_instructor_profiles",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     userId: varchar("user_id", { length: 36 })
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -34,8 +38,9 @@ export const trainingInstructorProfiles = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_instructor_profiles_organization_idx").on(t.organizationId),
     userIdx: uniqueIndex("training_instructor_user_uidx").on(t.userId),
-    codeIdx: uniqueIndex("training_instructor_code_uidx").on(t.instructorCode),
+    codeIdx: uniqueIndex("training_instructor_code_uidx").on(t.organizationId, t.instructorCode),
     statusIdx: index("training_instructor_status_idx").on(t.status),
     certificationExpiryIdx: index("training_instructor_cert_expiry_idx").on(t.trainerCertificationExpiry),
     medicalExpiryIdx: index("training_instructor_medical_expiry_idx").on(t.medicalFitnessExpiry),
@@ -46,6 +51,9 @@ export const trainingSessionReadiness = pgTable(
   "training_session_readiness",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -66,6 +74,7 @@ export const trainingSessionReadiness = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_session_readiness_organization_idx").on(t.organizationId),
     sessionIdx: uniqueIndex("training_readiness_session_uidx").on(t.sessionId),
     statusIdx: index("training_readiness_status_idx").on(t.status),
     reviewedIdx: index("training_readiness_reviewed_idx").on(t.reviewedAt),

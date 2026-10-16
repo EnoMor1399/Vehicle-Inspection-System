@@ -8,6 +8,7 @@ import { validateResolvedWebhookDestination, validateWebhookDestination } from "
 import { sanitizeTelemetryUrl } from "@/lib/telemetry";
 import { clientIpFromHeaders, normalizeRequestId, normalizeUserAgent } from "@/lib/request-context";
 import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
+import { getCurrentUser } from "@/lib/auth";
 
 const frontendErrorSchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -47,16 +48,25 @@ export async function POST(request: NextRequest) {
     const { message, stack, componentStack, timestamp, url } = parsed.data;
     const safeUrl = sanitizeTelemetryUrl(url);
 
-    await db.insert(securityEvents).values({
-      id: randomBytes(16).toString("hex"),
-      eventType: "frontend_error",
-      severity: "warning",
-      ipAddress,
-      userAgent,
-      description: message,
-      metadata: { stack, componentStack, timestamp, url: safeUrl, requestId },
-      createdAt: new Date(),
-    });
+    try {
+      const user = await getCurrentUser();
+      await db.insert(securityEvents).values({
+        id: randomBytes(16).toString("hex"),
+        organizationId: user.organizationId,
+        userId: user.id,
+        eventType: "frontend_error",
+        severity: "warning",
+        ipAddress,
+        userAgent,
+        description: message,
+        metadata: { stack, componentStack, timestamp, url: safeUrl, requestId },
+        createdAt: new Date(),
+      });
+    } catch {
+      // Public/login errors have no trustworthy tenant context. They may still
+      // be forwarded to the configured external telemetry destination below,
+      // but are not written into a tenant-owned database table.
+    }
 
     const webhook = process.env.ERROR_TRACKING_WEBHOOK;
     if (webhook) {

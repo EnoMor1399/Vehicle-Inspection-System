@@ -48,7 +48,7 @@ interface DashboardAggregateRow {
   due_inspections: number;
 }
 
-export async function computeDashboardStats(): Promise<DashboardStats> {
+export async function computeDashboardStats(organizationId: string): Promise<DashboardStats> {
   // Keep the dashboard snapshot internally consistent and use one database
   // round trip. This matters because the reports page executes several other
   // analytics queries concurrently and the serverless pool is intentionally
@@ -75,11 +75,13 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
             between CURRENT_DATE and CURRENT_DATE + interval '30 days'
         )::int as road_fund_expiring
       from ${vehicles}
+      where ${vehicles.organizationId} = ${organizationId}
     ),
     transporter_stats as (
       select count(*)::int as total_transporters
       from ${transporters}
-      where ${transporters.deletedAt} is null
+      where ${transporters.organizationId} = ${organizationId}
+        and ${transporters.deletedAt} is null
     ),
     inspection_stats as (
       select
@@ -100,6 +102,7 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
             and ${inspections.reinspectionDate} >= CURRENT_DATE
         )::int as pending_reinspections
       from ${inspections}
+      where ${inspections.organizationId} = ${organizationId}
     ),
     due_stats as (
       select count(*)::int as due_inspections
@@ -108,6 +111,7 @@ export async function computeDashboardStats(): Promise<DashboardStats> {
           ${inspections.vehicleId} as vehicle_id,
           max(${inspections.nextInspectionDate}) as due_date
         from ${inspections}
+        where ${inspections.organizationId} = ${organizationId}
         group by ${inspections.vehicleId}
       ) latest
       where latest.due_date
@@ -192,7 +196,7 @@ export interface YearlyData {
   avgOpacity: number;
 }
 
-export async function getYearlyComparison(): Promise<YearlyData[]> {
+export async function getYearlyComparison(organizationId: string): Promise<YearlyData[]> {
   const rows = await db.execute<{
     year: string;
     pass: number;
@@ -211,7 +215,8 @@ export async function getYearlyComparison(): Promise<YearlyData[]> {
       round(avg(nullif(${inspections.serviceBrakeEfficiency}::numeric, 0)), 2) as avg_brake,
       round(avg(nullif(${inspections.opacityTest}::numeric, 0)), 2) as avg_opacity
     from ${inspections}
-    where ${inspections.inspectionDate} >= CURRENT_DATE - interval '10 years'
+    where ${inspections.organizationId} = ${organizationId}
+      and ${inspections.inspectionDate} >= CURRENT_DATE - interval '10 years'
     group by date_trunc('year', ${inspections.inspectionDate})
     order by year asc
   `);
@@ -241,7 +246,7 @@ export async function getYearlyComparison(): Promise<YearlyData[]> {
   return data;
 }
 
-export async function getMonthlyTrend() {
+export async function getMonthlyTrend(organizationId: string) {
   const rows = await db.execute<{ month: string; pass: number; fail: number; conditional: number }>(sql`
     select
       to_char(date_trunc('month', ${inspections.inspectionDate}), 'YYYY-MM') as month,
@@ -249,7 +254,8 @@ export async function getMonthlyTrend() {
       count(*) filter (where ${inspections.overallResult} = 'fail')::int as fail,
       count(*) filter (where ${inspections.overallResult} in ('conditional_pass','reinspection_required'))::int as conditional
     from ${inspections}
-    where ${inspections.inspectionDate} >= CURRENT_DATE - interval '12 months'
+    where ${inspections.organizationId} = ${organizationId}
+      and ${inspections.inspectionDate} >= CURRENT_DATE - interval '12 months'
     group by date_trunc('month', ${inspections.inspectionDate})
     order by month asc
   `);
@@ -257,7 +263,7 @@ export async function getMonthlyTrend() {
 }
 
 // Station comparison
-export async function getStationStats() {
+export async function getStationStats(organizationId: string) {
   const rows = await db.execute<{
     station: string;
     inspections: number;
@@ -275,7 +281,10 @@ export async function getStationStats() {
         else 0
       end as pass_rate
     from ${inspections}
-    left join locations l on l.id = ${inspections.locationId}
+    left join locations l
+      on l.id = ${inspections.locationId}
+     and l.organization_id = ${organizationId}
+    where ${inspections.organizationId} = ${organizationId}
     group by l.name
     order by inspections desc
   `);
@@ -290,7 +299,7 @@ export async function getStationStats() {
 }
 
 // Transporter performance
-export async function getTransporterPerformance() {
+export async function getTransporterPerformance(organizationId: string) {
   const rows = await db.execute<{
     transporter: string;
     fleet: number;
@@ -310,9 +319,14 @@ export async function getTransporterPerformance() {
         else 0
       end as pass_rate
     from transporters t
-    left join vehicles v on v.transporter_id = t.id
-    left join inspections i on i.vehicle_id = v.id
-    where t.deleted_at is null
+    left join vehicles v
+      on v.transporter_id = t.id
+     and v.organization_id = t.organization_id
+    left join inspections i
+      on i.vehicle_id = v.id
+     and i.organization_id = t.organization_id
+    where t.organization_id = ${organizationId}
+      and t.deleted_at is null
     group by t.id, t.company_name
     order by inspections desc
   `);
@@ -328,7 +342,7 @@ export async function getTransporterPerformance() {
 }
 
 // Common defects (from section_data JSONB)
-export async function getCommonDefects() {
+export async function getCommonDefects(organizationId: string) {
   const rows = await db.execute<{ section: string; item: string; failures: number }>(sql`
     select
       sec->>'section' as section,
@@ -337,7 +351,8 @@ export async function getCommonDefects() {
     from ${inspections},
     jsonb_array_elements(${inspections.sectionData}) as sec,
     jsonb_array_elements(sec->'items') as item
-    where item->>'result' = 'fail'
+    where ${inspections.organizationId} = ${organizationId}
+      and item->>'result' = 'fail'
     group by sec->>'section', item->>'name'
     order by failures desc
     limit 10
@@ -346,10 +361,11 @@ export async function getCommonDefects() {
 }
 
 // Vehicle categories distribution
-export async function getCategoryDistribution() {
+export async function getCategoryDistribution(organizationId: string) {
   const rows = await db.execute<{ category: string; count: number }>(sql`
     select coalesce(category, 'Unspecified') as category, count(*)::int as count
     from ${vehicles}
+    where ${vehicles.organizationId} = ${organizationId}
     group by category
     order by count desc
   `);
@@ -357,7 +373,7 @@ export async function getCategoryDistribution() {
 }
 
 // Regional comparison. Region is the transporter operating region recorded on the transporter profile.
-export async function getRegionalStats() {
+export async function getRegionalStats(organizationId: string) {
   const rows = await db.execute<{
     region: string;
     vehicles: number;
@@ -379,8 +395,14 @@ export async function getRegionalStats() {
         else null
       end as pass_rate
     from vehicles v
-    left join transporters t on t.id = v.transporter_id and t.deleted_at is null
-    left join inspections i on i.vehicle_id = v.id
+    left join transporters t
+      on t.id = v.transporter_id
+     and t.organization_id = v.organization_id
+     and t.deleted_at is null
+    left join inspections i
+      on i.vehicle_id = v.id
+     and i.organization_id = v.organization_id
+    where v.organization_id = ${organizationId}
     group by coalesce(nullif(trim(t.region), ''), 'Unassigned')
     order by vehicles desc, region asc
   `);
@@ -397,7 +419,7 @@ export async function getRegionalStats() {
 }
 
 // Inspector performance
-export async function getInspectorPerformance() {
+export async function getInspectorPerformance(organizationId: string) {
   const rows = await db.execute<{ inspector: string; inspections: number; pass: number; fail: number; avgDuration: number }>(sql`
     select
       coalesce(${inspections.inspectorName}, 'Unknown') as inspector,
@@ -406,7 +428,8 @@ export async function getInspectorPerformance() {
       count(*) filter (where ${inspections.overallResult} = 'fail')::int as fail,
       0::int as avg_duration
     from ${inspections}
-    where ${inspections.inspectorName} is not null
+    where ${inspections.organizationId} = ${organizationId}
+      and ${inspections.inspectorName} is not null
     group by ${inspections.inspectorName}
     order by inspections desc
   `);

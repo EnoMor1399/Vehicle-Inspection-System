@@ -9,13 +9,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { locations, users } from "./schema";
+import { locations, users, organizations
+} from "./schema";
 import { trainingSessions } from "./training-schema";
 
 export const trainingResources = pgTable(
   "training_resources",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     resourceCode: varchar("resource_code", { length: 40 }).notNull(),
     name: varchar("name", { length: 220 }).notNull(),
     resourceType: varchar("resource_type", { length: 30 }).notNull(),
@@ -33,7 +37,8 @@ export const trainingResources = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    codeIdx: uniqueIndex("training_resource_code_uidx").on(t.resourceCode),
+    organizationIdx: index("training_resources_organization_idx").on(t.organizationId),
+    codeIdx: uniqueIndex("training_resource_code_uidx").on(t.organizationId, t.resourceCode),
     typeStatusIdx: index("training_resource_type_status_idx").on(t.resourceType, t.status),
     locationIdx: index("training_resource_location_idx").on(t.locationId),
     serviceDueIdx: index("training_resource_service_due_idx").on(t.serviceDueDate),
@@ -45,6 +50,9 @@ export const trainingResourceAllocations = pgTable(
   "training_resource_allocations",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     resourceId: varchar("resource_id", { length: 36 })
       .notNull()
       .references(() => trainingResources.id, { onDelete: "restrict" }),
@@ -59,6 +67,7 @@ export const trainingResourceAllocations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_resource_allocations_organization_idx").on(t.organizationId),
     resourceSessionIdx: index("training_resource_allocation_resource_session_idx").on(t.resourceId, t.sessionId),
     resourceStatusIdx: index("training_resource_allocation_resource_status_idx").on(t.resourceId, t.status),
     sessionStatusIdx: index("training_resource_allocation_session_status_idx").on(t.sessionId, t.status),

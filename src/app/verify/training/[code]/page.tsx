@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Award, Calendar, CheckCircle2, Fingerprint, GraduationCap, ShieldCheck, XCircle } from "lucide-react";
 import { db } from "@/db";
 import { trainingCertificates, trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -19,12 +19,13 @@ export default async function VerifyTrainingCertificatePage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  const settings = await getSettings();
+  const fallbackSettings = await getSettings();
   const parsed = trainingVerificationCodeSchema.safeParse(code);
-  if (!parsed.success) return <VerificationFailure companyName={settings.companyName} />;
+  if (!parsed.success) return <VerificationFailure companyName={fallbackSettings.companyName} />;
 
   const [record] = await db
     .select({
+      organizationId: trainingCertificates.organizationId,
       certificateNumber: trainingCertificates.certificateNumber,
       serviceId: trainingCertificates.serviceId,
       issueDate: trainingCertificates.issueDate,
@@ -37,12 +38,19 @@ export default async function VerifyTrainingCertificatePage({
       sessionTitle: trainingSessions.title,
     })
     .from(trainingCertificates)
-    .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingCertificates.participantId))
-    .innerJoin(trainingSessions, eq(trainingSessions.id, trainingCertificates.sessionId))
+    .innerJoin(trainingParticipants, and(
+      eq(trainingParticipants.id, trainingCertificates.participantId),
+      eq(trainingParticipants.organizationId, trainingCertificates.organizationId),
+    ))
+    .innerJoin(trainingSessions, and(
+      eq(trainingSessions.id, trainingCertificates.sessionId),
+      eq(trainingSessions.organizationId, trainingCertificates.organizationId),
+    ))
     .where(eq(trainingCertificates.verificationCode, parsed.data))
     .limit(1);
 
-  if (!record) return <VerificationFailure companyName={settings.companyName} />;
+  if (!record) return <VerificationFailure companyName={fallbackSettings.companyName} />;
+  const settings = await getSettings(record.organizationId);
 
   const currentTime = new Date();
   const effectiveStatus = effectiveTrainingCertificateStatus(record.status, record.expiryDate, currentTime);

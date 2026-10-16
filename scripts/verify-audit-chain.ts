@@ -28,26 +28,37 @@ try {
   }
 
   const { rows } = await client.query(`
-    select id, user_id, user_name, action, entity_type, entity_id, entity_label,
+    select id, organization_id, user_id, user_name, action, entity_type, entity_id, entity_label,
            summary, before, after, ip_address, previous_hash, event_hash, created_at
       from audit_logs
-     order by created_at asc, id asc
+     order by organization_id asc, created_at asc, id asc
   `);
 
-  let chainStarted = false;
-  let expectedPreviousHash: string | null = null;
+  const states = new Map<string, { chainStarted: boolean; expectedPreviousHash: string | null; verified: number }>();
   let verified = 0;
   const violations: string[] = [];
 
   for (const row of rows) {
+    const organizationId = row.organization_id || "__legacy_unassigned__";
+    const state = states.get(organizationId) || {
+      chainStarted: false,
+      expectedPreviousHash: null,
+      verified: 0,
+    };
+
     if (!row.event_hash) {
-      if (chainStarted) violations.push(`Unchained audit event after chain start: ${row.id}`);
+      if (state.chainStarted) {
+        violations.push(`Unchained audit event after chain start in organization ${organizationId}: ${row.id}`);
+      }
+      states.set(organizationId, state);
       continue;
     }
 
-    chainStarted = true;
+    state.chainStarted = true;
     const createdAt = new Date(row.created_at).toISOString();
-    if ((row.previous_hash || null) !== expectedPreviousHash) violations.push(`Previous hash mismatch for ${row.id}`);
+    if ((row.previous_hash || null) !== state.expectedPreviousHash) {
+      violations.push(`Previous hash mismatch for ${row.id} in organization ${organizationId}`);
+    }
 
     const calculated = hashAuditPayload({
       id: row.id,
@@ -65,12 +76,22 @@ try {
       previousHash: row.previous_hash ?? null,
     });
 
-    if (calculated !== row.event_hash) violations.push(`Event hash mismatch for ${row.id}`);
-    expectedPreviousHash = row.event_hash;
+    if (calculated !== row.event_hash) {
+      violations.push(`Event hash mismatch for ${row.id} in organization ${organizationId}`);
+    }
+    state.expectedPreviousHash = row.event_hash;
+    state.verified += 1;
+    states.set(organizationId, state);
     verified += 1;
   }
 
-  console.log(JSON.stringify({ database: actual, auditRows: rows.length, chainedRowsVerified: verified, violations: violations.length }, null, 2));
+  console.log(JSON.stringify({
+    database: actual,
+    auditRows: rows.length,
+    organizationsVerified: states.size,
+    chainedRowsVerified: verified,
+    violations: violations.length,
+  }, null, 2));
   if (violations.length) {
     console.error(violations.slice(0, 25).join("\n"));
     process.exitCode = 1;

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -99,9 +99,9 @@ function displayAward(value: number | null) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-async function getUserSummary(id?: string | null) {
+async function getUserSummary(organizationId: string, id?: string | null) {
   if (!id) return null;
-  const [record] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, id)).limit(1);
+  const [record] = await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.organizationId, organizationId), eq(users.id, id))).limit(1);
   return record || null;
 }
 
@@ -110,14 +110,14 @@ export default async function LegacyDriverAssessmentPrintPage({ params }: { para
   if (!canViewTraining(user)) return <div className="p-8 text-sm text-slate-600">You do not have access to Driver Training & Assessment Services.</div>;
 
   const { assessmentId } = await params;
-  const [assessment] = await db.select().from(trainingAssessments).where(eq(trainingAssessments.id, assessmentId)).limit(1);
+  const [assessment] = await db.select().from(trainingAssessments).where(and(eq(trainingAssessments.organizationId, user.organizationId), eq(trainingAssessments.id, assessmentId))).limit(1);
   if (!assessment) notFound();
 
   const [[participant], [session], assessor, reviewer] = await Promise.all([
-    db.select().from(trainingParticipants).where(eq(trainingParticipants.id, assessment.participantId)).limit(1),
-    db.select().from(trainingSessions).where(eq(trainingSessions.id, assessment.sessionId)).limit(1),
-    getUserSummary(assessment.assessorId),
-    getUserSummary(assessment.reviewerId),
+    db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, assessment.participantId))).limit(1),
+    db.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, assessment.sessionId))).limit(1),
+    getUserSummary(user.organizationId, assessment.assessorId),
+    getUserSummary(user.organizationId, assessment.reviewerId),
   ]);
   if (!participant || !session) notFound();
 

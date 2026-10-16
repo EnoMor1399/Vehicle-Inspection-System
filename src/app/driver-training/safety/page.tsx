@@ -34,12 +34,12 @@ export default async function TrainingSafetyPage() {
   const canManage = canManageTraining(user);
 
   const [sessions, participants, assessments, hazards, incidents, internalUsers] = await Promise.all([
-    db.select().from(trainingSessions).orderBy(desc(trainingSessions.startAt)).limit(500),
-    db.select().from(trainingParticipants).orderBy(asc(trainingParticipants.fullName)).limit(1500),
-    db.select().from(trainingRiskAssessments).orderBy(desc(trainingRiskAssessments.assessedAt)).limit(500),
-    db.select().from(trainingSafetyHazards).orderBy(desc(trainingSafetyHazards.createdAt)).limit(2000),
-    db.select().from(trainingSafetyIncidents).orderBy(desc(trainingSafetyIncidents.occurredAt)).limit(1000),
-    db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(and(eq(users.isActive, true), ne(users.role, "transporter_user"))).orderBy(asc(users.name)).limit(300),
+    db.select().from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)).orderBy(desc(trainingSessions.startAt)).limit(500),
+    db.select().from(trainingParticipants).where(eq(trainingParticipants.organizationId, user.organizationId)).orderBy(asc(trainingParticipants.fullName)).limit(1500),
+    db.select().from(trainingRiskAssessments).where(eq(trainingRiskAssessments.organizationId, user.organizationId)).orderBy(desc(trainingRiskAssessments.assessedAt)).limit(500),
+    db.select().from(trainingSafetyHazards).where(eq(trainingSafetyHazards.organizationId, user.organizationId)).orderBy(desc(trainingSafetyHazards.createdAt)).limit(2000),
+    db.select().from(trainingSafetyIncidents).where(eq(trainingSafetyIncidents.organizationId, user.organizationId)).orderBy(desc(trainingSafetyIncidents.occurredAt)).limit(1000),
+    db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(and(eq(users.organizationId, user.organizationId), eq(users.isActive, true), ne(users.role, "transporter_user"))).orderBy(asc(users.name)).limit(300),
   ]);
 
   const sessionById = new Map(sessions.map((session) => [session.id, session]));

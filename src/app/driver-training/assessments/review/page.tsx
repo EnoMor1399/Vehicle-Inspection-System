@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { AlertTriangle, BadgeCheck, Clock3, ShieldCheck, UserCheck } from "lucide-react";
 import { db } from "@/db";
 import { trainingAssessments, trainingParticipants, trainingSessions } from "@/db/training-schema";
@@ -39,6 +39,7 @@ export default async function DriverAssessmentReviewQueuePage() {
     .from(trainingAssessments)
     .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingAssessments.participantId))
     .innerJoin(trainingSessions, eq(trainingSessions.id, trainingAssessments.sessionId))
+    .where(eq(trainingAssessments.organizationId, user.organizationId))
     .orderBy(desc(trainingAssessments.assessedAt))
     .limit(200);
 

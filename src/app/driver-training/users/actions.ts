@@ -173,6 +173,7 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
         const [createdProfile] = await tx
           .insert(trainingInstructorProfiles)
           .values({
+            organizationId: actor.organizationId,
             id: profileId,
             userId: account.id,
             instructorCode,
@@ -194,6 +195,7 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
   }
 
   await logAudit({
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",

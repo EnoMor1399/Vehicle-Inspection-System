@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import {
+  activateOrganizationWorkspace,
   convertOnboardingRequest,
   setOrganizationStatus,
 } from "@/lib/organization-control-plane";
+import { logAudit } from "@/lib/audit";
 
 export type PlatformOrganizationActionState = {
   ok: boolean;
@@ -63,5 +65,41 @@ export async function changeOrganizationStatus(formData: FormData) {
     status: parsed.data.status,
     actorUserId: actor.id,
   });
+  revalidatePath("/platform/organizations");
+}
+
+
+export async function activateSubscriberWorkspace(formData: FormData) {
+  const actor = await requirePlatformSuperAdmin();
+  const parsed = z.object({
+    organizationId: z.string().uuid(),
+  }).safeParse({
+    organizationId: formData.get("organizationId"),
+  });
+  if (!parsed.success) throw new Error("Invalid organization activation request");
+
+  const result = await activateOrganizationWorkspace({
+    organizationId: parsed.data.organizationId,
+    actorUserId: actor.id,
+  });
+
+  await logAudit({
+    organizationId: actor.organizationId,
+    userId: actor.id,
+    userName: actor.name,
+    action: "approve",
+    entityType: "organization_workspace",
+    entityId: result.organization.id,
+    entityLabel: result.organization.name,
+    summary: `Verified tenant isolation and enabled operational access for ${result.organization.name}`,
+    after: {
+      status: result.organization.status,
+      operationalAccessEnabled: result.organization.operationalAccessEnabled,
+      dataIsolationVerifiedAt: result.organization.dataIsolationVerifiedAt,
+      tenantColumns: result.isolation.tenantColumns,
+      tenantGuards: result.isolation.requiredGuards,
+    },
+  });
+
   revalidatePath("/platform/organizations");
 }

@@ -4,6 +4,6 @@ import { computeDashboardStats } from "@/lib/analytics";
 export async function GET() {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
   if (!auth.ok) return apiError(auth.status, auth.message);
-  const stats = await computeDashboardStats();
+  const stats = await computeDashboardStats(auth.user.organizationId);
   return json({ data: stats, generatedAt: new Date().toISOString() });
 }

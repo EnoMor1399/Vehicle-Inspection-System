@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { trainingAssessments } from "@/db/training-schema";
 import { getCurrentUser } from "@/lib/auth";
@@ -39,7 +39,10 @@ export async function GET(
       reviewerSignature: trainingAssessments.reviewerSignature,
     })
     .from(trainingAssessments)
-    .where(eq(trainingAssessments.id, assessmentId))
+    .where(and(
+      eq(trainingAssessments.organizationId, user.organizationId),
+      eq(trainingAssessments.id, assessmentId),
+    ))
     .limit(1);
 
   const storedValue = kind === "assessor" ? assessment?.assessorSignature : assessment?.reviewerSignature;

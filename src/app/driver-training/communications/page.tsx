@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { asc, desc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { BellRing, CheckCircle2, Clock3, MailCheck, MessageSquareWarning, Send, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -29,12 +29,12 @@ export default async function TrainingCommunicationsPage() {
   const canManage = canManageTraining(user);
 
   const [participants, sessions, certificates, preferences, messages, events] = await Promise.all([
-    db.select().from(trainingParticipants).orderBy(asc(trainingParticipants.fullName)).limit(2000),
-    db.select().from(trainingSessions).orderBy(desc(trainingSessions.startAt)).limit(500),
-    db.select().from(trainingCertificates).orderBy(desc(trainingCertificates.issuedAt)).limit(1000),
-    db.select().from(trainingCommunicationPreferences).orderBy(desc(trainingCommunicationPreferences.updatedAt)).limit(2000),
-    db.select().from(trainingOutboundMessages).orderBy(desc(trainingOutboundMessages.createdAt)).limit(500),
-    db.select().from(trainingCommunicationEvents).orderBy(desc(trainingCommunicationEvents.createdAt)).limit(1000),
+    db.select().from(trainingParticipants).where(eq(trainingParticipants.organizationId, user.organizationId)).orderBy(asc(trainingParticipants.fullName)).limit(2000),
+    db.select().from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)).orderBy(desc(trainingSessions.startAt)).limit(500),
+    db.select().from(trainingCertificates).where(eq(trainingCertificates.organizationId, user.organizationId)).orderBy(desc(trainingCertificates.issuedAt)).limit(1000),
+    db.select().from(trainingCommunicationPreferences).where(eq(trainingCommunicationPreferences.organizationId, user.organizationId)).orderBy(desc(trainingCommunicationPreferences.updatedAt)).limit(2000),
+    db.select().from(trainingOutboundMessages).where(eq(trainingOutboundMessages.organizationId, user.organizationId)).orderBy(desc(trainingOutboundMessages.createdAt)).limit(500),
+    db.select().from(trainingCommunicationEvents).where(eq(trainingCommunicationEvents.organizationId, user.organizationId)).orderBy(desc(trainingCommunicationEvents.createdAt)).limit(1000),
   ]);
 
   const participantById = new Map(participants.map((participant) => [participant.id, participant]));

@@ -55,10 +55,17 @@ export default async function TransporterDetailPage({ params }: { params: Promis
   const [t] = await db
     .select()
     .from(transporters)
-    .where(and(eq(transporters.id, id), isNull(transporters.deletedAt)));
+    .where(and(
+      eq(transporters.organizationId, user.organizationId),
+      eq(transporters.id, id),
+      isNull(transporters.deletedAt),
+    ));
   if (!t) notFound();
 
-  const fleet = await db.select().from(vehicles).where(eq(vehicles.transporterId, id));
+  const fleet = await db.select().from(vehicles).where(and(
+    eq(vehicles.organizationId, user.organizationId),
+    eq(vehicles.transporterId, id),
+  ));
 
   const [technical, preTrips, docs] = fleet.length
     ? await Promise.all([
@@ -66,18 +73,30 @@ export default async function TransporterDetailPage({ params }: { params: Promis
           .select({ inspection: inspections, vehicle: vehicles })
           .from(inspections)
           .innerJoin(vehicles, eq(inspections.vehicleId, vehicles.id))
-          .where(eq(vehicles.transporterId, id))
+          .where(and(
+            eq(vehicles.organizationId, user.organizationId),
+            eq(inspections.organizationId, user.organizationId),
+            eq(vehicles.transporterId, id),
+          ))
           .orderBy(desc(inspections.inspectionDate)),
         db
           .select({ inspection: dailyInspections, vehicle: vehicles })
           .from(dailyInspections)
           .innerJoin(vehicles, eq(dailyInspections.vehicleId, vehicles.id))
-          .where(eq(vehicles.transporterId, id))
+          .where(and(
+            eq(vehicles.organizationId, user.organizationId),
+            eq(dailyInspections.organizationId, user.organizationId),
+            eq(vehicles.transporterId, id),
+          ))
           .orderBy(desc(dailyInspections.inspectionDate), desc(dailyInspections.completedAt)),
         db
           .select()
           .from(documents)
-          .where(and(eq(documents.ownerType, "transporter"), eq(documents.ownerId, id)))
+          .where(and(
+            eq(documents.organizationId, user.organizationId),
+            eq(documents.ownerType, "transporter"),
+            eq(documents.ownerId, id),
+          ))
           .orderBy(desc(documents.createdAt)),
       ])
     : [
@@ -86,7 +105,11 @@ export default async function TransporterDetailPage({ params }: { params: Promis
         await db
           .select()
           .from(documents)
-          .where(and(eq(documents.ownerType, "transporter"), eq(documents.ownerId, id)))
+          .where(and(
+            eq(documents.organizationId, user.organizationId),
+            eq(documents.ownerType, "transporter"),
+            eq(documents.ownerId, id),
+          ))
           .orderBy(desc(documents.createdAt)),
       ];
 

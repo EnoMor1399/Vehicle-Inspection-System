@@ -47,7 +47,11 @@ export async function GET(
       sizeBytes: documents.sizeBytes,
     })
     .from(documents)
-    .where(and(eq(documents.id, documentId), eq(documents.ownerType, WRITTEN_EXAM_OWNER_TYPE)))
+    .where(and(
+      eq(documents.organizationId, user.organizationId),
+      eq(documents.id, documentId),
+      eq(documents.ownerType, WRITTEN_EXAM_OWNER_TYPE),
+    ))
     .limit(1);
 
   if (!document || !isWrittenExamDocumentName(document.name)) return failure("Document not found", 404);
@@ -55,7 +59,10 @@ export async function GET(
   const [assessment] = await db
     .select({ id: trainingAssessments.id })
     .from(trainingAssessments)
-    .where(eq(trainingAssessments.id, document.ownerId))
+    .where(and(
+      eq(trainingAssessments.organizationId, user.organizationId),
+      eq(trainingAssessments.id, document.ownerId),
+    ))
     .limit(1);
   if (!assessment) return failure("Assessment record not found", 404);
 

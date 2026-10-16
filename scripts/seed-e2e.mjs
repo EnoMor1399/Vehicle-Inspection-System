@@ -36,16 +36,23 @@ try {
 
   await client.query("begin");
   await client.query(
-    `insert into locations (id, name, code, region, status)
-     values ($1, 'E2E Test Station', 'E2E', 'Test Region', 'active')
-     on conflict (id) do update set name = excluded.name, code = excluded.code, status = excluded.status`,
-    [locationId],
+    `insert into locations (id, organization_id, name, code, region, status)
+     values ($1, $2, 'E2E Test Station', 'E2E', 'Test Region', 'active')
+     on conflict (id) do update set
+       organization_id = excluded.organization_id,
+       name = excluded.name,
+       code = excluded.code,
+       status = excluded.status`,
+    [locationId, organizationId],
   );
   await client.query(
-    `insert into transporters (id, company_name, registration_number, status)
-     values ($1, 'E2E Transport Ltd', 'E2E-REG', 'active')
-     on conflict (id) do update set company_name = excluded.company_name, status = excluded.status`,
-    [transporterId],
+    `insert into transporters (id, organization_id, company_name, registration_number, status)
+     values ($1, $2, 'E2E Transport Ltd', 'E2E-REG', 'active')
+     on conflict (id) do update set
+       organization_id = excluded.organization_id,
+       company_name = excluded.company_name,
+       status = excluded.status`,
+    [transporterId, organizationId],
   );
   await client.query(
     `insert into users
@@ -84,6 +91,7 @@ try {
       (id, organization_id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
      values ($1, $5, 'E2E Training Administrator', $2, 'driver_training_admin', $3, $4::jsonb, true, null, 0, false)
      on conflict (email) do update set
+       organization_id = excluded.organization_id,
        name = excluded.name,
        role = excluded.role,
        password_hash = excluded.password_hash,
@@ -114,31 +122,41 @@ try {
     ],
   );
   await client.query(
-    `insert into vehicles (id, transporter_id, registration_number, make, model, status)
-     values ($1, $2, 'E2E-2026', 'TestMake', 'TestModel', 'active')
-     on conflict (registration_number) do update set transporter_id = excluded.transporter_id, make = excluded.make, model = excluded.model`,
-    [vehicleId, transporterId],
+    `insert into vehicles (id, organization_id, transporter_id, registration_number, make, model, status)
+     values ($1, $3, $2, 'E2E-2026', 'TestMake', 'TestModel', 'active')
+     on conflict (organization_id, registration_number) do update set
+       transporter_id = excluded.transporter_id,
+       make = excluded.make,
+       model = excluded.model`,
+    [vehicleId, transporterId, organizationId],
   );
   await client.query(
     `insert into inspections
-      (id, inspection_number, vehicle_id, location_id, inspector_id, inspector_name, station, workflow_status, overall_result, status)
-     values ($1, 'E2E-INSP-001', $2, $3, $4, 'E2E Inspector', 'E2E Test Station', 'completed', 'pass', 'completed')
-     on conflict (inspection_number) do update set vehicle_id = excluded.vehicle_id, location_id = excluded.location_id`,
-    [inspectionId, vehicleId, locationId, userId],
+      (id, organization_id, inspection_number, vehicle_id, location_id, inspector_id, inspector_name, station, workflow_status, overall_result, status)
+     values ($1, $5, 'E2E-INSP-001', $2, $3, $4, 'E2E Inspector', 'E2E Test Station', 'completed', 'pass', 'completed')
+     on conflict (organization_id, inspection_number) do update set
+       vehicle_id = excluded.vehicle_id,
+       location_id = excluded.location_id`,
+    [inspectionId, vehicleId, locationId, userId, organizationId],
   );
   await client.query(
     `insert into training_sessions
-      (id, reference_number, service_id, title, client_name, location_id, venue, start_at, end_at, status, created_by)
-     values ($1, 'E2E-TRAIN-001', 'defensive-driving', 'E2E Defensive Driving', 'E2E Transport Ltd', $2, 'E2E Test Station', now(), now() + interval '1 day', 'scheduled', $3)
-     on conflict (reference_number) do update set title = excluded.title, status = excluded.status`,
-    [sessionId, locationId, trainingUserId],
+      (id, organization_id, reference_number, service_id, title, client_name, location_id, venue, start_at, end_at, status, created_by)
+     values ($1, $4, 'E2E-TRAIN-001', 'defensive-driving', 'E2E Defensive Driving', 'E2E Transport Ltd', $2, 'E2E Test Station', now(), now() + interval '1 day', 'scheduled', $3)
+     on conflict (organization_id, reference_number) do update set
+       title = excluded.title,
+       status = excluded.status`,
+    [sessionId, locationId, trainingUserId, organizationId],
   );
   await client.query(
     `insert into training_participants
-      (id, session_id, full_name, company_name, employee_number, attendance_status, assessment_status, certificate_eligible, created_by)
-     values ($1, $2, 'E2E Driver', 'E2E Transport Ltd', 'E2E-EMP-001', 'attended', 'pending', false, $3)
-     on conflict (id) do update set full_name = excluded.full_name, attendance_status = excluded.attendance_status`,
-    [participantId, sessionId, trainingUserId],
+      (id, organization_id, session_id, full_name, company_name, employee_number, attendance_status, assessment_status, certificate_eligible, created_by)
+     values ($1, $4, $2, 'E2E Driver', 'E2E Transport Ltd', 'E2E-EMP-001', 'attended', 'pending', false, $3)
+     on conflict (id) do update set
+       organization_id = excluded.organization_id,
+       full_name = excluded.full_name,
+       attendance_status = excluded.attendance_status`,
+    [participantId, sessionId, trainingUserId, organizationId],
   );
   await client.query("commit");
 

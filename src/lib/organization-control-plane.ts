@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, pool } from "@/db";
 import {
   organizationInvitations,
   organizationOnboardingRequests,
@@ -19,6 +19,79 @@ export const SUBSCRIBER_ADMIN_ROLES = [
 ] as const;
 
 export type SubscriberAdminRole = (typeof SUBSCRIBER_ADMIN_ROLES)[number];
+
+const TENANT_DATA_PLANE_TABLES = [
+  "daily_inspections",
+  "webhooks",
+  "locations",
+  "transporters",
+  "vehicles",
+  "rfid_tags",
+  "inspections",
+  "inspection_appointments",
+  "documents",
+  "audit_logs",
+  "notifications",
+  "import_jobs",
+  "api_keys",
+  "signatures",
+  "security_events",
+  "training_sessions",
+  "training_participants",
+  "training_assessments",
+  "training_certificates",
+  "training_compliance_cases",
+  "training_compliance_events",
+  "training_requests",
+  "training_request_events",
+  "training_quotations",
+  "training_quotation_items",
+  "training_communication_preferences",
+  "training_outbound_messages",
+  "training_communication_events",
+  "training_curricula",
+  "training_curriculum_versions",
+  "training_session_curricula",
+  "training_matrix_requirements",
+  "training_development_plans",
+  "training_development_actions",
+  "training_attendance_signoffs",
+  "training_evidence_records",
+  "training_resources",
+  "training_resource_allocations",
+  "training_session_feedback",
+  "training_quality_findings",
+  "training_quality_events",
+  "training_instructor_profiles",
+  "training_session_readiness",
+  "training_risk_assessments",
+  "training_safety_hazards",
+  "training_safety_incidents",
+  "training_regulatory_requirements",
+  "training_accreditation_records",
+  "training_session_compliance_reviews",
+] as const;
+
+const REQUIRED_TENANT_GUARDS = [
+  "users_tenant_reference_guard",
+  "vehicle_tenant_reference_guard",
+  "rfid_tenant_reference_guard",
+  "inspection_tenant_reference_guard",
+  "appointment_tenant_reference_guard",
+  "daily_inspection_tenant_reference_guard",
+  "document_tenant_reference_guard",
+  "training_sessions_tenant_reference_guard",
+  "training_participants_tenant_reference_guard",
+  "training_assessments_tenant_reference_guard",
+  "training_certificates_tenant_reference_guard",
+  "training_requests_tenant_reference_guard",
+  "training_quotations_tenant_reference_guard",
+  "training_curricula_tenant_reference_guard",
+  "training_instructor_profiles_tenant_reference_guard",
+  "training_risk_assessments_tenant_reference_guard",
+  "training_safety_incidents_tenant_reference_guard",
+] as const;
+
 
 function invitationHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -435,6 +508,136 @@ export async function updateOrganizationProfile(input: {
     .returning();
   if (!updated) throw new Error("Organization not found");
   return updated;
+}
+
+export async function verifyTenantDataPlaneReadiness() {
+  const result = await pool.query<{
+    tenant_columns: number;
+    required_guards: number;
+  }>(
+    `SELECT
+       (
+         SELECT count(*)::int
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND column_name = 'organization_id'
+            AND is_nullable = 'NO'
+            AND column_default IS NULL
+            AND table_name = ANY($1::text[])
+       ) AS tenant_columns,
+       (
+         SELECT count(*)::int
+           FROM pg_trigger
+          WHERE NOT tgisinternal
+            AND tgname = ANY($2::text[])
+       ) AS required_guards`,
+    [[...TENANT_DATA_PLANE_TABLES], [...REQUIRED_TENANT_GUARDS]],
+  );
+
+  const row = result.rows[0] || { tenant_columns: 0, required_guards: 0 };
+  return {
+    ready:
+      Number(row.tenant_columns) === TENANT_DATA_PLANE_TABLES.length
+      && Number(row.required_guards) === REQUIRED_TENANT_GUARDS.length,
+    tenantColumns: Number(row.tenant_columns),
+    expectedTenantColumns: TENANT_DATA_PLANE_TABLES.length,
+    requiredGuards: Number(row.required_guards),
+    expectedRequiredGuards: REQUIRED_TENANT_GUARDS.length,
+  };
+}
+
+export async function activateOrganizationWorkspace(input: {
+  organizationId: string;
+  actorUserId: string;
+}) {
+  const [organization] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId))
+    .limit(1);
+  if (!organization) throw new Error("Organization not found");
+  if (organization.status === "cancelled" || organization.status === "suspended") {
+    throw new Error("Suspended or cancelled organizations cannot be activated");
+  }
+
+  const subscription = await getLatestOrganizationSubscription(input.organizationId);
+  if (!subscription) throw new Error("Assign a subscription before activating the workspace");
+  if (!["trialing", "active", "grace"].includes(subscription.subscription.status)) {
+    throw new Error("The organization subscription is not usable");
+  }
+
+  const now = new Date();
+  if (
+    subscription.subscription.status === "trialing"
+    && subscription.subscription.trialEndsAt
+    && new Date(subscription.subscription.trialEndsAt).getTime() < now.getTime()
+  ) {
+    throw new Error("The organization trial has expired");
+  }
+  if (
+    subscription.subscription.status === "grace"
+    && subscription.subscription.graceEndsAt
+    && new Date(subscription.subscription.graceEndsAt).getTime() < now.getTime()
+  ) {
+    throw new Error("The organization grace period has expired");
+  }
+  if (
+    subscription.subscription.status === "active"
+    && subscription.subscription.currentPeriodEnd
+    && new Date(subscription.subscription.currentPeriodEnd).getTime() < now.getTime()
+  ) {
+    throw new Error("The organization subscription period has ended");
+  }
+
+  const accountRows = await db
+    .select({ role: users.role, n: count() })
+    .from(users)
+    .where(and(
+      eq(users.organizationId, input.organizationId),
+      eq(users.isActive, true),
+      inArray(users.role, ["organization_owner", "vehicle_inspection_admin", "driver_training_admin"]),
+    ))
+    .groupBy(users.role);
+  const accountCounts = new Map(accountRows.map((row) => [row.role, Number(row.n || 0)]));
+
+  if ((accountCounts.get("organization_owner") || 0) < 1) {
+    throw new Error("Activate an Organization Owner account before enabling operations");
+  }
+  if (
+    subscription.plan.modules.includes("vehicle_inspection")
+    && (accountCounts.get("vehicle_inspection_admin") || 0) < 1
+  ) {
+    throw new Error("Create a Vehicle Inspection Administrator before enabling Vehicle Inspection");
+  }
+  if (
+    subscription.plan.modules.includes("driver_training")
+    && (accountCounts.get("driver_training_admin") || 0) < 1
+  ) {
+    throw new Error("Create a Driver Training Administrator before enabling Driver Training & Assessment");
+  }
+
+  const isolation = await verifyTenantDataPlaneReadiness();
+  if (!isolation.ready) {
+    throw new Error(
+      `Tenant isolation verification failed (${isolation.tenantColumns}/${isolation.expectedTenantColumns} tables, `
+      + `${isolation.requiredGuards}/${isolation.expectedRequiredGuards} database guards)`,
+    );
+  }
+
+  const [updated] = await db
+    .update(organizations)
+    .set({
+      status: "active",
+      operationalAccessEnabled: true,
+      dataIsolationVerifiedAt: now,
+      onboardingStage: "complete",
+      updatedAt: now,
+    })
+    .where(eq(organizations.id, input.organizationId))
+    .returning();
+
+  if (!updated) throw new Error("Organization activation did not complete");
+  return { organization: updated, isolation };
 }
 
 export async function setOrganizationStatus(input: {

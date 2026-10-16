@@ -69,7 +69,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
   const [participant] = await db
     .select()
     .from(trainingParticipants)
-    .where(eq(trainingParticipants.id, data.participantId))
+    .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId)))
     .limit(1);
   if (!participant) throw new Error("Training participant not found");
 
@@ -78,7 +78,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
     const [row] = await db
       .select()
       .from(trainingCertificates)
-      .where(eq(trainingCertificates.id, data.certificateId))
+      .where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.id, data.certificateId)))
       .limit(1);
     if (!row || row.participantId !== participant.id) {
       throw new Error("Selected certificate does not belong to this participant");
@@ -118,6 +118,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
       .select({ id: trainingComplianceCases.id })
       .from(trainingComplianceCases)
       .where(and(
+        eq(trainingComplianceCases.organizationId, user.organizationId),
         eq(trainingComplianceCases.participantId, participant.id),
         eq(trainingComplianceCases.caseType, data.caseType),
         certificateCondition,
@@ -127,6 +128,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
     if (existing) return { ok: false as const, error: "An unresolved compliance case already exists for this item" };
 
     const values = {
+      organizationId: user.organizationId,
       id,
       participantId: participant.id,
       certificateId: certificate?.id || null,
@@ -142,6 +144,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
     } as const;
     await tx.insert(trainingComplianceCases).values(values);
     await tx.insert(trainingComplianceEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       caseId: id,
       eventType: "case_opened",
@@ -154,6 +157,7 @@ export async function openTrainingComplianceCase(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "create",
@@ -191,7 +195,7 @@ export async function prepareTrainingComplianceReminder(formData: FormData) {
     .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingComplianceCases.participantId))
     .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
     .leftJoin(trainingCertificates, eq(trainingCertificates.id, trainingComplianceCases.certificateId))
-    .where(eq(trainingComplianceCases.id, data.caseId))
+    .where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.id, data.caseId)))
     .limit(1);
   if (!row) throw new Error("Training compliance case not found");
   if (!ACTIVE_CASE_STATUSES.includes(row.caseStatus as (typeof ACTIVE_CASE_STATUSES)[number])) {
@@ -209,6 +213,7 @@ export async function prepareTrainingComplianceReminder(formData: FormData) {
 
   await db.transaction(async (tx) => {
     await tx.insert(trainingComplianceEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       caseId: row.caseId,
       eventType: "reminder_prepared",
@@ -219,10 +224,11 @@ export async function prepareTrainingComplianceReminder(formData: FormData) {
     await tx
       .update(trainingComplianceCases)
       .set({ preferredChannel: data.channel, updatedAt: new Date() })
-      .where(eq(trainingComplianceCases.id, row.caseId));
+      .where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.id, row.caseId)));
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -251,7 +257,7 @@ export async function recordTrainingComplianceContact(formData: FormData) {
     const [before] = await tx
       .select()
       .from(trainingComplianceCases)
-      .where(eq(trainingComplianceCases.id, data.caseId))
+      .where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.id, data.caseId)))
       .limit(1);
     if (!before) return { ok: false as const, error: "Training compliance case not found" };
     if (!ACTIVE_CASE_STATUSES.includes(before.status as (typeof ACTIVE_CASE_STATUSES)[number])) {
@@ -269,8 +275,9 @@ export async function recordTrainingComplianceContact(formData: FormData) {
         nextFollowUpDate: data.nextFollowUpDate || null,
         updatedAt: contactedAt,
       })
-      .where(eq(trainingComplianceCases.id, before.id));
+      .where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.id, before.id)));
     await tx.insert(trainingComplianceEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       caseId: before.id,
       eventType: "contact_recorded",
@@ -283,6 +290,7 @@ export async function recordTrainingComplianceContact(formData: FormData) {
 
   if (!result.ok) throw new Error(result.error);
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",
@@ -308,7 +316,7 @@ export async function updateTrainingComplianceStatus(formData: FormData) {
   const [before] = await db
     .select()
     .from(trainingComplianceCases)
-    .where(eq(trainingComplianceCases.id, data.caseId))
+    .where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.id, data.caseId)))
     .limit(1);
   if (!before) throw new Error("Training compliance case not found");
   if (!canTransitionTrainingComplianceCase(before.status, data.status)) {
@@ -319,8 +327,9 @@ export async function updateTrainingComplianceStatus(formData: FormData) {
     await tx
       .update(trainingComplianceCases)
       .set({ status: data.status, notes: data.notes || before.notes, updatedAt: new Date() })
-      .where(eq(trainingComplianceCases.id, before.id));
+      .where(and(eq(trainingComplianceCases.organizationId, user.organizationId), eq(trainingComplianceCases.id, before.id)));
     await tx.insert(trainingComplianceEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       caseId: before.id,
       eventType: "status_changed",
@@ -330,6 +339,7 @@ export async function updateTrainingComplianceStatus(formData: FormData) {
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "update",

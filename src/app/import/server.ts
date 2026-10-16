@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { dailyInspections, importJobs, inspections, transporters, vehicles } from "@/db/schema";
 import { newId } from "@/lib/utils";
@@ -186,6 +187,7 @@ export async function submitImport(input: ImportInput) {
   async function finishImport() {
     await db.insert(importJobs).values({
       id: jobId,
+      organizationId: user.organizationId,
       fileName: input.fileName.trim(),
       fileType: input.fileType.slice(0, 20),
       entityType: input.entityType,
@@ -201,6 +203,7 @@ export async function submitImport(input: ImportInput) {
     });
 
     await logAudit({
+      organizationId: user.organizationId,
       userId: user.id,
       userName: user.name,
       action: "import",
@@ -221,7 +224,10 @@ export async function submitImport(input: ImportInput) {
   }
 
   if (input.entityType === "pre_trip_inspections") {
-    const vehicleRows = await db.select({ id: vehicles.id, registrationNumber: vehicles.registrationNumber }).from(vehicles);
+    const vehicleRows = await db
+      .select({ id: vehicles.id, registrationNumber: vehicles.registrationNumber })
+      .from(vehicles)
+      .where(eq(vehicles.organizationId, user.organizationId));
     const vehicleByRegistration = new Map(vehicleRows.map((vehicle) => [vehicle.registrationNumber.toUpperCase(), vehicle.id]));
     const seenSourceRefs = new Set<string>();
     const prepared: { rowNumber: number; value: typeof dailyInspections.$inferInsert }[] = [];
@@ -289,6 +295,7 @@ export async function submitImport(input: ImportInput) {
         rowNumber,
         value: {
           id: newId(),
+          organizationId: user.organizationId,
           vehicleId,
           driverId: null,
           driverName: normalizedOptional(row.driver_name, 200) || "Historical import",
@@ -338,19 +345,39 @@ export async function submitImport(input: ImportInput) {
   }
 
   const existingVehicleRegistrations = input.entityType === "vehicles"
-    ? new Set((await db.select({ registrationNumber: vehicles.registrationNumber }).from(vehicles)).map((row) => row.registrationNumber.toUpperCase()))
+    ? new Set((await db
+        .select({ registrationNumber: vehicles.registrationNumber })
+        .from(vehicles)
+        .where(eq(vehicles.organizationId, user.organizationId)))
+      .map((row) => row.registrationNumber.toUpperCase()))
     : new Set<string>();
   const transporterByName = input.entityType === "vehicles"
-    ? new Map((await db.select({ id: transporters.id, companyName: transporters.companyName }).from(transporters)).map((row) => [row.companyName, row.id]))
+    ? new Map((await db
+        .select({ id: transporters.id, companyName: transporters.companyName })
+        .from(transporters)
+        .where(eq(transporters.organizationId, user.organizationId)))
+      .map((row) => [row.companyName, row.id]))
     : new Map<string, string>();
   const existingTransporterNames = input.entityType === "transporters"
-    ? new Set((await db.select({ companyName: transporters.companyName }).from(transporters)).map((row) => row.companyName))
+    ? new Set((await db
+        .select({ companyName: transporters.companyName })
+        .from(transporters)
+        .where(eq(transporters.organizationId, user.organizationId)))
+      .map((row) => row.companyName))
     : new Set<string>();
   const vehicleByRegistration = input.entityType === "inspections"
-    ? new Map((await db.select({ id: vehicles.id, registrationNumber: vehicles.registrationNumber }).from(vehicles)).map((row) => [row.registrationNumber.toUpperCase(), row.id]))
+    ? new Map((await db
+        .select({ id: vehicles.id, registrationNumber: vehicles.registrationNumber })
+        .from(vehicles)
+        .where(eq(vehicles.organizationId, user.organizationId)))
+      .map((row) => [row.registrationNumber.toUpperCase(), row.id]))
     : new Map<string, string>();
   const existingInspectionNumbers = input.entityType === "inspections"
-    ? new Set((await db.select({ inspectionNumber: inspections.inspectionNumber }).from(inspections)).map((row) => row.inspectionNumber))
+    ? new Set((await db
+        .select({ inspectionNumber: inspections.inspectionNumber })
+        .from(inspections)
+        .where(eq(inspections.organizationId, user.organizationId)))
+      .map((row) => row.inspectionNumber))
     : new Set<string>();
 
   for (let index = 0; index < mappedRows.length; index += 1) {
@@ -422,6 +449,7 @@ export async function submitImport(input: ImportInput) {
 
         await db.insert(vehicles).values({
           id: newId(),
+          organizationId: user.organizationId,
           transporterId,
           registrationNumber: registration,
           make,
@@ -464,6 +492,7 @@ export async function submitImport(input: ImportInput) {
 
         await db.insert(transporters).values({
           id: newId(),
+          organizationId: user.organizationId,
           companyName,
           registrationNumber: normalizedOptional(row.registration_number, 100),
           tinNumber: normalizedOptional(row.tin_number, 100),
@@ -513,6 +542,7 @@ export async function submitImport(input: ImportInput) {
 
         await db.insert(inspections).values({
           id,
+          organizationId: user.organizationId,
           inspectionNumber: number,
           vehicleId,
           inspectionDate: parsedDate.date,
