@@ -12,6 +12,7 @@ const multiOrganizationMigration = readFileSync("migrations/20261016_multi_organ
 const tenantCoreMigration = readFileSync("migrations/20261016_tenant_data_plane_core.sql", "utf8");
 const tenantTrainingMigration = readFileSync("migrations/20261016_tenant_data_plane_training.sql", "utf8");
 const tenantFailClosedMigration = readFileSync("migrations/20261016_tenant_data_plane_fail_closed.sql", "utf8");
+const subscriptionCapacityMigration = readFileSync("migrations/20261016_subscription_capacity_guards.sql", "utf8");
 
 test("enterprise migration runner includes the security access-path migration", () => {
   assert.match(runner, /migrations\/20260902_security_query_indexes\.sql/);
@@ -127,4 +128,26 @@ test("final tenant cutover removes all compatibility defaults", () => {
   assert.match(tenantFailClosedMigration, /ALTER COLUMN organization_id DROP DEFAULT/);
   assert.match(tenantFailClosedMigration, /daily_inspections/);
   assert.match(tenantFailClosedMigration, /training_session_compliance_reviews/);
+});
+
+
+test("subscription capacity guards are applied after tenant data-plane cutover", () => {
+  const failClosedPosition = runner.indexOf("migrations/20261016_tenant_data_plane_fail_closed.sql");
+  const capacityPosition = runner.indexOf("migrations/20261016_subscription_capacity_guards.sql");
+  assert.ok(failClosedPosition >= 0);
+  assert.ok(capacityPosition > failClosedPosition);
+});
+
+test("subscription capacity migration serializes and rejects plan overages", () => {
+  assert.match(subscriptionCapacityMigration, /vims_enforce_subscription_capacity/);
+  assert.match(subscriptionCapacityMigration, /pg_advisory_xact_lock/);
+  assert.match(subscriptionCapacityMigration, /SUBSCRIPTION_LIMIT:/);
+  assert.match(subscriptionCapacityMigration, /max_users/);
+  assert.match(subscriptionCapacityMigration, /max_stations/);
+  assert.match(subscriptionCapacityMigration, /max_vehicles/);
+  assert.match(subscriptionCapacityMigration, /max_inspections_per_month/);
+  assert.match(subscriptionCapacityMigration, /users_subscription_capacity_guard/);
+  assert.match(subscriptionCapacityMigration, /locations_subscription_capacity_guard/);
+  assert.match(subscriptionCapacityMigration, /vehicles_subscription_capacity_guard/);
+  assert.match(subscriptionCapacityMigration, /inspections_subscription_capacity_guard/);
 });
