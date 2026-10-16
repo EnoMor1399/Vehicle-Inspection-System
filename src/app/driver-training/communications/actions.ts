@@ -44,8 +44,8 @@ async function requireTrainingManager() {
 
 async function loadParticipantPreference(participantId: string) {
   const [[participant], [preference]] = await Promise.all([
-    db.select().from(trainingParticipants).where(eq(trainingParticipants.id, participantId)).limit(1),
-    db.select().from(trainingCommunicationPreferences).where(eq(trainingCommunicationPreferences.participantId, participantId)).limit(1),
+    db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participantId))).limit(1),
+    db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), eq(trainingCommunicationPreferences.participantId, participantId))).limit(1),
   ]);
   return { participant, preference };
 }
@@ -65,7 +65,7 @@ export async function upsertTrainingCommunicationPreference(formData: FormData) 
   const whatsappOptIn = formData.has("whatsappOptIn");
   const doNotContact = formData.has("doNotContact");
 
-  const [participant] = await db.select().from(trainingParticipants).where(eq(trainingParticipants.id, data.participantId)).limit(1);
+  const [participant] = await db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, data.participantId))).limit(1);
   if (!participant) throw new Error("Training participant not found");
 
   const effective = doNotContact
@@ -76,7 +76,7 @@ export async function upsertTrainingCommunicationPreference(formData: FormData) 
   if (effective.preferredChannel === "whatsapp" && !effective.whatsappOptIn) throw new Error("Preferred WhatsApp channel requires WhatsApp opt-in");
 
   const now = new Date();
-  const [existing] = await db.select().from(trainingCommunicationPreferences).where(eq(trainingCommunicationPreferences.participantId, participant.id)).limit(1);
+  const [existing] = await db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), eq(trainingCommunicationPreferences.participantId, participant.id))).limit(1);
   const values = {
     emailOptIn: effective.emailOptIn,
     smsOptIn: effective.smsOptIn,
@@ -90,10 +90,11 @@ export async function upsertTrainingCommunicationPreference(formData: FormData) 
     updatedAt: now,
   } as const;
 
-  if (existing) await db.update(trainingCommunicationPreferences).set(values).where(eq(trainingCommunicationPreferences.id, existing.id));
+  if (existing) await db.update(trainingCommunicationPreferences).set(values).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), eq(trainingCommunicationPreferences.id, existing.id)));
   else await db.insert(trainingCommunicationPreferences).values({ id: newId(), participantId: participant.id, ...values });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: existing ? "update" : "create",
@@ -124,11 +125,11 @@ export async function createTrainingOutboundMessage(formData: FormData) {
   if (!participant) throw new Error("Training participant not found");
 
   if (data.sessionId) {
-    const [session] = await db.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+    const [session] = await db.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
     if (!session || session.id !== participant.sessionId) throw new Error("Selected session does not belong to this participant");
   }
   if (data.certificateId) {
-    const [certificate] = await db.select().from(trainingCertificates).where(eq(trainingCertificates.id, data.certificateId)).limit(1);
+    const [certificate] = await db.select().from(trainingCertificates).where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.id, data.certificateId))).limit(1);
     if (!certificate || certificate.participantId !== participant.id) throw new Error("Selected certificate does not belong to this participant");
   }
 
@@ -154,6 +155,7 @@ export async function createTrainingOutboundMessage(formData: FormData) {
   await db.transaction(async (tx) => {
     await tx.insert(trainingOutboundMessages).values(values);
     await tx.insert(trainingCommunicationEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       messageId: id,
       eventType: "created",
@@ -163,7 +165,7 @@ export async function createTrainingOutboundMessage(formData: FormData) {
       createdBy: user.id,
     });
   });
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_outbound_message", entityId: id, entityLabel: participant.fullName, summary: `Prepared Driver Training ${data.messageType} message`, after: values });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_outbound_message", entityId: id, entityLabel: participant.fullName, summary: `Prepared Driver Training ${data.messageType} message`, after: values });
   refreshCommunicationPaths();
 }
 
@@ -175,12 +177,12 @@ export async function transitionTrainingOutboundMessage(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.messageId}))`);
-    const [message] = await tx.select().from(trainingOutboundMessages).where(eq(trainingOutboundMessages.id, data.messageId)).limit(1);
+    const [message] = await tx.select().from(trainingOutboundMessages).where(and(eq(trainingOutboundMessages.organizationId, user.organizationId), eq(trainingOutboundMessages.id, data.messageId))).limit(1);
     if (!message) return { ok: false as const, error: "Outbound training message not found" };
     if (!canTransitionTrainingMessage(message.status, data.status)) return { ok: false as const, error: `Message cannot move from ${message.status} to ${data.status}` };
 
-    const [participant] = await tx.select().from(trainingParticipants).where(eq(trainingParticipants.id, message.participantId)).limit(1);
-    const [preference] = await tx.select().from(trainingCommunicationPreferences).where(eq(trainingCommunicationPreferences.participantId, message.participantId)).limit(1);
+    const [participant] = await tx.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, message.participantId))).limit(1);
+    const [preference] = await tx.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), eq(trainingCommunicationPreferences.participantId, message.participantId))).limit(1);
     if (!participant) return { ok: false as const, error: "Training participant not found" };
     const currentAddress = normalizeTrainingRecipient(message.channel, participant);
 
@@ -201,8 +203,9 @@ export async function transitionTrainingOutboundMessage(formData: FormData) {
           ? { status: "queued", queuedAt: now, recipientAddress: currentAddress || message.recipientAddress, updatedAt: now }
           : { status: "cancelled", updatedAt: now };
 
-    await tx.update(trainingOutboundMessages).set(patch).where(eq(trainingOutboundMessages.id, message.id));
+    await tx.update(trainingOutboundMessages).set(patch).where(and(eq(trainingOutboundMessages.organizationId, user.organizationId), eq(trainingOutboundMessages.id, message.id)));
     await tx.insert(trainingCommunicationEvents).values({
+      organizationId: user.organizationId,
       id: newId(),
       messageId: message.id,
       eventType: data.status === "queued" ? "queued" : data.status === "approved" ? "approved" : data.status === "cancelled" ? "cancelled" : "returned_to_draft",
@@ -216,6 +219,7 @@ export async function transitionTrainingOutboundMessage(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: data.status === "approved" ? "approve" : "update",
@@ -243,11 +247,11 @@ export async function prepareTrainingSessionReminderDrafts(formData: FormData) {
   const user = await requireTrainingManager();
   const sessionId = field(formData, "sessionId");
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error("Invalid training session");
-  const [session] = await db.select().from(trainingSessions).where(eq(trainingSessions.id, sessionId)).limit(1);
+  const [session] = await db.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, sessionId))).limit(1);
   if (!session || session.status !== "scheduled") throw new Error("Session reminders can only be prepared for scheduled training sessions");
 
   const participants = await db.select().from(trainingParticipants).where(and(eq(trainingParticipants.sessionId, session.id), inArray(trainingParticipants.attendanceStatus, ["registered", "attended"])));
-  const preferences = await db.select().from(trainingCommunicationPreferences).where(inArray(trainingCommunicationPreferences.participantId, participants.map((participant) => participant.id)));
+  const preferences = await db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), inArray(trainingCommunicationPreferences.participantId, participants.map((participant) => participant.id))));
   const prefByParticipant = new Map(preferences.map((preference) => [preference.participantId, preference]));
   let created = 0;
 
@@ -265,6 +269,7 @@ export async function prepareTrainingSessionReminderDrafts(formData: FormData) {
 
     const id = newId();
     await db.insert(trainingOutboundMessages).values({
+      organizationId: user.organizationId,
       id,
       participantId: participant.id,
       sessionId: session.id,
@@ -283,7 +288,7 @@ export async function prepareTrainingSessionReminderDrafts(formData: FormData) {
     created += 1;
   }
 
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_communication_batch", entityId: session.id, entityLabel: session.referenceNumber, summary: `Prepared ${created} session reminder drafts`, after: { created } });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_communication_batch", entityId: session.id, entityLabel: session.referenceNumber, summary: `Prepared ${created} session reminder drafts`, after: { created } });
   refreshCommunicationPaths();
 }
 
@@ -291,7 +296,7 @@ export async function prepareTrainingCertificateExpiryDrafts() {
   const user = await requireTrainingManager();
   const today = new Date();
   const horizon = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
-  const certificates = await db.select().from(trainingCertificates).where(eq(trainingCertificates.status, "active"));
+  const certificates = await db.select().from(trainingCertificates).where(and(eq(trainingCertificates.organizationId, user.organizationId), eq(trainingCertificates.status, "active")));
   const expiring = certificates.filter((certificate) => {
     if (!certificate.expiryDate) return false;
     const expiry = new Date(`${certificate.expiryDate}T23:59:59.999Z`);
@@ -300,8 +305,8 @@ export async function prepareTrainingCertificateExpiryDrafts() {
   if (!expiring.length) return;
 
   const participantIds = [...new Set(expiring.map((certificate) => certificate.participantId))];
-  const participants = await db.select().from(trainingParticipants).where(inArray(trainingParticipants.id, participantIds));
-  const preferences = await db.select().from(trainingCommunicationPreferences).where(inArray(trainingCommunicationPreferences.participantId, participantIds));
+  const participants = await db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), inArray(trainingParticipants.id, participantIds)));
+  const preferences = await db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), inArray(trainingCommunicationPreferences.participantId, participantIds)));
   const participantById = new Map(participants.map((participant) => [participant.id, participant]));
   const prefByParticipant = new Map(preferences.map((preference) => [preference.participantId, preference]));
   let created = 0;
@@ -320,6 +325,7 @@ export async function prepareTrainingCertificateExpiryDrafts() {
 
     const id = newId();
     await db.insert(trainingOutboundMessages).values({
+      organizationId: user.organizationId,
       id,
       participantId: participant.id,
       sessionId: certificate.sessionId,
@@ -338,6 +344,6 @@ export async function prepareTrainingCertificateExpiryDrafts() {
     created += 1;
   }
 
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_communication_batch", entityId: null, entityLabel: "Certificate expiry reminders", summary: `Prepared ${created} certificate-expiry reminder drafts`, after: { created, horizonDays: 60 } });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_communication_batch", entityId: null, entityLabel: "Certificate expiry reminders", summary: `Prepared ${created} certificate-expiry reminder drafts`, after: { created, horizonDays: 60 } });
   refreshCommunicationPaths();
 }
