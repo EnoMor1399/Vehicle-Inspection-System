@@ -72,8 +72,8 @@ export async function createTrainingRegulatoryRequirement(formData: FormData) {
     createdBy: user.id,
     updatedAt: new Date(),
   } as const;
-  await db.insert(trainingRegulatoryRequirements).values(values);
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_regulatory_requirement", entityId: id, entityLabel: data.requirementCode, summary: `Created Driver Training regulatory requirement ${data.requirementCode}`, after: values });
+  await db.insert(trainingRegulatoryRequirements).values({ ...values, organizationId: user.organizationId });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_regulatory_requirement", entityId: id, entityLabel: data.requirementCode, summary: `Created Driver Training regulatory requirement ${data.requirementCode}`, after: values });
   refreshAccreditationPaths();
 }
 
@@ -82,10 +82,10 @@ export async function setTrainingRegulatoryRequirementStatus(formData: FormData)
   const requirementId = field(formData, "requirementId");
   const status = field(formData, "status");
   if (!/^[0-9a-f-]{36}$/i.test(requirementId) || !["active", "inactive"].includes(status)) throw new Error("Invalid regulatory requirement status change");
-  const [before] = await db.select().from(trainingRegulatoryRequirements).where(eq(trainingRegulatoryRequirements.id, requirementId)).limit(1);
+  const [before] = await db.select().from(trainingRegulatoryRequirements).where(and(eq(trainingRegulatoryRequirements.organizationId, user.organizationId), eq(trainingRegulatoryRequirements.id, requirementId))).limit(1);
   if (!before) throw new Error("Regulatory requirement not found");
-  await db.update(trainingRegulatoryRequirements).set({ status, updatedAt: new Date() }).where(eq(trainingRegulatoryRequirements.id, requirementId));
-  await logAudit({ userId: user.id, userName: user.name, action: "update", entityType: "training_regulatory_requirement", entityId: before.id, entityLabel: before.requirementCode, summary: `Changed regulatory requirement to ${status}`, before: { status: before.status }, after: { status } });
+  await db.update(trainingRegulatoryRequirements).set({ status, updatedAt: new Date() }).where(and(eq(trainingRegulatoryRequirements.organizationId, user.organizationId), eq(trainingRegulatoryRequirements.id, requirementId)));
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "update", entityType: "training_regulatory_requirement", entityId: before.id, entityLabel: before.requirementCode, summary: `Changed regulatory requirement to ${status}`, before: { status: before.status }, after: { status } });
   refreshAccreditationPaths();
 }
 
@@ -102,7 +102,7 @@ export async function createTrainingAccreditationRecord(formData: FormData) {
   });
   if (!parsed.success) throw new Error(trainingAccreditationValidationMessage(parsed.error));
   const data = parsed.data;
-  const [requirement] = await db.select().from(trainingRegulatoryRequirements).where(eq(trainingRegulatoryRequirements.id, data.requirementId)).limit(1);
+  const [requirement] = await db.select().from(trainingRegulatoryRequirements).where(and(eq(trainingRegulatoryRequirements.organizationId, user.organizationId), eq(trainingRegulatoryRequirements.id, data.requirementId))).limit(1);
   if (!requirement) throw new Error("Regulatory requirement not found");
   if (requirement.status !== "active") throw new Error("Accreditation evidence can only be added to an active requirement");
   const id = newId();
@@ -119,8 +119,8 @@ export async function createTrainingAccreditationRecord(formData: FormData) {
     createdBy: user.id,
     updatedAt: new Date(),
   } as const;
-  await db.insert(trainingAccreditationRecords).values(values);
-  await logAudit({ userId: user.id, userName: user.name, action: "create", entityType: "training_accreditation", entityId: id, entityLabel: requirement.requirementCode, summary: `Added accreditation evidence for ${requirement.requirementCode}`, after: values });
+  await db.insert(trainingAccreditationRecords).values({ ...values, organizationId: user.organizationId });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "create", entityType: "training_accreditation", entityId: id, entityLabel: requirement.requirementCode, summary: `Added accreditation evidence for ${requirement.requirementCode}`, after: values });
   refreshAccreditationPaths();
 }
 
@@ -137,7 +137,7 @@ export async function decideTrainingAccreditationRecord(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.accreditationId}))`);
-    const [record] = await tx.select().from(trainingAccreditationRecords).where(eq(trainingAccreditationRecords.id, data.accreditationId)).limit(1);
+    const [record] = await tx.select().from(trainingAccreditationRecords).where(and(eq(trainingAccreditationRecords.organizationId, user.organizationId), eq(trainingAccreditationRecords.id, data.accreditationId))).limit(1);
     if (!record) return { ok: false as const, error: "Accreditation record not found" };
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-accreditation:${record.requirementId}`}))`);
     const allowed = record.status === "pending"
@@ -161,11 +161,11 @@ export async function decideTrainingAccreditationRecord(formData: FormData) {
       verifiedAt: data.status === "verified" ? now : record.verifiedAt,
       updatedAt: now,
     } as const;
-    await tx.update(trainingAccreditationRecords).set(patch).where(eq(trainingAccreditationRecords.id, record.id));
+    await tx.update(trainingAccreditationRecords).set(patch).where(and(eq(trainingAccreditationRecords.organizationId, user.organizationId), eq(trainingAccreditationRecords.id, record.id)));
     return { ok: true as const, record, patch };
   });
   if (!result.ok) throw new Error(result.error);
-  await logAudit({ userId: user.id, userName: user.name, action: data.status === "verified" ? "approve" : data.status === "rejected" ? "reject" : "update", entityType: "training_accreditation", entityId: result.record.id, entityLabel: result.record.credentialNumber || result.record.id, summary: `Changed accreditation evidence from ${result.record.status} to ${data.status}`, before: { status: result.record.status }, after: { status: data.status, verificationNotes: data.verificationNotes || null } });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: data.status === "verified" ? "approve" : data.status === "rejected" ? "reject" : "update", entityType: "training_accreditation", entityId: result.record.id, entityLabel: result.record.credentialNumber || result.record.id, summary: `Changed accreditation evidence from ${result.record.status} to ${data.status}`, before: { status: result.record.status }, after: { status: data.status, verificationNotes: data.verificationNotes || null } });
   refreshAccreditationPaths();
 }
 
@@ -175,7 +175,7 @@ export async function reviewTrainingSessionRegulatoryCompliance(formData: FormDa
   if (!parsed.success) throw new Error(trainingAccreditationValidationMessage(parsed.error));
   const data = parsed.data;
 
-  const [session] = await db.select().from(trainingSessions).where(eq(trainingSessions.id, data.sessionId)).limit(1);
+  const [session] = await db.select().from(trainingSessions).where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, data.sessionId))).limit(1);
   if (!session) throw new Error("Training session not found");
   if (!["scheduled", "in_progress"].includes(session.status)) throw new Error("Regulatory compliance review is only available for scheduled or in-progress sessions");
   const [requirements, accreditations] = await Promise.all([
@@ -186,9 +186,9 @@ export async function reviewTrainingSessionRegulatoryCompliance(formData: FormDa
   const now = new Date();
   const [existing] = await db.select().from(trainingSessionComplianceReviews).where(eq(trainingSessionComplianceReviews.sessionId, session.id)).limit(1);
   const values = { status: evaluation.ready ? "ready" : "blocked", blockers: evaluation.blockers, reviewedBy: user.id, reviewedAt: now, notes: data.notes || null, updatedAt: now } as const;
-  if (existing) await db.update(trainingSessionComplianceReviews).set(values).where(eq(trainingSessionComplianceReviews.id, existing.id));
+  if (existing) await db.update(trainingSessionComplianceReviews).set(values).where(and(eq(trainingSessionComplianceReviews.organizationId, user.organizationId), eq(trainingSessionComplianceReviews.id, existing.id)));
   else await db.insert(trainingSessionComplianceReviews).values({ id: newId(), sessionId: session.id, ...values });
 
-  await logAudit({ userId: user.id, userName: user.name, action: "inspect", entityType: "training_session_compliance", entityId: session.id, entityLabel: session.referenceNumber, summary: `Reviewed regulatory compliance: ${evaluation.ready ? "ready" : "blocked"}`, after: { ...values, applicableRequirements: evaluation.applicableCount } });
+  await logAudit({ organizationId: user.organizationId, userId: user.id, userName: user.name, action: "inspect", entityType: "training_session_compliance", entityId: session.id, entityLabel: session.referenceNumber, summary: `Reviewed regulatory compliance: ${evaluation.ready ? "ready" : "blocked"}`, after: { ...values, applicableRequirements: evaluation.applicableCount } });
   refreshAccreditationPaths();
 }
