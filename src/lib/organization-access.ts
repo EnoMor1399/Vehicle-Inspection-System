@@ -39,7 +39,7 @@ export function isPlatformSuperAdmin(user: { role: string }) {
   return user.role === "super_admin";
 }
 
-function periodAllowsAccess(
+export function periodAllowsAccess(
   subscription: typeof organizationSubscriptions.$inferSelect,
   now = new Date(),
 ) {
