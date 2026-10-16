@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { AlertTriangle, BellRing, CalendarClock, CheckCircle2, ClipboardList, PhoneCall, ShieldAlert, UserRoundCheck } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -69,7 +69,10 @@ export default async function TrainingCompliancePage() {
       .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingComplianceCases.participantId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
       .leftJoin(trainingCertificates, eq(trainingCertificates.id, trainingComplianceCases.certificateId))
-      .where(inArray(trainingComplianceCases.status, [...ACTIVE_CASES]))
+      .where(and(
+        eq(trainingComplianceCases.organizationId, user.organizationId),
+        inArray(trainingComplianceCases.status, [...ACTIVE_CASES]),
+      ))
       .orderBy(asc(trainingComplianceCases.dueDate), desc(trainingComplianceCases.updatedAt))
       .limit(300),
     db
@@ -87,7 +90,10 @@ export default async function TrainingCompliancePage() {
       .from(trainingCertificates)
       .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingCertificates.participantId))
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-      .where(isNotNull(trainingCertificates.expiryDate))
+      .where(and(
+        eq(trainingCertificates.organizationId, user.organizationId),
+        isNotNull(trainingCertificates.expiryDate),
+      ))
       .orderBy(asc(trainingCertificates.expiryDate))
       .limit(300),
     db
@@ -101,7 +107,10 @@ export default async function TrainingCompliancePage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-      .where(isNotNull(trainingParticipants.driverLicenseExpiry))
+      .where(and(
+        eq(trainingParticipants.organizationId, user.organizationId),
+        isNotNull(trainingParticipants.driverLicenseExpiry),
+      ))
       .orderBy(asc(trainingParticipants.driverLicenseExpiry))
       .limit(300),
     db
@@ -115,7 +124,10 @@ export default async function TrainingCompliancePage() {
       })
       .from(trainingParticipants)
       .innerJoin(trainingSessions, eq(trainingSessions.id, trainingParticipants.sessionId))
-      .where(inArray(trainingParticipants.riskLevel, ["high", "critical"]))
+      .where(and(
+        eq(trainingParticipants.organizationId, user.organizationId),
+        inArray(trainingParticipants.riskLevel, ["high", "critical"]),
+      ))
       .orderBy(trainingParticipants.fullName)
       .limit(300),
     db
@@ -128,6 +140,7 @@ export default async function TrainingCompliancePage() {
         createdAt: trainingComplianceEvents.createdAt,
       })
       .from(trainingComplianceEvents)
+      .where(eq(trainingComplianceEvents.organizationId, user.organizationId))
       .orderBy(desc(trainingComplianceEvents.createdAt))
       .limit(30),
   ]);
