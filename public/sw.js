@@ -1,14 +1,25 @@
-const CACHE_NAME = "rsl-vims-v3-static";
+const CACHE_NAME = "rsl-vims-v4-static";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [
   OFFLINE_URL,
-  "/manifest.json",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
+  "/manifest.json?v=4",
+  "/pwa/icon/192",
+  "/pwa/icon/512",
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+
+    // A single optional asset failure must never prevent the service worker
+    // from installing. Broken precache URLs previously blocked PWA install.
+    await Promise.allSettled(
+      PRECACHE_URLS.map(async (url) => {
+        const response = await fetch(url, { cache: "reload" });
+        if (response.ok) await cache.put(url, response);
+      })
+    );
+  })());
   self.skipWaiting();
 });
 
@@ -65,7 +76,7 @@ self.addEventListener("fetch", (event) => {
 
   // Icons and manifest resources use stale-while-revalidate so installation
   // starts quickly while newer branding metadata can replace cached copies.
-  if (url.pathname.startsWith("/icons/") || url.pathname === "/manifest.json") {
+  if (url.pathname.startsWith("/pwa/icon/") || url.pathname === "/manifest.json") {
     event.respondWith((async () => {
       const cached = await caches.match(request);
       const networkPromise = fetch(request).then((response) => {
