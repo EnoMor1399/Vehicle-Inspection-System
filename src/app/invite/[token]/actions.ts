@@ -1,6 +1,7 @@
 "use server";
 
 import { acceptOrganizationInvitation } from "@/lib/organization-control-plane";
+import { extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
 
 export type InvitationAcceptState = {
   ok: boolean;
@@ -23,9 +24,10 @@ export async function acceptInvitationAction(
       message: "Your account has been created. Sign in to continue and complete any required two-factor setup.",
     };
   } catch (error) {
+    const capacityMessage = extractSubscriptionCapacityError(error);
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Unable to accept the invitation.",
+      message: capacityMessage || (error instanceof Error ? error.message : "Unable to accept the invitation."),
     };
   }
 }
