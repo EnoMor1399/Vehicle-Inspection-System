@@ -6,6 +6,7 @@ import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { hashApiKey, legacyApiKeyHash } from "@/lib/api-keys";
 import { shouldRefreshApiKeyUsage } from "@/lib/api-key-usage";
+import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
 
 export type ApiScope = "read" | "write" | "inspect" | "admin";
 
@@ -32,6 +33,17 @@ function scopesAllowed(granted: string[] | null | undefined, required: ApiScope[
 
 function userAllowed(user: typeof users.$inferSelect, permission?: string): boolean {
   return !permission || hasPermission(user, permission);
+}
+
+async function apiSubscriptionAllowed(user: typeof users.$inferSelect): Promise<AuthFailure | null> {
+  const state = await getOrganizationSubscriptionState(user.organizationId);
+  if (!state.operationalAccess) {
+    return { ok: false, status: 403, message: "Organization subscription is not operational" };
+  }
+  if (!hasOrganizationModule(state, "api")) {
+    return { ok: false, status: 403, message: "The organization subscription does not include API & Integrations" };
+  }
+  return null;
 }
 
 export async function authenticateApiRequest(options: AuthOptions = {}): Promise<Authenticated | AuthFailure> {
@@ -71,6 +83,8 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
       if (!userAllowed(user, options.permission)) {
         return { ok: false, status: 403, message: "User does not have permission for this resource" };
       }
+      const subscriptionFailure = await apiSubscriptionAllowed(user);
+      if (subscriptionFailure) return subscriptionFailure;
 
       const now = new Date();
       const upgradingLegacyHash = keyRow.keyHash === legacyHash && currentHash !== legacyHash;
@@ -110,6 +124,8 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
         if (!userAllowed(user, options.permission)) {
           return { ok: false, status: 403, message: "You do not have permission for this resource" };
         }
+        const subscriptionFailure = await apiSubscriptionAllowed(user);
+        if (subscriptionFailure) return subscriptionFailure;
         // Browser sessions inherit the user's permissions rather than API-key scopes.
         return { ok: true, user, authType: "session", scopes: ["read", "write", "inspect"] };
       }

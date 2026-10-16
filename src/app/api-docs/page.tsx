@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { Code, Key, Link as LinkIcon, ShieldCheck, Terminal } from "lucide-react";
-import { requirePermission } from "@/lib/require-auth";
+import { requireOrganizationModule, requirePermission } from "@/lib/require-auth";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
 import { ApiKeyManager } from "./ApiKeyManager";
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ApiDocsPage() {
   const user = await requirePermission("settings");
+  await requireOrganizationModule("api");
   const requestHeaders = await headers();
   const forwardedHost = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "your-vims-domain.example";
   const forwardedProto = requestHeaders.get("x-forwarded-proto") || (process.env.NODE_ENV === "production" ? "https" : "http");

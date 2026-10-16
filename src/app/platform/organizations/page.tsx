@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Building2, Clock3, ShieldCheck, UsersRound } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
@@ -116,6 +117,12 @@ export default async function PlatformOrganizationsPage() {
                     <td className="py-3 pr-4"><Badge tone={organization.status === "active" ? "emerald" : organization.status === "suspended" ? "red" : "amber"}>{organization.status}</Badge></td>
                     <td className="py-3">
                       <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/platform/organizations/${organization.id}`}
+                          className="rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                        >
+                          Manage
+                        </Link>
                         <form action={changeOrganizationStatus} className="flex items-center gap-2">
                           <input type="hidden" name="organizationId" value={organization.id} />
                           <select name="status" defaultValue={organization.status} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">

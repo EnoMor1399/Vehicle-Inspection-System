@@ -11,6 +11,7 @@ import { getSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
+import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
 
 export const dynamic = "force-dynamic";
 
@@ -89,9 +90,21 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   try {
     const user = await getCurrentUser();
     accountTheme = await getUserThemePreference(user.id);
-    const allowedResources = SHELL_RESOURCES.filter((resource) => hasPermission(user, resource)) as string[];
-    if (canAccessVehicleInspection(user)) allowedResources.push("vehicle_inspection");
-    if (canAccessDriverTraining(user)) allowedResources.push("training");
+    const organizationState = await getOrganizationSubscriptionState(user.organizationId);
+    const allowedResources = SHELL_RESOURCES.filter((resource) => {
+      if (!hasPermission(user, resource)) return false;
+      if (resource === "reports") return hasOrganizationModule(organizationState, "reports");
+      return true;
+    }) as string[];
+    if (canAccessVehicleInspection(user) && hasOrganizationModule(organizationState, "vehicle_inspection")) {
+      allowedResources.push("vehicle_inspection");
+    }
+    if (canAccessDriverTraining(user) && hasOrganizationModule(organizationState, "driver_training")) {
+      allowedResources.push("training");
+    }
+    if (hasPermission(user, "settings") && hasOrganizationModule(organizationState, "api")) {
+      allowedResources.push("api_module");
+    }
 
     shellUser = {
       role: user.role,

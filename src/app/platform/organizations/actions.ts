@@ -7,6 +7,7 @@ import {
   activateOrganizationWorkspace,
   convertOnboardingRequest,
   setOrganizationStatus,
+  updateOrganizationSubscriptionLifecycle,
 } from "@/lib/organization-control-plane";
 import { logAudit } from "@/lib/audit";
 
@@ -102,4 +103,97 @@ export async function activateSubscriberWorkspace(formData: FormData) {
   });
 
   revalidatePath("/platform/organizations");
+}
+
+
+export type SubscriptionLifecycleActionState = {
+  ok: boolean;
+  message: string;
+};
+
+function optionalDate(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw new Error("One of the subscription dates is invalid");
+  return parsed;
+}
+
+export async function updateSubscriberSubscription(
+  _previous: SubscriptionLifecycleActionState,
+  formData: FormData,
+): Promise<SubscriptionLifecycleActionState> {
+  const actor = await requirePlatformSuperAdmin();
+  const parsed = z.object({
+    organizationId: z.string().uuid(),
+    planCode: z.string().trim().min(1).max(50),
+    status: z.enum(["trialing", "active", "past_due", "grace", "suspended", "cancelled", "expired"]),
+    amount: z.string().trim().max(30).optional(),
+    currency: z.string().trim().regex(/^[A-Za-z]{3}$/),
+    notes: z.string().trim().max(4000).optional(),
+  }).safeParse({
+    organizationId: formData.get("organizationId"),
+    planCode: formData.get("planCode"),
+    status: formData.get("status"),
+    amount: typeof formData.get("amount") === "string" ? formData.get("amount") : undefined,
+    currency: formData.get("currency"),
+    notes: typeof formData.get("notes") === "string" ? formData.get("notes") : undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message || "Invalid subscription update." };
+  }
+
+  try {
+    const result = await updateOrganizationSubscriptionLifecycle({
+      organizationId: parsed.data.organizationId,
+      actorUserId: actor.id,
+      planCode: parsed.data.planCode,
+      status: parsed.data.status,
+      amount: parsed.data.amount || null,
+      currency: parsed.data.currency,
+      currentPeriodEnd: optionalDate(formData.get("currentPeriodEnd")),
+      trialEndsAt: optionalDate(formData.get("trialEndsAt")),
+      graceEndsAt: optionalDate(formData.get("graceEndsAt")),
+      cancelAtPeriodEnd: formData.get("cancelAtPeriodEnd") === "on",
+      notes: parsed.data.notes || null,
+    });
+
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "update",
+      entityType: "organization_subscription",
+      entityId: result.subscription.id,
+      entityLabel: result.organization.name,
+      summary: `Updated ${result.organization.name} subscription to ${result.plan.name} / ${result.subscription.status}`,
+      before: {
+        plan: result.before.plan.code,
+        status: result.before.subscription.status,
+        amount: result.before.subscription.amount,
+        currency: result.before.subscription.currency,
+      },
+      after: {
+        plan: result.plan.code,
+        status: result.subscription.status,
+        amount: result.subscription.amount,
+        currency: result.subscription.currency,
+        modules: result.plan.modules,
+        cancelAtPeriodEnd: result.subscription.cancelAtPeriodEnd,
+      },
+    });
+
+    revalidatePath("/platform/organizations");
+    revalidatePath(`/platform/organizations/${parsed.data.organizationId}`);
+    revalidatePath("/organization/account");
+
+    const sessionNote = result.planChanged || result.statusChanged
+      ? " Active organization sessions were revoked so the new entitlement state applies immediately."
+      : "";
+    return { ok: true, message: `Subscription updated successfully.${sessionNote}` };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Unable to update the subscription.",
+    };
+  }
 }

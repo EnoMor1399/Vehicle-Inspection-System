@@ -183,6 +183,30 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
           "Role or domain changes revoke active sessions so the user must sign in again under the new authorization boundary",
         ],
       },
+      {
+        id: "subscriber-plans",
+        title: "Subscriber Plans, Modules & Capacity",
+        content:
+          "For subscribed organizations, the VIMS plan controls both capacity and which operational modules are available. User roles do not override plan entitlements: a user must have the required role/permission and the organization plan must include the module.",
+        steps: [
+          "Organization Owners can review current plan usage under Access & Support → Organization Account",
+          "Review active-user, active-station, managed-vehicle and current-month inspection usage before requesting a smaller plan",
+          "Platform Super Administrators can open Platform Administration → Subscriber Companies → Manage to update the plan and subscription lifecycle",
+          "Use Verify & activate only after the required Organization Owner and operational administrators are active and tenant isolation passes readiness checks",
+          "After a plan or subscription-status change, affected users must sign in again so the new entitlement state is applied",
+        ],
+        tips: [
+          "Vehicle Inspection, Driver Training & Assessment, Reports & Analytics, and API & Integrations are independently controlled plan modules",
+          "Inactive stations and decommissioned vehicles do not consume active capacity",
+          "A plan downgrade is blocked when current usage is above the target plan rather than deleting records automatically",
+          "Trial and grace-period subscriptions require valid end dates",
+        ],
+        warnings: [
+          "Direct URLs and API calls are protected by the same module-entitlement checks as the navigation menu",
+          "Suspended, expired, cancelled, past-due or otherwise unusable subscriptions cannot operate protected VIMS workspaces",
+          "Do not reduce a subscriber plan simply to force records out of scope; reduce legitimate usage first or choose a larger plan",
+        ],
+      },
     ],
   },
   inspections: {
