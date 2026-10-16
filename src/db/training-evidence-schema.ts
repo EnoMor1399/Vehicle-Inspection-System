@@ -8,13 +8,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingParticipants, trainingSessions } from "./training-schema";
 
 export const trainingAttendanceSignoffs = pgTable(
   "training_attendance_signoffs",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     participantId: varchar("participant_id", { length: 36 })
       .notNull()
       .references(() => trainingParticipants.id, { onDelete: "cascade" }),
@@ -35,6 +39,7 @@ export const trainingAttendanceSignoffs = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_attendance_signoffs_organization_idx").on(t.organizationId),
     participantSessionIdx: uniqueIndex("training_attendance_participant_session_uidx").on(t.participantId, t.sessionId),
     sessionStatusIdx: index("training_attendance_session_status_idx").on(t.sessionId, t.status),
     participantIdx: index("training_attendance_participant_idx").on(t.participantId),
@@ -46,6 +51,9 @@ export const trainingEvidenceRecords = pgTable(
   "training_evidence_records",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     sessionId: varchar("session_id", { length: 36 })
       .notNull()
       .references(() => trainingSessions.id, { onDelete: "cascade" }),
@@ -64,6 +72,7 @@ export const trainingEvidenceRecords = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_evidence_records_organization_idx").on(t.organizationId),
     sessionIdx: index("training_evidence_session_idx").on(t.sessionId, t.capturedAt),
     participantIdx: index("training_evidence_participant_idx").on(t.participantId),
     statusIdx: index("training_evidence_status_idx").on(t.status, t.capturedAt),
