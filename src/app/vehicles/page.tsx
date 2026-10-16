@@ -31,6 +31,7 @@ export default async function VehiclesPage() {
     .from(vehicles)
     .leftJoin(transporters, eq(transporters.id, vehicles.transporterId))
     .leftJoin(inspections, eq(inspections.vehicleId, vehicles.id))
+    .where(eq(vehicles.organizationId, user.organizationId))
     .groupBy(vehicles.id, transporters.companyName)
     .orderBy(desc(vehicles.createdAt));
 
@@ -39,7 +40,7 @@ export default async function VehiclesPage() {
       <PageHeader
         eyebrow="Vehicle Registry"
         title="Vehicles"
-        description="Complete register of vehicles inspected under the RSL programme."
+        description="Complete vehicle register for your organization workspace."
         action={
           editable ? (
             <Link href="/vehicles/new">
