@@ -6,7 +6,9 @@ import { canAccessVehicleInspection } from "@/lib/system-access";
 
 export const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Administrator",
-  admin: "Administrator",
+  vehicle_inspection_admin: "Vehicle Inspection Administrator",
+  driver_training_admin: "Driver Training Administrator",
+  admin: "Legacy Administrator",
   operations_manager: "Operations Manager",
   supervisor: "Supervisor",
   instructor: "Instructor Account",
@@ -18,7 +20,14 @@ export const ROLE_LABEL: Record<string, string> = {
   transporter_user: "Transporter Portal User",
 };
 
-const PRIVILEGED_2FA_ROLES = new Set(["super_admin", "admin", "operations_manager", "supervisor"]);
+const PRIVILEGED_2FA_ROLES = new Set([
+  "super_admin",
+  "vehicle_inspection_admin",
+  "driver_training_admin",
+  "admin",
+  "operations_manager",
+  "supervisor",
+]);
 
 type CurrentUserOptions = {
   allowPendingPrivileged2FA?: boolean;
@@ -165,7 +174,7 @@ export async function login(
   }
 
   const privileged2FARequired = process.env.REQUIRE_PRIVILEGED_2FA === "true"
-    && ["super_admin", "admin", "operations_manager", "supervisor"].includes(user.role);
+    && ["super_admin", "vehicle_inspection_admin", "driver_training_admin", "admin", "operations_manager", "supervisor"].includes(user.role);
   if (privileged2FARequired && (!user.twoFactorEnabled || !user.twoFactorSecret)) {
     // Do not reject valid primary credentials here: the authenticated user
     // needs a revocable session to reach the mandatory enrollment screen.
@@ -246,9 +255,28 @@ export async function logout(sessionId?: string): Promise<void> {
   jar.delete("rsl_user_id");
 }
 
+const VEHICLE_ADMIN_PERMISSIONS = {
+  transporters: true,
+  vehicles: true,
+  inspections: true,
+  approve: true,
+  reports: true,
+  users: true,
+  documents: true,
+  locations: true,
+  import: true,
+  notifications: true,
+  audit: true,
+  settings: true,
+};
+
 const ROLE_MATRIX: Record<string, Record<string, boolean>> = {
   super_admin: { "*": true },
-  admin: { transporters: true, vehicles: true, inspections: true, approve: true, reports: true, users: true, documents: true, locations: true, import: true, notifications: true, audit: true, settings: true },
+  vehicle_inspection_admin: VEHICLE_ADMIN_PERMISSIONS,
+  driver_training_admin: {},
+  // Kept only for a controlled migration window. New assignments must use one
+  // of the domain-specific administrator roles.
+  admin: VEHICLE_ADMIN_PERMISSIONS,
   operations_manager: { transporters: true, vehicles: true, inspections: true, reports: true, locations: true, documents: true, notifications: true },
   supervisor: { transporters: true, vehicles: true, inspections: true, reports: true, approve: true, documents: true },
   instructor: {},
