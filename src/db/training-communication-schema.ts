@@ -7,13 +7,17 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingCertificates, trainingParticipants, trainingSessions } from "./training-schema";
 
 export const trainingCommunicationPreferences = pgTable(
   "training_communication_preferences",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     participantId: varchar("participant_id", { length: 36 }).notNull().references(() => trainingParticipants.id, { onDelete: "cascade" }),
     emailOptIn: boolean("email_opt_in").notNull().default(false),
     smsOptIn: boolean("sms_opt_in").notNull().default(false),
@@ -27,6 +31,7 @@ export const trainingCommunicationPreferences = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_communication_preferences_organization_idx").on(t.organizationId),
     participantIdx: uniqueIndex("training_comm_pref_participant_uidx").on(t.participantId),
     channelIdx: index("training_comm_pref_channel_idx").on(t.preferredChannel),
     dncIdx: index("training_comm_pref_dnc_idx").on(t.doNotContact),
@@ -37,6 +42,9 @@ export const trainingOutboundMessages = pgTable(
   "training_outbound_messages",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     participantId: varchar("participant_id", { length: 36 }).notNull().references(() => trainingParticipants.id, { onDelete: "cascade" }),
     sessionId: varchar("session_id", { length: 36 }).references(() => trainingSessions.id, { onDelete: "set null" }),
     certificateId: varchar("certificate_id", { length: 36 }).references(() => trainingCertificates.id, { onDelete: "set null" }),
@@ -59,6 +67,7 @@ export const trainingOutboundMessages = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_outbound_messages_organization_idx").on(t.organizationId),
     participantIdx: index("training_outbound_participant_idx").on(t.participantId, t.createdAt),
     sessionIdx: index("training_outbound_session_idx").on(t.sessionId, t.status),
     certificateIdx: index("training_outbound_certificate_idx").on(t.certificateId),
@@ -71,6 +80,9 @@ export const trainingCommunicationEvents = pgTable(
   "training_communication_events",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     messageId: varchar("message_id", { length: 36 }).notNull().references(() => trainingOutboundMessages.id, { onDelete: "cascade" }),
     eventType: varchar("event_type", { length: 30 }).notNull(),
     fromStatus: varchar("from_status", { length: 20 }),
@@ -80,6 +92,7 @@ export const trainingCommunicationEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_communication_events_organization_idx").on(t.organizationId),
     messageCreatedIdx: index("training_comm_event_message_created_idx").on(t.messageId, t.createdAt),
   })
 );
