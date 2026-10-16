@@ -10,6 +10,7 @@ import { getOrganizationSubscriptionState } from "@/lib/organization-access";
 
 const PRIVILEGED_2FA_ROLES = new Set([
   "super_admin",
+  "organization_owner",
   "vehicle_inspection_admin",
   "driver_training_admin",
   "admin",
