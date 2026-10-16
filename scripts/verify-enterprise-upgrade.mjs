@@ -65,6 +65,86 @@ const requiredAuditColumns = [
   "event_hash",
 ];
 
+const requiredCoreTenantTables = [
+  "daily_inspections",
+  "webhooks",
+  "locations",
+  "transporters",
+  "vehicles",
+  "rfid_tags",
+  "inspections",
+  "inspection_appointments",
+  "documents",
+  "audit_logs",
+  "notifications",
+  "import_jobs",
+  "api_keys",
+  "signatures",
+  "security_events",
+];
+
+const requiredTrainingTenantTables = [
+  "training_sessions",
+  "training_participants",
+  "training_assessments",
+  "training_certificates",
+  "training_compliance_cases",
+  "training_compliance_events",
+  "training_requests",
+  "training_request_events",
+  "training_quotations",
+  "training_quotation_items",
+  "training_communication_preferences",
+  "training_outbound_messages",
+  "training_communication_events",
+  "training_curricula",
+  "training_curriculum_versions",
+  "training_session_curricula",
+  "training_matrix_requirements",
+  "training_development_plans",
+  "training_development_actions",
+  "training_attendance_signoffs",
+  "training_evidence_records",
+  "training_resources",
+  "training_resource_allocations",
+  "training_session_feedback",
+  "training_quality_findings",
+  "training_quality_events",
+  "training_instructor_profiles",
+  "training_session_readiness",
+  "training_risk_assessments",
+  "training_safety_hazards",
+  "training_safety_incidents",
+  "training_regulatory_requirements",
+  "training_accreditation_records",
+  "training_session_compliance_reviews",
+];
+
+const requiredTenantTables = [
+  ...requiredCoreTenantTables,
+  ...requiredTrainingTenantTables,
+];
+
+const requiredTenantTriggers = [
+  "users_tenant_reference_guard",
+  "vehicle_tenant_reference_guard",
+  "rfid_tenant_reference_guard",
+  "inspection_tenant_reference_guard",
+  "appointment_tenant_reference_guard",
+  "daily_inspection_tenant_reference_guard",
+  "document_tenant_reference_guard",
+  "training_sessions_tenant_reference_guard",
+  "training_participants_tenant_reference_guard",
+  "training_assessments_tenant_reference_guard",
+  "training_certificates_tenant_reference_guard",
+  "training_requests_tenant_reference_guard",
+  "training_quotations_tenant_reference_guard",
+  "training_curricula_tenant_reference_guard",
+  "training_instructor_profiles_tenant_reference_guard",
+  "training_risk_assessments_tenant_reference_guard",
+  "training_safety_incidents_tenant_reference_guard",
+];
+
 const requiredAssessmentColumns = [
   "assessment_version",
   "theory_score",
@@ -231,6 +311,22 @@ const requiredIndexes = [
   "user_organization_idx",
   "user_organization_role_idx",
   "system_settings_organization_uidx",
+  "location_organization_code_uidx",
+  "vehicle_organization_reg_uidx",
+  "rfid_organization_tag_uidx",
+  "inspection_organization_number_uidx",
+  "inspection_appointment_organization_number_uidx",
+  "inspection_organization_date_idx",
+  "document_organization_owner_idx",
+  "audit_organization_created_idx",
+  "training_sessions_organization_idx",
+  "training_participants_organization_idx",
+  "training_assessments_organization_idx",
+  "training_certificates_organization_idx",
+  "training_requests_organization_idx",
+  "training_curricula_organization_idx",
+  "training_instructor_profiles_organization_idx",
+  "training_safety_incidents_organization_idx",
 ];
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
@@ -257,6 +353,34 @@ try {
   );
   const presentTables = new Set(tableResult.rows.map((row) => row.tablename));
   const missingTables = requiredTables.filter((name) => !presentTables.has(name));
+
+  const tenantColumnResult = await client.query(
+    `SELECT table_name, is_nullable
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name = 'organization_id'
+        AND table_name = ANY($1::text[])`,
+    [requiredTenantTables],
+  );
+  const tenantColumnMap = new Map(
+    tenantColumnResult.rows.map((row) => [row.table_name, row.is_nullable]),
+  );
+  const missingTenantColumns = requiredTenantTables.filter((name) => !tenantColumnMap.has(name));
+  const nullableTenantColumns = requiredTenantTables.filter(
+    (name) => tenantColumnMap.get(name) && tenantColumnMap.get(name) !== "NO",
+  );
+
+  const tenantTriggerResult = await client.query(
+    `SELECT tgname
+       FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname = ANY($1::text[])`,
+    [requiredTenantTriggers],
+  );
+  const presentTenantTriggers = new Set(tenantTriggerResult.rows.map((row) => row.tgname));
+  const missingTenantTriggers = requiredTenantTriggers.filter(
+    (name) => !presentTenantTriggers.has(name),
+  );
 
   const assessmentColumnResult = await client.query(
     `SELECT column_name
@@ -381,6 +505,11 @@ try {
       usersWithoutOrganization: Number(tenantAssignment.users_without_org || 0),
       settingsWithoutOrganization: Number(tenantAssignment.settings_without_org || 0),
       activeSubscriptionPlans: Number(tenantAssignment.active_plans || 0),
+      tenantColumnsVerified: requiredTenantTables.length - missingTenantColumns.length,
+      tenantColumnsExpected: requiredTenantTables.length,
+      nullableTenantColumns: nullableTenantColumns.length,
+      tenantTriggersVerified: requiredTenantTriggers.length - missingTenantTriggers.length,
+      tenantTriggersExpected: requiredTenantTriggers.length,
     }),
   );
 
@@ -399,6 +528,9 @@ try {
     || Number(tenantAssignment.users_without_org || 0) > 0
     || Number(tenantAssignment.settings_without_org || 0) > 0
     || Number(tenantAssignment.active_plans || 0) < 3
+    || missingTenantColumns.length > 0
+    || nullableTenantColumns.length > 0
+    || missingTenantTriggers.length > 0
   ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
@@ -414,6 +546,9 @@ try {
     if (Number(tenantAssignment.users_without_org || 0) > 0) console.error(`Users without organization: ${tenantAssignment.users_without_org}`);
     if (Number(tenantAssignment.settings_without_org || 0) > 0) console.error(`Settings rows without organization: ${tenantAssignment.settings_without_org}`);
     if (Number(tenantAssignment.active_plans || 0) < 3) console.error(`Expected at least 3 active subscription plans, found ${tenantAssignment.active_plans}`);
+    if (missingTenantColumns.length > 0) console.error(`Missing organization_id columns: ${missingTenantColumns.join(", ")}`);
+    if (nullableTenantColumns.length > 0) console.error(`Nullable organization_id columns: ${nullableTenantColumns.join(", ")}`);
+    if (missingTenantTriggers.length > 0) console.error(`Missing tenant reference guards: ${missingTenantTriggers.join(", ")}`);
     process.exitCode = 1;
   } else {
     console.log("Enterprise database upgrade verification passed.");
