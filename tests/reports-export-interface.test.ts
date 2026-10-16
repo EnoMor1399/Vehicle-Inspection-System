@@ -8,7 +8,7 @@ test("report exports remain spreadsheet-safe and useful without recent rows", ()
   assert.match(actions, /neutralizeSpreadsheetFormula/);
   assert.match(actions, /report\.rows\.length > 0/);
   assert.match(actions, /\["Metric", "Value"\]/);
-  assert.match(actions, /new Blob\(\["\\uFEFF", lines\.join\("\\n"\)\]\)/);
+  assert.equal(actions.includes('new Blob(["\\uFEFF", lines.join("\\n")]'), true);
   assert.match(actions, /Inspection Compliance/);
 });
 
