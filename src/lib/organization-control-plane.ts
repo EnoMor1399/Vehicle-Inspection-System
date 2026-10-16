@@ -522,6 +522,7 @@ export async function verifyTenantDataPlaneReadiness() {
           WHERE table_schema = 'public'
             AND column_name = 'organization_id'
             AND is_nullable = 'NO'
+            AND column_default IS NULL
             AND table_name = ANY($1::text[])
        ) AS tenant_columns,
        (
