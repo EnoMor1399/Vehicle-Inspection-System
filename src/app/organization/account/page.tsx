@@ -80,14 +80,14 @@ export default async function OrganizationAccountPage() {
               <tr><th className="py-2 pr-4">Email</th><th className="py-2 pr-4">Role</th><th className="py-2 pr-4">Created</th><th className="py-2">Status</th></tr>
             </thead>
             <tbody>
-              {invitations.map((invite) => (
+              {invitations.map(({ invitation: invite, expired }) => (
                 <tr key={invite.id} className="border-b border-slate-100">
                   <td className="py-3 pr-4">{invite.email}</td>
                   <td className="py-3 pr-4">{invite.role.replaceAll("_", " ")}</td>
                   <td className="py-3 pr-4 text-slate-500">{formatDateTime(invite.createdAt)}</td>
                   <td className="py-3">
-                    <Badge tone={invite.acceptedAt ? "emerald" : invite.revokedAt || new Date(invite.expiresAt) < new Date() ? "red" : "amber"}>
-                      {invite.acceptedAt ? "accepted" : invite.revokedAt ? "revoked" : new Date(invite.expiresAt) < new Date() ? "expired" : "pending"}
+                    <Badge tone={invite.acceptedAt ? "emerald" : invite.revokedAt || expired ? "red" : "amber"}>
+                      {invite.acceptedAt ? "accepted" : invite.revokedAt ? "revoked" : expired ? "expired" : "pending"}
                     </Badge>
                   </td>
                 </tr>
