@@ -52,6 +52,7 @@ try {
       (id, organization_id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
      values ($1, $6, 'E2E Inspector', $2, 'inspector', $3, $4::jsonb, true, $5, 0, false)
      on conflict (email) do update set
+       organization_id = excluded.organization_id,
        name = excluded.name,
        role = excluded.role,
        password_hash = excluded.password_hash,
