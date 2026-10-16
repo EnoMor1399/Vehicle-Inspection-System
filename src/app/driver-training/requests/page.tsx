@@ -28,16 +28,16 @@ export default async function TrainingRequestsPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const [requests, events, trainingLocations, internalUsers, sessions, acceptedQuotations] = await Promise.all([
-    db.select().from(trainingRequests).orderBy(desc(trainingRequests.createdAt)).limit(300),
-    db.select().from(trainingRequestEvents).orderBy(desc(trainingRequestEvents.createdAt)).limit(1200),
-    db.select({ id: locations.id, name: locations.name }).from(locations).orderBy(asc(locations.name)).limit(300),
+    db.select().from(trainingRequests).where(eq(trainingRequests.organizationId, user.organizationId)).orderBy(desc(trainingRequests.createdAt)).limit(300),
+    db.select().from(trainingRequestEvents).where(eq(trainingRequestEvents.organizationId, user.organizationId)).orderBy(desc(trainingRequestEvents.createdAt)).limit(1200),
+    db.select({ id: locations.id, name: locations.name }).from(locations).where(eq(locations.organizationId, user.organizationId)).orderBy(asc(locations.name)).limit(300),
     db
       .select({ id: users.id, name: users.name, role: users.role })
       .from(users)
-      .where(and(eq(users.isActive, true), ne(users.role, "transporter_user")))
+      .where(and(eq(users.organizationId, user.organizationId), eq(users.isActive, true), ne(users.role, "transporter_user")))
       .orderBy(asc(users.name))
       .limit(300),
-    db.select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber }).from(trainingSessions).limit(1000),
+    db.select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber }).from(trainingSessions).where(eq(trainingSessions.organizationId, user.organizationId)).limit(1000),
     db
       .select({
         requestId: trainingQuotations.requestId,
@@ -45,7 +45,7 @@ export default async function TrainingRequestsPage() {
         validUntil: trainingQuotations.validUntil,
       })
       .from(trainingQuotations)
-      .where(and(eq(trainingQuotations.status, "accepted"), gte(trainingQuotations.validUntil, today)))
+      .where(and(eq(trainingQuotations.organizationId, user.organizationId), eq(trainingQuotations.status, "accepted"), gte(trainingQuotations.validUntil, today)))
       .limit(1000),
   ]);
 
