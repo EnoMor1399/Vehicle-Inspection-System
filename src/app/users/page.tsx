@@ -13,8 +13,8 @@ import { UserAccessEditor } from "./UserAccessEditor";
 export const dynamic = "force-dynamic";
 
 const ROLE_GROUPS = [
-  { key: "super_admin", tone: "red" as const, label: "Super Administrator", desc: "Full system access" },
-  { key: "admin", tone: "red" as const, label: "Administrator", desc: "Manage inspection modules" },
+  { key: "super_admin", tone: "red" as const, label: "Super Administrator", desc: "Enterprise oversight" },
+  { key: "vehicle_inspection_admin", tone: "red" as const, label: "Vehicle Inspection Administrator", desc: "Inspection administration only" },
   { key: "operations_manager", tone: "amber" as const, label: "Operations Manager", desc: "Daily inspection operations" },
   { key: "supervisor", tone: "amber" as const, label: "Supervisor", desc: "Approve inspections" },
   { key: "inspector", tone: "blue" as const, label: "Inspector", desc: "Perform inspections" },
@@ -55,16 +55,16 @@ export default async function UsersPage() {
   ]);
 
   const matrix = [
-    { resource: "Transporters", super_admin: true, admin: true, operations_manager: true, supervisor: true, inspector: false, data_entry: true, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
-    { resource: "Vehicles", super_admin: true, admin: true, operations_manager: true, supervisor: true, inspector: true, data_entry: true, auditor: false, compliance_officer: true, viewer: false, transporter_user: false },
-    { resource: "Inspections", super_admin: true, admin: true, operations_manager: true, supervisor: true, inspector: true, data_entry: false, auditor: false, compliance_officer: true, viewer: false, transporter_user: false },
-    { resource: "Approve", super_admin: true, admin: true, operations_manager: false, supervisor: true, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
-    { resource: "Reports", super_admin: true, admin: true, operations_manager: true, supervisor: true, inspector: false, data_entry: false, auditor: true, compliance_officer: true, viewer: false, transporter_user: false },
-    { resource: "Import/Export", super_admin: true, admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: true, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
-    { resource: "Users", super_admin: true, admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
-    { resource: "Locations", super_admin: true, admin: true, operations_manager: true, supervisor: false, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
-    { resource: "Audit Log", super_admin: true, admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: false, auditor: true, compliance_officer: false, viewer: false, transporter_user: false },
-    { resource: "Settings", super_admin: true, admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Transporters", super_admin: true, vehicle_inspection_admin: true, operations_manager: true, supervisor: true, inspector: false, data_entry: true, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Vehicles", super_admin: true, vehicle_inspection_admin: true, operations_manager: true, supervisor: true, inspector: true, data_entry: true, auditor: false, compliance_officer: true, viewer: false, transporter_user: false },
+    { resource: "Inspections", super_admin: true, vehicle_inspection_admin: true, operations_manager: true, supervisor: true, inspector: true, data_entry: false, auditor: false, compliance_officer: true, viewer: false, transporter_user: false },
+    { resource: "Approve", super_admin: true, vehicle_inspection_admin: true, operations_manager: false, supervisor: true, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Reports", super_admin: true, vehicle_inspection_admin: true, operations_manager: true, supervisor: true, inspector: false, data_entry: false, auditor: true, compliance_officer: true, viewer: false, transporter_user: false },
+    { resource: "Import/Export", super_admin: true, vehicle_inspection_admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: true, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Users", super_admin: true, vehicle_inspection_admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Locations", super_admin: true, vehicle_inspection_admin: true, operations_manager: true, supervisor: false, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Audit Log", super_admin: true, vehicle_inspection_admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: false, auditor: true, compliance_officer: false, viewer: false, transporter_user: false },
+    { resource: "Settings", super_admin: true, vehicle_inspection_admin: true, operations_manager: false, supervisor: false, inspector: false, data_entry: false, auditor: false, compliance_officer: false, viewer: false, transporter_user: false },
   ];
 
   const roleCounts = ROLE_GROUPS.map((r) => ({
@@ -99,7 +99,7 @@ export default async function UsersPage() {
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700"><Car className="h-4 w-4" /></div>
           <div>
             <p className="text-sm font-semibold text-slate-950">Vehicle Inspection account boundary</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Only accounts assigned to Vehicle Inspection appear here. An account may be assigned to both systems only when cross-department access is required.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Vehicle Inspection administration is a separate security domain. Inspection administrators manage fleet, inspection staff, stations, inspection workflows, compliance and reporting only. Driver Training & Assessment administration is managed separately; only the Super Administrator has enterprise oversight across both domains.</p>
           </div>
         </div>
       </Card>
@@ -180,7 +180,7 @@ export default async function UsersPage() {
                         </div>
                       </td>
                       <td className="py-3 pr-4"><Badge tone={role?.tone || "slate"}>{ROLE_LABEL[account.role] || account.role}</Badge></td>
-                      <td className="py-3 pr-4"><Badge tone={trainingAccess ? "violet" : "blue"}>{trainingAccess ? "Both systems" : "Vehicle Inspection"}</Badge></td>
+                      <td className="py-3 pr-4"><Badge tone={account.role === "super_admin" ? "violet" : "blue"}>{account.role === "super_admin" ? "Enterprise oversight" : "Vehicle Inspection"}</Badge></td>
                       <td className="py-3 pr-4 text-slate-600">{account.locationName || "—"}</td>
                       <td className="py-3 pr-4"><Badge tone={account.isActive ? "emerald" : "slate"}>{account.isActive ? "Active" : "Inactive"}</Badge></td>
                       <td className="py-3 pr-4 text-slate-600 text-xs">{account.lastLoginAt ? formatDateTime(account.lastLoginAt) : "Never"}</td>
