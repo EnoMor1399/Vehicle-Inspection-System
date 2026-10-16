@@ -136,6 +136,7 @@ export async function recordComprehensiveDriverAssessment(formData: FormData) {
     if (session.status === "cancelled") return { ok: false as const, error: "Cancelled training sessions cannot be assessed" };
 
     const assessment = {
+      organizationId: user.organizationId,
       id,
       participantId: participant.id,
       sessionId: participant.sessionId,
