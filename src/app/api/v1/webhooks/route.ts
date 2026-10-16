@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
 import { db } from "@/db";
 import { webhooks } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { webhookCreateSchema, zodDetails } from "@/lib/api-schemas";
 import { API_SMALL_JSON_BODY_LIMIT, readJsonBody } from "@/lib/request-body";
@@ -24,7 +24,10 @@ export async function GET() {
     lastTriggeredAt: webhooks.lastTriggeredAt,
     failureCount: webhooks.failureCount,
     createdAt: webhooks.createdAt,
-  }).from(webhooks).where(eq(webhooks.userId, auth.user.id));
+  }).from(webhooks).where(and(
+    eq(webhooks.organizationId, auth.user.organizationId),
+    eq(webhooks.userId, auth.user.id),
+  ));
   return json({ data: rows });
 }
 
@@ -57,7 +60,10 @@ export async function POST(request: Request) {
       const [countRow] = await tx
         .select({ n: sql<number>`count(*)::int` })
         .from(webhooks)
-        .where(eq(webhooks.userId, auth.user.id));
+        .where(and(
+          eq(webhooks.organizationId, auth.user.organizationId),
+          eq(webhooks.userId, auth.user.id),
+        ));
 
       if (Number(countRow?.n || 0) >= MAX_WEBHOOKS_PER_USER) {
         return { ok: false as const };
@@ -65,6 +71,7 @@ export async function POST(request: Request) {
 
       await tx.insert(webhooks).values({
         id,
+        organizationId: auth.user.organizationId,
         userId: auth.user.id,
         url: destination.url.toString(),
         events,
