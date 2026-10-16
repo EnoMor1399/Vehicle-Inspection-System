@@ -7,13 +7,17 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
-import { users } from "./schema";
+import { users, organizations
+} from "./schema";
 import { trainingAssessments, trainingParticipants } from "./training-schema";
 
 export const trainingDevelopmentPlans = pgTable(
   "training_development_plans",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     participantId: varchar("participant_id", { length: 36 })
       .notNull()
       .references(() => trainingParticipants.id, { onDelete: "cascade" }),
@@ -32,6 +36,7 @@ export const trainingDevelopmentPlans = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_development_plans_organization_idx").on(t.organizationId),
     participantIdx: index("training_development_participant_idx").on(t.participantId, t.createdAt),
     statusTargetIdx: index("training_development_status_target_idx").on(t.status, t.targetDate),
     priorityIdx: index("training_development_priority_idx").on(t.priority),
@@ -44,6 +49,9 @@ export const trainingDevelopmentActions = pgTable(
   "training_development_actions",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     planId: varchar("plan_id", { length: 36 })
       .notNull()
       .references(() => trainingDevelopmentPlans.id, { onDelete: "cascade" }),
@@ -60,6 +68,7 @@ export const trainingDevelopmentActions = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    organizationIdx: index("training_development_actions_organization_idx").on(t.organizationId),
     planStatusIdx: index("training_development_action_plan_status_idx").on(t.planId, t.status),
     dueIdx: index("training_development_action_due_idx").on(t.status, t.dueDate),
     typeIdx: index("training_development_action_type_idx").on(t.actionType),
