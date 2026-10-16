@@ -16,6 +16,7 @@ import {
 } from "@/lib/system-access";
 import { isUserRole } from "@/lib/user-access-policy";
 import { newId } from "@/lib/utils";
+import { getOrganizationAccountSnapshot } from "@/lib/organization-control-plane";
 
 const TRAINING_ACCOUNT_ROLES = new Set([
   "driver_training_admin",
@@ -90,6 +91,14 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
     redirectWithFormError("Only a Super Administrator can create a Driver Training Administrator account");
   }
 
+  const accountSnapshot = await getOrganizationAccountSnapshot(actor.organizationId);
+  if (!accountSnapshot.subscription) {
+    redirectWithFormError("Your organization does not have an active subscription plan");
+  }
+  if (accountSnapshot.userCount + accountSnapshot.pendingInvitationCount >= accountSnapshot.subscription.plan.maxUsers) {
+    redirectWithFormError("Your organization has reached its subscription user limit");
+  }
+
   const passwordValidation = validatePasswordStrength(password);
   if (!passwordValidation.valid) {
     redirectWithFormError(passwordValidation.errors[0] || "The initial password does not meet the password policy");
@@ -131,6 +140,7 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
         .insert(users)
         .values({
           id: accountId,
+          organizationId: actor.organizationId,
           name,
           email,
           phone: phone || null,
