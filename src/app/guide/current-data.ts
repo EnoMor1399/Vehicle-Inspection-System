@@ -28,7 +28,7 @@ const DRIVER_TRAINING_SECTION: GuideSection = {
       id: "training-overview",
       title: "Department Workspace",
       content:
-        "Driver Training & Assessment manages the training lifecycle from request intake and scheduling through participants, evidence, assessment, independent review, certification, compliance, and analytics. Access is limited to users assigned to the Driver Training system or authorized cross-system administrators.",
+        "Driver Training & Assessment manages the training lifecycle from request intake and scheduling through participants, evidence, assessment, independent review, certification, compliance, and analytics. Access is limited to users assigned to the Driver Training & Assessment domain; only the Super Administrator has enterprise oversight across both administration domains.",
       tips: [
         "Use the Driver Training navigation bar inside the department instead of looking for every workspace in the global sidebar",
         "Overview summarizes the department; Operations groups Requests, Sessions, and Participants; Assessments groups the assessment workspace, Review queue, and Certificates",
@@ -154,13 +154,31 @@ const UPDATED_SECTIONS: Record<string, SectionPatch> = {
         id: "navigation",
         title: "Understanding the Interface",
         content:
-          "The global sidebar is role-aware and groups Operations, Departments, Intelligence, Administration, and Access & Support. Driver Training & Assessment has its own compact department navigation for its specialist workspaces.",
+          "The global sidebar is role-aware and separates Vehicle Inspection Operations, Driver Training & Assessment, Vehicle Inspection Intelligence, Vehicle Inspection Administration, and Access & Support. Driver Training & Assessment has its own compact department navigation for its specialist workspaces.",
         tips: [
           "On mobile, open the main menu to access global modules",
           "The active page is highlighted so you can confirm your current workspace",
           "Inside Driver Training, use Overview, Operations, Assessments, Analytics, and More",
           "Use the appearance control to switch between Day, Night, or Auto display modes when available to your account",
           "Use browser Back carefully on unfinished forms; verify the record was submitted before leaving a transaction",
+        ],
+      },
+      "administration-boundaries": {
+        id: "administration-boundaries",
+        title: "Administration Domains & Responsibilities",
+        content:
+          "Vehicle Inspection Administration and Driver Training & Assessment Administration are separate security and operational domains. Vehicle Inspection Administrators manage inspection users, fleet/vehicle records, stations, inspection workflows, inspection compliance, reports, imports, documents and inspection settings. Driver Training Administrators manage training staff, programmes, instructors, participants, assessments, independent review, certificates, training compliance and training assurance. The Super Administrator is the only default role with enterprise oversight across both domains.",
+        steps: [
+          "Assign Vehicle Inspection Administrator only to staff responsible for inspection administration",
+          "Assign Driver Training Administrator only to staff responsible for training and assessment administration",
+          "Assign inspectors to Vehicle Inspection and instructors to Driver Training & Assessment",
+          "For shared functional roles such as Operations Manager, Supervisor, Data Entry, Auditor, Compliance Officer or Viewer, select exactly one operational domain",
+          "Use the Vehicle Inspection Users page and Driver Training Users page as separate staff-administration workspaces",
+        ],
+        warnings: [
+          "Ordinary accounts cannot be assigned to both domains",
+          "Do not use one department's administrator account to perform or approve the other department's work",
+          "Role or domain changes revoke active sessions so the user must sign in again under the new authorization boundary",
         ],
       },
     },
