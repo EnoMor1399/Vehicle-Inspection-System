@@ -42,10 +42,10 @@ async function requireTrainingManager() {
   return user;
 }
 
-async function loadParticipantPreference(participantId: string) {
+async function loadParticipantPreference(organizationId: string, participantId: string) {
   const [[participant], [preference]] = await Promise.all([
-    db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participantId))).limit(1),
-    db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, user.organizationId), eq(trainingCommunicationPreferences.participantId, participantId))).limit(1),
+    db.select().from(trainingParticipants).where(and(eq(trainingParticipants.organizationId, organizationId), eq(trainingParticipants.id, participantId))).limit(1),
+    db.select().from(trainingCommunicationPreferences).where(and(eq(trainingCommunicationPreferences.organizationId, organizationId), eq(trainingCommunicationPreferences.participantId, participantId))).limit(1),
   ]);
   return { participant, preference };
 }
@@ -122,7 +122,7 @@ export async function createTrainingOutboundMessage(formData: FormData) {
   });
   if (!parsed.success) throw new Error(trainingCommunicationValidationMessage(parsed.error));
   const data = parsed.data;
-  const { participant } = await loadParticipantPreference(data.participantId);
+  const { participant } = await loadParticipantPreference(user.organizationId, data.participantId);
   if (!participant) throw new Error("Training participant not found");
 
   if (data.sessionId) {
@@ -286,7 +286,7 @@ export async function prepareTrainingSessionReminderDrafts(formData: FormData) {
       preparedBy: user.id,
       updatedAt: new Date(),
     });
-    await db.insert(trainingCommunicationEvents).values({ id: newId(), messageId: id, eventType: "generated", fromStatus: null, toStatus: "draft", summary: `Generated session reminder draft for ${participant.fullName}`, createdBy: user.id });
+    await db.insert(trainingCommunicationEvents).values({ organizationId: user.organizationId, id: newId(), messageId: id, eventType: "generated", fromStatus: null, toStatus: "draft", summary: `Generated session reminder draft for ${participant.fullName}`, createdBy: user.id });
     created += 1;
   }
 
@@ -342,7 +342,7 @@ export async function prepareTrainingCertificateExpiryDrafts() {
       preparedBy: user.id,
       updatedAt: new Date(),
     });
-    await db.insert(trainingCommunicationEvents).values({ id: newId(), messageId: id, eventType: "generated", fromStatus: null, toStatus: "draft", summary: `Generated certificate-expiry reminder draft for ${participant.fullName}`, createdBy: user.id });
+    await db.insert(trainingCommunicationEvents).values({ organizationId: user.organizationId, id: newId(), messageId: id, eventType: "generated", fromStatus: null, toStatus: "draft", summary: `Generated certificate-expiry reminder draft for ${participant.fullName}`, createdBy: user.id });
     created += 1;
   }
 
