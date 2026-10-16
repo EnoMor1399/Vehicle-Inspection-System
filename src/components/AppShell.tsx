@@ -117,7 +117,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/organization/account", label: "Organization Account", icon: Building2, organizationOwnerOnly: true },
       { href: "/portal", label: "Transporter Portal", icon: Truck, superAdminOnly: true },
       { href: "/apps", label: "App Access", icon: Smartphone },
-      { href: "/api-docs", label: "API & Integrations", icon: FileBarChart, resource: "settings" },
+      { href: "/api-docs", label: "API & Integrations", icon: FileBarChart, resource: "api_module" },
       { href: "/guide", label: "User Guide", icon: BookOpen },
     ],
   },
