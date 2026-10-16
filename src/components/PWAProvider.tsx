@@ -39,11 +39,40 @@ export function PWAProvider() {
   );
 
   useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      const installEvent = event as BeforeInstallPromptEvent;
+      installEvent.preventDefault();
+      window.__vimsInstallPrompt = installEvent;
+      window.dispatchEvent(new Event("vims:install-available"));
+    };
+
+    const onAppInstalled = () => {
+      window.__vimsInstallPrompt = null;
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    let updateTimer: number | undefined;
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // The web application remains usable if service-worker registration fails.
-      });
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/", updateViaCache: "none" })
+        .then((registration) => {
+          // Check for a newer shell periodically without caching protected data.
+          updateTimer = window.setInterval(() => {
+            registration.update().catch(() => undefined);
+          }, 60 * 60 * 1000);
+        })
+        .catch(() => {
+          // The web application remains usable if service-worker registration fails.
+        });
     }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+      if (updateTimer !== undefined) window.clearInterval(updateTimer);
+    };
   }, []);
 
   if (isOnline) return null;
