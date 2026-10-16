@@ -102,7 +102,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     if (canAccessDriverTraining(user) && hasOrganizationModule(organizationState, "driver_training")) {
       allowedResources.push("training");
     }
-    if (hasOrganizationModule(organizationState, "api")) {
+    if (hasPermission(user, "settings") && hasOrganizationModule(organizationState, "api")) {
       allowedResources.push("api_module");
     }
 
