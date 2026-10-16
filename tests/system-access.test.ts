@@ -74,3 +74,16 @@ test("user access action persists domain assignment and revokes sessions", () =>
   assert.match(source, /update\(sessions\)/);
   assert.match(source, /driver-training\/users/);
 });
+
+
+test("Organization Owner is an account administrator, not an operational administrator", () => {
+  const user = {
+    role: "organization_owner",
+    permissions: { vehicle_inspection: false, training: false },
+  };
+  assert.equal(canAccessVehicleInspection(user), false);
+  assert.equal(canAccessDriverTraining(user), false);
+  assert.equal(canViewTraining(user), false);
+  assert.equal(canManageTraining(user), false);
+  assert.equal(accessAreaLabel(user), "No system access");
+});
