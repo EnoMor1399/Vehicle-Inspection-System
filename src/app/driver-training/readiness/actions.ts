@@ -109,6 +109,7 @@ export async function saveTrainingInstructorProfile(formData: FormData) {
     const [created] = await tx
       .insert(trainingInstructorProfiles)
       .values({
+        organizationId: actor.organizationId,
         id,
         userId: data.userId,
         instructorCode,
@@ -224,7 +225,7 @@ export async function saveTrainingSessionReadiness(formData: FormData) {
 
     const [created] = await tx
       .insert(trainingSessionReadiness)
-      .values({ id: newId(), sessionId: data.sessionId, ...values })
+      .values({ organizationId: actor.organizationId, id: newId(), sessionId: data.sessionId, ...values })
       .returning();
     return { action: "create" as const, before: null, after: created };
   });
