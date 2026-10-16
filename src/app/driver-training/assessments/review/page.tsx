@@ -39,6 +39,7 @@ export default async function DriverAssessmentReviewQueuePage() {
     .from(trainingAssessments)
     .innerJoin(trainingParticipants, eq(trainingParticipants.id, trainingAssessments.participantId))
     .innerJoin(trainingSessions, eq(trainingSessions.id, trainingAssessments.sessionId))
+    .where(eq(trainingAssessments.organizationId, user.organizationId))
     .orderBy(desc(trainingAssessments.assessedAt))
     .limit(200);
 
