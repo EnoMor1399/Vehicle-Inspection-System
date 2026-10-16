@@ -4,7 +4,6 @@ import { PWAInstallCentre } from "@/components/PWAInstallCentre";
 import {
   Apple,
   CheckCircle2,
-  Chrome,
   Globe2,
   Laptop,
   LockKeyhole,
@@ -114,7 +113,7 @@ export default async function AppsPage() {
             </div>
             <div className="mt-4 space-y-2 text-sm text-slate-600">
               <p className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />If an install prompt is unavailable, the App Access page shows the correct manual steps.</p>
-              <p className="flex gap-2"><Chrome className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />For desktop Firefox environments without full PWA installation support, use current Chrome, Edge or Chromium for an installed-app experience.</p>
+              <p className="flex gap-2"><Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />For desktop Firefox environments without full PWA installation support, use current Chrome, Edge or Chromium for an installed-app experience.</p>
             </div>
           </Card>
 
