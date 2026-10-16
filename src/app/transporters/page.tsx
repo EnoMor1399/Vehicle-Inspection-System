@@ -36,7 +36,10 @@ export default async function TransportersPage() {
       .leftJoin(vehicles, eq(vehicles.transporterId, transporters.id))
       .leftJoin(inspections, eq(inspections.vehicleId, vehicles.id))
       .leftJoin(dailyInspections, eq(dailyInspections.vehicleId, vehicles.id))
-      .where(isNull(transporters.deletedAt))
+      .where(and(
+        eq(transporters.organizationId, user.organizationId),
+        isNull(transporters.deletedAt),
+      ))
       .groupBy(transporters.id)
       .orderBy(desc(transporters.createdAt)),
 
@@ -51,6 +54,8 @@ export default async function TransportersPage() {
       .innerJoin(transporters, eq(transporters.id, vehicles.transporterId))
       .where(
         and(
+          eq(transporters.organizationId, user.organizationId),
+          eq(inspections.organizationId, user.organizationId),
           isNull(transporters.deletedAt),
           sql`${inspections.inspectionDate} >= date_trunc('month', current_date) - interval '11 months'`,
         ),
@@ -69,6 +74,8 @@ export default async function TransportersPage() {
       .innerJoin(transporters, eq(transporters.id, vehicles.transporterId))
       .where(
         and(
+          eq(transporters.organizationId, user.organizationId),
+          eq(dailyInspections.organizationId, user.organizationId),
           isNull(transporters.deletedAt),
           sql`${dailyInspections.inspectionDate} >= date_trunc('month', current_date) - interval '11 months'`,
         ),
