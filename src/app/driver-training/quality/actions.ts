@@ -44,11 +44,11 @@ async function requireTrainingManager() {
   return user;
 }
 
-async function validateSessionParticipant(sessionId: string, participantId?: string) {
+async function validateSessionParticipant(organizationId: string, sessionId: string, participantId?: string) {
   const [session] = await db
     .select({ id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber, status: trainingSessions.status })
     .from(trainingSessions)
-    .where(and(eq(trainingSessions.organizationId, user.organizationId), eq(trainingSessions.id, sessionId)))
+    .where(and(eq(trainingSessions.organizationId, organizationId), eq(trainingSessions.id, sessionId)))
     .limit(1);
   if (!session) throw new Error("Training session not found");
 
@@ -56,7 +56,7 @@ async function validateSessionParticipant(sessionId: string, participantId?: str
   const [participant] = await db
     .select({ id: trainingParticipants.id, sessionId: trainingParticipants.sessionId, fullName: trainingParticipants.fullName })
     .from(trainingParticipants)
-    .where(and(eq(trainingParticipants.organizationId, user.organizationId), eq(trainingParticipants.id, participantId)))
+    .where(and(eq(trainingParticipants.organizationId, organizationId), eq(trainingParticipants.id, participantId)))
     .limit(1);
   if (!participant || participant.sessionId !== sessionId) {
     throw new Error("The selected participant does not belong to this training session");
@@ -64,12 +64,12 @@ async function validateSessionParticipant(sessionId: string, participantId?: str
   return { session, participant };
 }
 
-async function validateOwner(ownerId?: string) {
+async function validateOwner(organizationId: string, ownerId?: string) {
   if (!ownerId) return null;
   const [owner] = await db
     .select({ id: users.id, name: users.name, role: users.role, isActive: users.isActive })
     .from(users)
-    .where(eq(users.id, ownerId))
+    .where(and(eq(users.organizationId, organizationId), eq(users.id, ownerId)))
     .limit(1);
   if (!owner || !owner.isActive || owner.role === "transporter_user") {
     throw new Error("Quality action owners must be active internal VIMS users");
@@ -95,7 +95,7 @@ export async function submitTrainingFeedback(formData: FormData) {
   });
   if (!parsed.success) throw new Error(trainingQualityValidationMessage(parsed.error));
   const data = parsed.data;
-  const context = await validateSessionParticipant(data.sessionId, data.participantId);
+  const context = await validateSessionParticipant(actor.organizationId, data.sessionId, data.participantId);
   if (!["in_progress", "completed"].includes(context.session.status)) {
     throw new Error("Training feedback can only be recorded for in-progress or completed sessions");
   }
@@ -147,7 +147,7 @@ export async function submitTrainingFeedback(formData: FormData) {
         .returning();
       if (finding) {
         await tx.insert(trainingQualityEvents).values({
-          organizationId: user.organizationId,
+          organizationId: actor.organizationId,
           id: newId(),
           findingId: finding.id,
           eventType: "created",
@@ -161,7 +161,7 @@ export async function submitTrainingFeedback(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -192,8 +192,8 @@ export async function createTrainingQualityFinding(formData: FormData) {
   });
   if (!parsed.success) throw new Error(trainingQualityValidationMessage(parsed.error));
   const data = parsed.data;
-  const context = await validateSessionParticipant(data.sessionId, data.participantId);
-  await validateOwner(data.ownerId);
+  const context = await validateSessionParticipant(actor.organizationId, data.sessionId, data.participantId);
+  await validateOwner(actor.organizationId, data.ownerId);
   const createdAt = new Date();
 
   const result = await db.transaction(async (tx) => {
@@ -221,7 +221,7 @@ export async function createTrainingQualityFinding(formData: FormData) {
       .returning();
     if (!finding) throw new Error("Unable to create quality finding");
     await tx.insert(trainingQualityEvents).values({
-      organizationId: user.organizationId,
+      organizationId: actor.organizationId,
       id: newId(),
       findingId: finding.id,
       eventType: "created",
@@ -233,7 +233,7 @@ export async function createTrainingQualityFinding(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "create",
@@ -260,12 +260,12 @@ export async function updateTrainingQualityFinding(formData: FormData) {
   });
   if (!parsed.success) throw new Error(trainingQualityValidationMessage(parsed.error));
   const data = parsed.data;
-  await validateOwner(data.ownerId);
+  await validateOwner(actor.organizationId, data.ownerId);
   const updatedAt = new Date();
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-quality-finding:${data.findingId}`}))`);
-    const [before] = await tx.select().from(trainingQualityFindings).where(and(eq(trainingQualityFindings.organizationId, user.organizationId), eq(trainingQualityFindings.id, data.findingId))).limit(1);
+    const [before] = await tx.select().from(trainingQualityFindings).where(and(eq(trainingQualityFindings.organizationId, actor.organizationId), eq(trainingQualityFindings.id, data.findingId))).limit(1);
     if (!before) throw new Error("Training quality finding not found");
     if (["closed", "dismissed"].includes(before.status)) throw new Error(`The finding is already ${before.status}`);
     if (!canTransitionTrainingQualityFinding(before.status, data.status)) {
@@ -282,7 +282,7 @@ export async function updateTrainingQualityFinding(formData: FormData) {
         actionPlan: data.actionPlan || null,
         updatedAt,
       })
-      .where(and(eq(trainingQualityFindings.organizationId, user.organizationId), eq(trainingQualityFindings.id, before.id)))
+      .where(and(eq(trainingQualityFindings.organizationId, actor.organizationId), eq(trainingQualityFindings.id, before.id)))
       .returning();
     if (!after) throw new Error("Unable to update quality finding");
 
@@ -290,7 +290,7 @@ export async function updateTrainingQualityFinding(formData: FormData) {
     const summaryParts = [`Quality finding ${eventType === "status_changed" ? `moved from ${before.status} to ${after.status}` : "progress updated"}`];
     if (data.note) summaryParts.push(data.note);
     await tx.insert(trainingQualityEvents).values({
-      organizationId: user.organizationId,
+      organizationId: actor.organizationId,
       id: newId(),
       findingId: before.id,
       eventType,
@@ -302,7 +302,7 @@ export async function updateTrainingQualityFinding(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
@@ -331,7 +331,7 @@ export async function closeTrainingQualityFinding(formData: FormData) {
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`training-quality-finding:${data.findingId}`}))`);
-    const [before] = await tx.select().from(trainingQualityFindings).where(and(eq(trainingQualityFindings.organizationId, user.organizationId), eq(trainingQualityFindings.id, data.findingId))).limit(1);
+    const [before] = await tx.select().from(trainingQualityFindings).where(and(eq(trainingQualityFindings.organizationId, actor.organizationId), eq(trainingQualityFindings.id, data.findingId))).limit(1);
     if (!before) throw new Error("Training quality finding not found");
     if (before.status !== "verification") {
       throw new Error("Move the finding to verification before controlled closure");
@@ -352,11 +352,11 @@ export async function closeTrainingQualityFinding(formData: FormData) {
         closedAt,
         updatedAt: closedAt,
       })
-      .where(and(eq(trainingQualityFindings.organizationId, user.organizationId), eq(trainingQualityFindings.id, before.id)))
+      .where(and(eq(trainingQualityFindings.organizationId, actor.organizationId), eq(trainingQualityFindings.id, before.id)))
       .returning();
     if (!after) throw new Error("Unable to close quality finding");
     await tx.insert(trainingQualityEvents).values({
-      organizationId: user.organizationId,
+      organizationId: actor.organizationId,
       id: newId(),
       findingId: before.id,
       eventType: "closed",
@@ -368,7 +368,7 @@ export async function closeTrainingQualityFinding(formData: FormData) {
   });
 
   await logAudit({
-    organizationId: user.organizationId,
+    organizationId: actor.organizationId,
     userId: actor.id,
     userName: actor.name,
     action: "update",
