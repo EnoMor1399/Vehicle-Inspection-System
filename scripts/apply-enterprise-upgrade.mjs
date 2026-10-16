@@ -58,6 +58,7 @@ const migrationPaths = [
   "migrations/20261016_multi_organization_subscriptions.sql",
   "migrations/20261016_tenant_data_plane_core.sql",
   "migrations/20261016_tenant_data_plane_training.sql",
+  "migrations/20261016_tenant_data_plane_fail_closed.sql",
 ];
 
 const client = new pg.Client({
