@@ -7,6 +7,7 @@ const migration = readFileSync("migrations/20260902_security_query_indexes.sql",
 const schedulingMigration = readFileSync("migrations/20261015_inspection_scheduling.sql", "utf8");
 const administrationRoleMigration = readFileSync("migrations/20261016_admin_domain_roles.sql", "utf8");
 const administrationAssignmentMigration = readFileSync("migrations/20261016_admin_domain_assignment.sql", "utf8");
+const organizationOwnerRoleMigration = readFileSync("migrations/20261016_organization_owner_role.sql", "utf8");
 const multiOrganizationMigration = readFileSync("migrations/20261016_multi_organization_subscriptions.sql", "utf8");
 
 test("enterprise migration runner includes the security access-path migration", () => {
@@ -55,8 +56,12 @@ test("administration-domain migrations create explicit roles and database isolat
 });
 
 
-test("enterprise migration runner includes multi-organization subscriptions", () => {
-  assert.match(runner, /migrations\/20261016_multi_organization_subscriptions\.sql/);
+test("enterprise migration runner commits organization-owner role before multi-organization subscriptions", () => {
+  const rolePosition = runner.indexOf("migrations/20261016_organization_owner_role.sql");
+  const controlPlanePosition = runner.indexOf("migrations/20261016_multi_organization_subscriptions.sql");
+  assert.ok(rolePosition >= 0);
+  assert.ok(controlPlanePosition > rolePosition);
+  assert.match(organizationOwnerRoleMigration, /organization_owner/);
 });
 
 test("multi-organization migration preserves RSL and provisions a fail-closed subscriber control plane", () => {
