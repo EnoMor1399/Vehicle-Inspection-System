@@ -80,6 +80,7 @@ export async function requireWorkspaceUser() {
 
 export async function requireInternalUser() {
   const user = await requireWorkspaceUser();
+  if (user.role === "organization_owner") redirect("/organization/account");
   if (user.role === "transporter_user") redirect("/portal");
   return user;
 }
