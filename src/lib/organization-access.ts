@@ -1,15 +1,31 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  inspections,
+  locations,
   organizations,
+  organizationInvitations,
   organizationSubscriptions,
   subscriptionPlans,
-  type users,
+  users,
+  vehicles,
 } from "@/db/schema";
 
 export const RSL_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000101";
 
 export type OrganizationUser = Pick<typeof users.$inferSelect, "id" | "role" | "organizationId">;
+
+export type SubscriptionModule = "vehicle_inspection" | "driver_training" | "reports" | "api";
+export type SubscriptionQuota = "users" | "stations" | "vehicles" | "inspections_monthly";
+
+export type OrganizationUsage = {
+  users: number;
+  pendingInvitations: number;
+  stations: number;
+  vehicles: number;
+  inspectionsThisMonth: number;
+};
+
 
 export type SubscriptionAccessState = {
   organization: typeof organizations.$inferSelect | null;
@@ -31,6 +47,144 @@ const USABLE_SUBSCRIPTION_STATUSES = new Set(["trialing", "active", "grace"]);
 
 export function isPlatformSuperAdmin(user: { role: string }) {
   return user.role === "super_admin";
+}
+
+export function planHasModule(
+  plan: Pick<typeof subscriptionPlans.$inferSelect, "modules" | "features"> | null | undefined,
+  module: SubscriptionModule,
+) {
+  if (!plan) return false;
+  if (plan.modules.includes(module)) return true;
+
+  const features = plan.features && typeof plan.features === "object" ? plan.features : {};
+  if (module === "api") return features.api_access === true;
+  if (module === "driver_training") return features.driver_training === true;
+  return false;
+}
+
+export function organizationHasModule(
+  state: Pick<SubscriptionAccessState, "organization" | "plan" | "subscriptionUsable">,
+  module: SubscriptionModule,
+) {
+  if (!state.organization || !state.plan || !state.subscriptionUsable) return false;
+  if (!state.organization.enabledModules.includes(module)) return false;
+  return planHasModule(state.plan, module);
+}
+
+export function subscriptionModuleLabel(module: SubscriptionModule) {
+  switch (module) {
+    case "vehicle_inspection":
+      return "Vehicle Inspection";
+    case "driver_training":
+      return "Driver Training & Assessment";
+    case "reports":
+      return "Reports & Analytics";
+    case "api":
+      return "API & Integrations";
+  }
+}
+
+export async function assertOrganizationModuleAccess(
+  organizationId: string,
+  module: SubscriptionModule,
+) {
+  const state = await getOrganizationSubscriptionState(organizationId);
+  if (!state.operationalAccess) {
+    throw new Error("Organization workspace is not operational");
+  }
+  if (!organizationHasModule(state, module)) {
+    throw new Error(`${subscriptionModuleLabel(module)} is not included in the current subscription plan`);
+  }
+  return state;
+}
+
+export async function getOrganizationUsage(
+  organizationId: string,
+  now = new Date(),
+): Promise<OrganizationUsage> {
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  const [
+    [userCount],
+    pendingInvitations,
+    [stationCount],
+    [vehicleCount],
+    [inspectionCount],
+  ] = await Promise.all([
+    db.select({ n: count() }).from(users).where(eq(users.organizationId, organizationId)),
+    db
+      .select({ id: organizationInvitations.id })
+      .from(organizationInvitations)
+      .where(and(
+        eq(organizationInvitations.organizationId, organizationId),
+        eq(organizationInvitations.acceptedAt, null),
+        eq(organizationInvitations.revokedAt, null),
+        gte(organizationInvitations.expiresAt, now),
+      )),
+    db.select({ n: count() }).from(locations).where(eq(locations.organizationId, organizationId)),
+    db
+      .select({ n: count() })
+      .from(vehicles)
+      .where(and(
+        eq(vehicles.organizationId, organizationId),
+        ne(vehicles.status, "decommissioned"),
+      )),
+    db
+      .select({ n: count() })
+      .from(inspections)
+      .where(and(
+        eq(inspections.organizationId, organizationId),
+        gte(inspections.inspectionDate, monthStart),
+        lt(inspections.inspectionDate, nextMonth),
+      )),
+  ]);
+
+  return {
+    users: Number(userCount?.n || 0),
+    pendingInvitations: pendingInvitations.length,
+    stations: Number(stationCount?.n || 0),
+    vehicles: Number(vehicleCount?.n || 0),
+    inspectionsThisMonth: Number(inspectionCount?.n || 0),
+  };
+}
+
+export async function assertOrganizationQuota(
+  organizationId: string,
+  quota: SubscriptionQuota,
+) {
+  const state = await getOrganizationSubscriptionState(organizationId);
+  if (!state.operationalAccess || !state.plan) {
+    throw new Error("Organization workspace is not operational");
+  }
+
+  const usage = await getOrganizationUsage(organizationId);
+  const limits: Record<SubscriptionQuota, number> = {
+    users: state.plan.maxUsers,
+    stations: state.plan.maxStations,
+    vehicles: state.plan.maxVehicles,
+    inspections_monthly: state.plan.maxInspectionsPerMonth,
+  };
+  const current: Record<SubscriptionQuota, number> = {
+    users: usage.users + usage.pendingInvitations,
+    stations: usage.stations,
+    vehicles: usage.vehicles,
+    inspections_monthly: usage.inspectionsThisMonth,
+  };
+
+  if (current[quota] >= limits[quota]) {
+    const labels: Record<SubscriptionQuota, string> = {
+      users: "user seats",
+      stations: "inspection stations",
+      vehicles: "active vehicles",
+      inspections_monthly: "monthly inspections",
+    };
+    throw new Error(
+      `Subscription limit reached for ${labels[quota]} (${current[quota]}/${limits[quota]}). Upgrade the organization plan to continue.`,
+    );
+  }
+
+  return { state, usage, limit: limits[quota], current: current[quota] };
 }
 
 function periodAllowsAccess(
