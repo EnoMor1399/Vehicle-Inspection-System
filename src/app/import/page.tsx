@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { dailyInspections, importJobs, vehicles, inspections } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
@@ -43,9 +43,17 @@ export default async function ImportPage() {
   const canDo = canImport(user);
 
   const [jobs, vehicleExportRows, inspectionExportRows, preTripExportRows] = await Promise.all([
-    db.select().from(importJobs).orderBy(desc(importJobs.createdAt)).limit(25),
-    db.select({ registrationNumber: vehicles.registrationNumber, make: vehicles.make, model: vehicles.model, status: vehicles.status, vin: vehicles.vin, updatedAt: vehicles.updatedAt }).from(vehicles).orderBy(desc(vehicles.updatedAt)),
-    db.select({ inspectionNumber: inspections.inspectionNumber, vehicleId: inspections.vehicleId, inspectionDate: inspections.inspectionDate, overallResult: inspections.overallResult, workflowStatus: inspections.workflowStatus, inspectorName: inspections.inspectorName, station: inspections.station }).from(inspections).orderBy(desc(inspections.inspectionDate)),
+    db.select().from(importJobs)
+      .where(eq(importJobs.organizationId, user.organizationId))
+      .orderBy(desc(importJobs.createdAt)).limit(25),
+    db.select({ registrationNumber: vehicles.registrationNumber, make: vehicles.make, model: vehicles.model, status: vehicles.status, vin: vehicles.vin, updatedAt: vehicles.updatedAt })
+      .from(vehicles)
+      .where(eq(vehicles.organizationId, user.organizationId))
+      .orderBy(desc(vehicles.updatedAt)),
+    db.select({ inspectionNumber: inspections.inspectionNumber, vehicleId: inspections.vehicleId, inspectionDate: inspections.inspectionDate, overallResult: inspections.overallResult, workflowStatus: inspections.workflowStatus, inspectorName: inspections.inspectorName, station: inspections.station })
+      .from(inspections)
+      .where(eq(inspections.organizationId, user.organizationId))
+      .orderBy(desc(inspections.inspectionDate)),
     db
       .select({
         registrationNumber: vehicles.registrationNumber,
@@ -61,6 +69,10 @@ export default async function ImportPage() {
       })
       .from(dailyInspections)
       .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
+      .where(and(
+        eq(dailyInspections.organizationId, user.organizationId),
+        eq(vehicles.organizationId, user.organizationId),
+      ))
       .orderBy(desc(dailyInspections.inspectionDate), desc(dailyInspections.completedAt)),
   ]);
   const vehicleExport = vehicleExportRows.map((row) => ({ ...row, updatedAt: row.updatedAt?.toISOString?.() || String(row.updatedAt || "") }));
