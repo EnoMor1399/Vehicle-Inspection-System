@@ -184,7 +184,7 @@ export async function reviewTrainingSessionRegulatoryCompliance(formData: FormDa
   ]);
   const evaluation = evaluateTrainingRegulatoryCompliance(session.serviceId, requirements, accreditations);
   const now = new Date();
-  const [existing] = await db.select().from(trainingSessionComplianceReviews).where(eq(trainingSessionComplianceReviews.sessionId, session.id)).limit(1);
+  const [existing] = await db.select().from(trainingSessionComplianceReviews).where(and(eq(trainingSessionComplianceReviews.organizationId, user.organizationId), eq(trainingSessionComplianceReviews.sessionId, session.id))).limit(1);
   const values = { status: evaluation.ready ? "ready" : "blocked", blockers: evaluation.blockers, reviewedBy: user.id, reviewedAt: now, notes: data.notes || null, updatedAt: now } as const;
   if (existing) await db.update(trainingSessionComplianceReviews).set(values).where(and(eq(trainingSessionComplianceReviews.organizationId, user.organizationId), eq(trainingSessionComplianceReviews.id, existing.id)));
   else await db.insert(trainingSessionComplianceReviews).values({ id: newId(), sessionId: session.id, ...values });
