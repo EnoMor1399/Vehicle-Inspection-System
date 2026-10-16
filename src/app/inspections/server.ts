@@ -48,7 +48,7 @@ const TEMPLATE_TYPES = new Set(["bus", "truck", "tanker", "trailer", "taxi", "pr
 
 function inspectionNumber(id: string, at: Date): string {
   const stamp = at.toISOString().slice(0, 10).replaceAll("-", "");
-  return `RSL-INS-${stamp}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+  return `VIMS-INS-${stamp}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 }
 
 function boundedNumber(value: string | undefined, label: string, min: number, max: number): string | null {
@@ -115,7 +115,7 @@ function validateSections(sectionData: InspectionSectionData[]) {
 
 export async function createInspection(data: InspectionFormData) {
   const user = await requireEditor();
-  const settings = await getSettings();
+  const settings = await getSettings(user.organizationId);
 
   if (!data.vehicleId) throw new Error("Vehicle is required");
   if (!data.station?.trim()) throw new Error("Inspection station is required");
@@ -132,7 +132,13 @@ export async function createInspection(data: InspectionFormData) {
   const reinspectionDate = validateOptionalDate(data.reinspectionDate, "Re-inspection date");
   const odometerReading = boundedInteger(data.odometerReading, "Odometer reading", 0, 20_000_000);
 
-  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, data.vehicleId));
+  const [vehicle] = await db
+    .select()
+    .from(vehicles)
+    .where(and(
+      eq(vehicles.organizationId, user.organizationId),
+      eq(vehicles.id, data.vehicleId),
+    ));
   if (!vehicle) throw new Error("Vehicle not found");
   if (vehicle.status === "decommissioned") throw new Error("A decommissioned vehicle cannot be inspected");
 
@@ -140,7 +146,10 @@ export async function createInspection(data: InspectionFormData) {
     ? await db
         .select()
         .from(inspectionAppointments)
-        .where(eq(inspectionAppointments.id, data.appointmentId))
+        .where(and(
+          eq(inspectionAppointments.organizationId, user.organizationId),
+          eq(inspectionAppointments.id, data.appointmentId),
+        ))
         .limit(1)
     : [undefined];
 
@@ -174,6 +183,7 @@ export async function createInspection(data: InspectionFormData) {
   const workflowStatus = "completed" as const;
   const payload = {
     id,
+    organizationId: user.organizationId,
     inspectionNumber: number,
     vehicleId: data.vehicleId,
     inspectionDate: inspectedAt,
@@ -208,6 +218,7 @@ export async function createInspection(data: InspectionFormData) {
     if (data.inspectorSignature) {
       await tx.insert(signatures).values({
         id: newId(),
+        organizationId: user.organizationId,
         inspectionId: id,
         type: "inspector",
         signerName: data.inspectorName.trim() || user.name,
@@ -224,7 +235,10 @@ export async function createInspection(data: InspectionFormData) {
           linkedInspectionId: id,
           updatedAt: new Date(),
         })
-        .where(eq(inspectionAppointments.id, linkedAppointment.id));
+        .where(and(
+          eq(inspectionAppointments.organizationId, user.organizationId),
+          eq(inspectionAppointments.id, linkedAppointment.id),
+        ));
     }
 
     const awaitingApproval = settings.requireSupervisorApproval && data.overallResult !== "fail";
@@ -235,10 +249,14 @@ export async function createInspection(data: InspectionFormData) {
         : data.overallResult === "pass"
           ? "passed"
           : "under_inspection";
-    await tx.update(vehicles).set({ status: newStatus as any, updatedAt: new Date() }).where(eq(vehicles.id, data.vehicleId));
+    await tx
+      .update(vehicles)
+      .set({ status: newStatus as any, updatedAt: new Date() })
+      .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, data.vehicleId)));
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "inspect",
@@ -251,6 +269,7 @@ export async function createInspection(data: InspectionFormData) {
 
   const event = data.overallResult === "fail" ? "inspection.failed" : "inspection.completed";
   await emitWebhookEvent(event, {
+    organizationId: user.organizationId,
     id,
     inspectionNumber: number,
     vehicleId: data.vehicleId,
@@ -279,12 +298,15 @@ export async function approveInspection(id: string, input: { remarks?: string; s
     .select({ inspection: inspections, vehicle: vehicles })
     .from(inspections)
     .innerJoin(vehicles, eq(vehicles.id, inspections.vehicleId))
-    .where(eq(inspections.id, id));
+    .where(and(
+      eq(inspections.organizationId, user.organizationId),
+      eq(inspections.id, id),
+    ));
   if (!row) throw new Error("Inspection not found");
   if (row.inspection.workflowStatus === "approved") return { approved: true };
   if (row.inspection.workflowStatus !== "completed") throw new Error("Only completed inspections can be approved");
 
-  const settings = await getSettings();
+  const settings = await getSettings(user.organizationId);
   if (settings.requireDigitalSignature && !input.signature) {
     throw new Error("Supervisor digital signature is required for approval");
   }
@@ -298,12 +320,17 @@ export async function approveInspection(id: string, input: { remarks?: string; s
       supervisorRemarks: input.remarks?.trim() || null,
       supervisorSignature: input.signature || null,
       updatedAt: new Date(),
-    }).where(eq(inspections.id, id));
+    }).where(and(eq(inspections.organizationId, user.organizationId), eq(inspections.id, id)));
 
     if (input.signature) {
-      await tx.delete(signatures).where(and(eq(signatures.inspectionId, id), eq(signatures.type, "supervisor")));
+      await tx.delete(signatures).where(and(
+        eq(signatures.organizationId, user.organizationId),
+        eq(signatures.inspectionId, id),
+        eq(signatures.type, "supervisor"),
+      ));
       await tx.insert(signatures).values({
         id: newId(),
+        organizationId: user.organizationId,
         inspectionId: id,
         type: "supervisor",
         signerName: user.name,
@@ -317,10 +344,14 @@ export async function approveInspection(id: string, input: { remarks?: string; s
       : row.inspection.overallResult === "fail"
         ? "failed"
         : "under_inspection";
-    await tx.update(vehicles).set({ status: status as any, updatedAt: new Date() }).where(eq(vehicles.id, row.vehicle.id));
+    await tx
+      .update(vehicles)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(and(eq(vehicles.organizationId, user.organizationId), eq(vehicles.id, row.vehicle.id)));
   });
 
   await logAudit({
+    organizationId: user.organizationId,
     userId: user.id,
     userName: user.name,
     action: "approve",
@@ -347,7 +378,11 @@ export async function getInspectionDetail(id: string) {
     .select({ inspection: inspections, vehicle: vehicles })
     .from(inspections)
     .innerJoin(vehicles, eq(inspections.vehicleId, vehicles.id))
-    .where(eq(inspections.id, id));
+    .where(and(
+      eq(inspections.organizationId, user.organizationId),
+      eq(vehicles.organizationId, user.organizationId),
+      eq(inspections.id, id),
+    ));
   if (!row || !canAccessTransporterScope(user, row.vehicle.transporterId)) return null;
   return row;
 }
