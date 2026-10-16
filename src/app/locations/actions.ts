@@ -36,8 +36,15 @@ export async function saveStation(input: StationInput) {
   const status = data.status || "active";
 
   const duplicateQuery = data.id
-    ? and(eq(locations.code, data.code), ne(locations.id, data.id))
-    : eq(locations.code, data.code);
+    ? and(
+        eq(locations.organizationId, user.organizationId),
+        eq(locations.code, data.code),
+        ne(locations.id, data.id),
+      )
+    : and(
+        eq(locations.organizationId, user.organizationId),
+        eq(locations.code, data.code),
+      );
   const [duplicate] = await db.select({ id: locations.id }).from(locations).where(duplicateQuery).limit(1);
   if (duplicate) throw new Error("Another station already uses this code");
 
@@ -58,10 +65,18 @@ export async function saveStation(input: StationInput) {
   } as const;
 
   if (data.id) {
-    const [before] = await db.select().from(locations).where(eq(locations.id, data.id)).limit(1);
+    const [before] = await db
+      .select()
+      .from(locations)
+      .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)))
+      .limit(1);
     if (!before) throw new Error("Station not found");
-    await db.update(locations).set(values).where(eq(locations.id, data.id));
+    await db
+      .update(locations)
+      .set(values)
+      .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)));
     await logAudit({
+      organizationId: user.organizationId,
       userId: user.id,
       userName: user.name,
       action: "update",
@@ -74,8 +89,9 @@ export async function saveStation(input: StationInput) {
     });
   } else {
     const id = newId();
-    await db.insert(locations).values({ id, ...values });
+    await db.insert(locations).values({ id, organizationId: user.organizationId, ...values });
     await logAudit({
+      organizationId: user.organizationId,
       userId: user.id,
       userName: user.name,
       action: "create",
