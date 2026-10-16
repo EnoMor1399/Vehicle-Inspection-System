@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, ne } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   inspections,
@@ -118,8 +118,8 @@ export async function getOrganizationUsage(
       .from(organizationInvitations)
       .where(and(
         eq(organizationInvitations.organizationId, organizationId),
-        eq(organizationInvitations.acceptedAt, null),
-        eq(organizationInvitations.revokedAt, null),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
         gte(organizationInvitations.expiresAt, now),
       )),
     db.select({ n: count() }).from(locations).where(eq(locations.organizationId, organizationId)),
