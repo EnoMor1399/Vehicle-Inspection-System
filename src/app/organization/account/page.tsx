@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Building2, CarFront, ClipboardCheck, CreditCard, MapPin, ShieldCheck, UsersRound } from "lucide-react";
+import { CarFront, ClipboardCheck, CreditCard, MapPin, ShieldCheck, UsersRound } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requireOrganizationAccountManager } from "@/lib/require-auth";
 import {
@@ -23,7 +23,7 @@ export default async function OrganizationAccountPage() {
     return <div className="p-8 text-sm text-red-700">Organization subscription data is unavailable.</div>;
   }
 
-  const { organization, subscription, userCount, pendingInvitationCount } = snapshot;
+  const { organization, subscription, pendingInvitationCount } = snapshot;
   const plan = subscription.plan;
   const trainingEnabled = plan.modules.includes("driver_training");
 
