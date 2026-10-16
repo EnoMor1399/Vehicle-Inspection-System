@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { dailyInspections, vehicles } from "@/db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Card, Badge, Button, StatCard, EmptyState } from "@/components/ui";
 import { requirePermission } from "@/lib/require-auth";
@@ -10,7 +10,7 @@ import { Plus, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, Calendar, A
 export const dynamic = "force-dynamic";
 
 export default async function DailyInspectionsPage() {
-  await requirePermission("inspections");
+  const user = await requirePermission("inspections");
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -31,7 +31,11 @@ export default async function DailyInspectionsPage() {
       })
       .from(dailyInspections)
       .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
-      .where(eq(dailyInspections.inspectionDate, today))
+      .where(and(
+        eq(dailyInspections.organizationId, user.organizationId),
+        eq(vehicles.organizationId, user.organizationId),
+        eq(dailyInspections.inspectionDate, today),
+      ))
       .orderBy(desc(dailyInspections.completedAt)),
     db
       .select({
@@ -49,6 +53,10 @@ export default async function DailyInspectionsPage() {
       })
       .from(dailyInspections)
       .innerJoin(vehicles, eq(vehicles.id, dailyInspections.vehicleId))
+      .where(and(
+        eq(dailyInspections.organizationId, user.organizationId),
+        eq(vehicles.organizationId, user.organizationId),
+      ))
       .orderBy(desc(dailyInspections.inspectionDate), desc(dailyInspections.completedAt))
       .limit(15),
     db
@@ -58,7 +66,8 @@ export default async function DailyInspectionsPage() {
         failed: sql<number>`count(*) filter (where ${dailyInspections.status} = 'failed')::int`,
         defectNoted: sql<number>`count(*) filter (where ${dailyInspections.status} = 'defect_noted')::int`,
       })
-      .from(dailyInspections),
+      .from(dailyInspections)
+      .where(eq(dailyInspections.organizationId, user.organizationId)),
   ]);
 
   const passRate = stats[0]?.total
