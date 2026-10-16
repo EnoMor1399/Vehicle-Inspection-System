@@ -106,6 +106,7 @@ export async function submitTrainingFeedback(formData: FormData) {
     const [feedback] = await tx
       .insert(trainingSessionFeedback)
       .values({
+        organizationId: actor.organizationId,
         id: newId(),
         sessionId: data.sessionId,
         participantId: data.participantId || null,
@@ -131,6 +132,7 @@ export async function submitTrainingFeedback(formData: FormData) {
       [finding] = await tx
         .insert(trainingQualityFindings)
         .values({
+          organizationId: actor.organizationId,
           id: findingId,
           sessionId: data.sessionId,
           participantId: data.participantId || null,
@@ -201,6 +203,7 @@ export async function createTrainingQualityFinding(formData: FormData) {
     const [finding] = await tx
       .insert(trainingQualityFindings)
       .values({
+        organizationId: actor.organizationId,
         id: newId(),
         sessionId: data.sessionId,
         participantId: data.participantId || null,
