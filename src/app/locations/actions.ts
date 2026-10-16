@@ -72,10 +72,19 @@ export async function saveStation(input: StationInput) {
       .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)))
       .limit(1);
     if (!before) throw new Error("Station not found");
-    await db
-      .update(locations)
-      .set(values)
-      .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)));
+    if (before.status === "inactive" && status !== "inactive") {
+      await assertSubscriptionCapacityAvailable(user.organizationId, "stations");
+    }
+    try {
+      await db
+        .update(locations)
+        .set(values)
+        .where(and(eq(locations.organizationId, user.organizationId), eq(locations.id, data.id)));
+    } catch (error) {
+      const capacityMessage = extractSubscriptionCapacityError(error);
+      if (capacityMessage) throw new Error(capacityMessage);
+      throw error;
+    }
     await logAudit({
       organizationId: user.organizationId,
       userId: user.id,
