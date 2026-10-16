@@ -18,7 +18,7 @@ import { isUserRole } from "@/lib/user-access-policy";
 import { newId } from "@/lib/utils";
 
 const TRAINING_ACCOUNT_ROLES = new Set([
-  "admin",
+  "driver_training_admin",
   "operations_manager",
   "supervisor",
   "instructor",
@@ -86,8 +86,8 @@ export async function createDriverTrainingUser(formData: FormData): Promise<void
   if (!isUserRole(role) || !TRAINING_ACCOUNT_ROLES.has(role)) {
     redirectWithFormError("Select a valid Driver Training account function");
   }
-  if (actor.role !== "super_admin" && role === "admin") {
-    redirectWithFormError("Only a Super Administrator can create an Administrator account");
+  if (actor.role !== "super_admin" && role === "driver_training_admin") {
+    redirectWithFormError("Only a Super Administrator can create a Driver Training Administrator account");
   }
 
   const passwordValidation = validatePasswordStrength(password);
