@@ -402,6 +402,8 @@ export async function updateOrganizationProfile(input: {
   phone?: string;
   email?: string;
   website?: string;
+  themeColor?: string;
+  accentColor?: string;
 }) {
   const name = input.name.trim().slice(0, 255);
   if (name.length < 2) throw new Error("Enter a valid organization name");
@@ -421,6 +423,8 @@ export async function updateOrganizationProfile(input: {
       phone: input.phone?.trim().slice(0, 50) || null,
       email: input.email?.trim().toLowerCase().slice(0, 200) || null,
       website: input.website?.trim().slice(0, 200) || null,
+      themeColor: input.themeColor?.trim().slice(0, 20) || "#039703",
+      accentColor: input.accentColor?.trim().slice(0, 20) || "#026b02",
       updatedAt: new Date(),
     })
     .where(eq(organizations.id, input.organizationId))
