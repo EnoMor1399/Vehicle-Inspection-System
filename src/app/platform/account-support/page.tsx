@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/db";
 import { users, organizations } from "@/db/schema";
 import { eq, asc, and } from "drizzle-orm";
@@ -30,7 +31,7 @@ export default async function AccountSupportPage({ searchParams }: { searchParam
   return (
     <main className="mx-auto max-w-5xl p-6">
       <h1 className="text-2xl font-bold">Platform Account Support</h1>
-      <p className="mt-2 text-sm"><a href="/platform/oversight" className="font-semibold text-emerald-800 underline">Platform Oversight Centre</a>
+      <p className="mt-2 text-sm"><Link href="/platform/oversight" className="font-semibold text-emerald-800 underline">Platform Oversight Centre</Link>
         {organizationFilter ? <span> · Viewing accounts for selected organisation</span> : null}
       </p>
       <p className="my-3 text-sm text-slate-600">Super Administrator only. Password resets revoke all active sessions. Never transmit temporary passwords over public channels.</p>

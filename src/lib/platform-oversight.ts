@@ -99,6 +99,7 @@ export async function getPlatformOrganizationOversight(organizationId: string) {
   if (!org) return null;
   const [
     accounts, recentVehicles, recentInspections, recentAudit, recentSecurity,
+    recentStations, recentTransporters, recentDocuments, recentTrainingSessions,
     userTotal, vehiclesTotal, inspectionsTotal, stationsTotal,
     transportersTotal, documentsTotal, trainingTotal,
   ] = await Promise.all([
@@ -132,6 +133,26 @@ export async function getPlatformOrganizationOversight(organizationId: string) {
       resolved: securityEvents.resolved, createdAt: securityEvents.createdAt,
     }).from(securityEvents).where(eq(securityEvents.organizationId, org.id))
       .orderBy(desc(securityEvents.createdAt)).limit(12),
+    db.select({
+      id: locations.id, name: locations.name, code: locations.code,
+      status: locations.status, region: locations.region,
+    }).from(locations).where(eq(locations.organizationId, org.id))
+      .orderBy(locations.name).limit(15),
+    db.select({
+      id: transporters.id, companyName: transporters.companyName,
+      registrationNumber: transporters.registrationNumber, status: transporters.status,
+    }).from(transporters).where(eq(transporters.organizationId, org.id))
+      .orderBy(transporters.companyName).limit(15),
+    db.select({
+      id: documents.id, name: documents.name,
+      ownerType: documents.ownerType, type: documents.type, createdAt: documents.createdAt,
+    }).from(documents).where(eq(documents.organizationId, org.id))
+      .orderBy(desc(documents.createdAt)).limit(15),
+    db.select({
+      id: trainingSessions.id, referenceNumber: trainingSessions.referenceNumber,
+      title: trainingSessions.title, startAt: trainingSessions.startAt, status: trainingSessions.status,
+    }).from(trainingSessions).where(eq(trainingSessions.organizationId, org.id))
+      .orderBy(desc(trainingSessions.startAt)).limit(15),
     scopedCount(users, org.id),
     scopedCount(vehicles, org.id),
     scopedCount(inspections, org.id),
@@ -146,6 +167,7 @@ export async function getPlatformOrganizationOversight(organizationId: string) {
       stations: stationsTotal, transporters: transportersTotal,
       documents: documentsTotal, trainingSessions: trainingTotal },
     accounts, recentVehicles, recentInspections, recentAudit, recentSecurity,
+    recentStations, recentTransporters, recentDocuments, recentTrainingSessions,
   };
 }
 

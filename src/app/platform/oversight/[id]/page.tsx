@@ -15,7 +15,8 @@ export default async function OrganizationOversightDetail({
   const result = await getPlatformOrganizationOversight(id);
   if (!result) notFound();
   const { organization: org, accounts, counts, recentVehicles,
-    recentInspections, recentAudit, recentSecurity } = result;
+    recentInspections, recentAudit, recentSecurity,
+    recentStations, recentTransporters, recentDocuments, recentTrainingSessions } = result;
   const metricItems = [
     ["Accounts", counts.users], ["Vehicles", counts.vehicles],
     ["Inspections", counts.inspections], ["Stations", counts.stations],
@@ -111,6 +112,46 @@ export default async function OrganizationOversightDetail({
               <span className="text-xs text-slate-600">{inspection.overallResult.replaceAll("_", " ")} · {inspection.workflowStatus.replaceAll("_", " ")}</span>
             </div>
           )) : <p className="py-3 text-sm text-slate-500">No inspections yet.</p>}
+        </Card>
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold">Stations</h2>
+          <p className="mb-3 text-xs text-slate-500">First 15 of {counts.stations} inspection locations</p>
+          {recentStations.length ? recentStations.map((station) => (
+            <div key={station.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm last:border-0">
+              <span><strong>{station.name}</strong><p className="text-xs text-slate-500">{station.code} · {station.region || "Region not specified"}</p></span>
+              <span className="text-xs text-slate-600">{station.status}</span>
+            </div>
+          )) : <p className="py-3 text-sm text-slate-500">No stations registered.</p>}
+        </Card>
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold">Transporter companies</h2>
+          <p className="mb-3 text-xs text-slate-500">First 15 of {counts.transporters} transporters</p>
+          {recentTransporters.length ? recentTransporters.map((transporter) => (
+            <div key={transporter.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm last:border-0">
+              <span><strong>{transporter.companyName}</strong><p className="text-xs text-slate-500">{transporter.registrationNumber || "No registration"}</p></span>
+              <span className="text-xs text-slate-600">{transporter.status}</span>
+            </div>
+          )) : <p className="py-3 text-sm text-slate-500">No transporter companies.</p>}
+        </Card>
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold">Driver training sessions</h2>
+          <p className="mb-3 text-xs text-slate-500">Most recent 15 of {counts.trainingSessions} sessions</p>
+          {recentTrainingSessions.length ? recentTrainingSessions.map((session) => (
+            <div key={session.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm last:border-0">
+              <span><strong>{session.title}</strong><p className="text-xs text-slate-500">{session.referenceNumber} · {formatDateTime(session.startAt)}</p></span>
+              <span className="text-xs text-slate-600">{session.status}</span>
+            </div>
+          )) : <p className="py-3 text-sm text-slate-500">No training sessions.</p>}
+        </Card>
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold">Document inventory</h2>
+          <p className="mb-3 text-xs text-slate-500">Latest 15 of {counts.documents} records; file contents are not exposed by this oversight view</p>
+          {recentDocuments.length ? recentDocuments.map((document) => (
+            <div key={document.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm last:border-0">
+              <span><strong>{document.name}</strong><p className="text-xs text-slate-500">{document.ownerType}</p></span>
+              <span className="text-xs text-slate-600">{document.type}</span>
+            </div>
+          )) : <p className="py-3 text-sm text-slate-500">No documents.</p>}
         </Card>
         <Card className="p-5">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold"><ShieldAlert className="h-5 w-5" /> Security events</h2>

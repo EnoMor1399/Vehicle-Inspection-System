@@ -21,6 +21,7 @@ test("organization oversight read model filters every operational and security r
   assert.match(source, /eq\(organizations\.id, organizationId\)/);
   for (const table of [
     "users", "vehicles", "inspections", "auditLogs", "securityEvents",
+    "locations", "transporters", "documents", "trainingSessions",
   ]) {
     assert.match(source, new RegExp(`eq\\(${table}\\.organizationId, org\\.id\\)`));
   }
@@ -41,4 +42,13 @@ test("overarching navigation and account support remain Super Admin-only", () =>
   assert.match(detail, /platform\/account-support\?organizationId=/);
   assert.match(support, /actor\.role !== "super_admin"/);
   assert.match(support, /eq\(users\.organizationId, organizationFilter\)/);
+});
+
+
+test("resource previews include tenant-scoped training, stations, transporter and document metadata", () => {
+  const view = read("src/app/platform/oversight/[id]/page.tsx");
+  for (const section of ["Stations", "Transporter companies", "Driver training sessions", "Document inventory"]) {
+    assert.ok(view.includes(section), `Missing resource section: ${section}`);
+  }
+  assert.match(view, /file contents are not exposed/);
 });
