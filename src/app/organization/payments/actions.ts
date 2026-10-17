@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { organizationSubscriptions, organizations, subscriptionPayments } from "@/db/schema";
 import { getLatestOrganizationSubscription } from "@/lib/organization-control-plane";
@@ -56,15 +56,16 @@ export async function startSubscriptionCheckout(
           eq(subscriptionPayments.status, "success"),
         )).limit(1);
       if (paid) throw new Error("This subscription billing period is already paid. Do not submit another payment.");
-      const [recent] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
+      const [inFlight] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
         .where(and(
           eq(subscriptionPayments.subscriptionId, current.subscription.id),
           eq(subscriptionPayments.organizationId, user.organizationId),
-          eq(subscriptionPayments.amountSubunits, amountSubunits),
-          eq(subscriptionPayments.status, "pending"),
-          gte(subscriptionPayments.createdAt, new Date(Date.now() - 5 * 60_000)),
-        )).orderBy(desc(subscriptionPayments.createdAt)).limit(1);
-      if (recent) throw new Error("A checkout was started recently. Wait five minutes before trying again to avoid duplicate charges.");
+          eq(subscriptionPayments.billingPeriodStart, current.subscription.currentPeriodStart),
+          inArray(subscriptionPayments.status, ["pending", "processing"]),
+        )).limit(1);
+      if (inFlight) {
+        throw new Error("A payment is still awaiting confirmation for this billing period. Check its status before starting another checkout.");
+      }
       await tx.insert(subscriptionPayments).values({
         id: newId(),
         organizationId: user.organizationId,
