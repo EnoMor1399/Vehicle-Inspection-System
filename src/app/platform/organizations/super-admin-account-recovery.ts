@@ -1,6 +1,11 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import { headers } from "next/headers";
+import { decryptField } from "@/lib/field-encryption";
+import { rateLimit } from "@/lib/rate-limit";
+import { verifyTwoFactorToken } from "@/lib/security";
+import { clientIpFromHeaders } from "@/lib/request-context";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -14,11 +19,21 @@ import { logAudit } from "@/lib/audit";
  * only once to the authenticated platform Super Administrator; never log it.
  * A future self-service reset-token flow should replace delivery by admin.
  */
-export async function superAdminResetUserPassword(targetUserId: string) {
+export async function superAdminResetUserPassword(targetUserId: string, authenticationCode: string) {
   const actor = await getCurrentUser();
-  if (actor.role !== "super_admin" || !actor.isActive || !actor.twoFactorEnabled) {
+  if (actor.role !== "super_admin" || !actor.isActive || !actor.twoFactorEnabled || !actor.twoFactorSecret) {
     throw new Error("An active Super Administrator with enrolled MFA is required");
   }
+  const ip = clientIpFromHeaders(await headers());
+  const limiter = await rateLimit("twoFactor", `password-reset:${actor.id}:${ip}`);
+  if (!limiter.allowed) throw new Error("Too many account recovery attempts");
+  if (typeof authenticationCode !== "string" || !/^\\d{6,8}$/.test(authenticationCode.trim())) {
+    throw new Error("Enter your authenticator code");
+  }
+  const verified = await verifyTwoFactorToken(
+    decryptField(actor.twoFactorSecret), authenticationCode.trim(),
+  );
+  if (!verified) throw new Error("Authenticator code was not accepted");
   if (!/^[a-zA-Z0-9-]{1,64}$/.test(targetUserId)) {
     throw new Error("Invalid user identifier");
   }
