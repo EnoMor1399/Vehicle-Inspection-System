@@ -104,6 +104,7 @@ export async function verifyAndRecordPayment(reference: string) {
     currency: payment.currency,
     amountSubunits: payment.amountSubunits,
     customerEmail: payment.customerEmail,
+    channel: payment.channel as CheckoutChannel,
     mode,
   })) {
     throw new Error("Payment verification did not match the original invoice. Contact support.");
