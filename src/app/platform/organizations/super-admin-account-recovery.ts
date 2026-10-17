@@ -9,10 +9,11 @@ import { clientIpFromHeaders } from "@/lib/request-context";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { sessions, users } from "@/db/schema";
+import { securityEvents, sessions, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { logAudit } from "@/lib/audit";
+import { newId } from "@/lib/utils";
 
 /**
  * Emergency supervised account recovery. The generated password is displayed
@@ -68,6 +69,19 @@ export async function superAdminResetUserPassword(targetUserId: string, authenti
       .returning({ id: users.id });
     if (!updated) throw new Error("Password reset could not be completed");
     await tx.update(sessions).set({ isActive: false }).where(eq(sessions.userId, target.id));
+    // Mandatory security evidence is written atomically with the password reset.
+    // Associate the event with the account's own tenant and target user; the
+    // platform actor is referenced explicitly in metadata.
+    await tx.insert(securityEvents).values({
+      id: newId(),
+      organizationId: target.organizationId,
+      userId: target.id,
+      eventType: "admin_password_reset",
+      severity: "warning",
+      ipAddress: ip,
+      description: "Platform Super Administrator reset the password; account must rotate it at next sign-in",
+      metadata: { actorUserId: actor.id, targetUserId: target.id, sessionsRevoked: true },
+    });
   });
 
   await logAudit({
