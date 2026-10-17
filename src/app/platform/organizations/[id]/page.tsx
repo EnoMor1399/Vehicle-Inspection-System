@@ -50,6 +50,10 @@ export default async function PlatformOrganizationDetailPage({
         Subscriber Companies
       </Link>
 
+      <Link href={`/platform/oversight/${organization.id}`} className="mb-4 inline-flex rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">
+        View full organisation oversight →
+      </Link>
+
       <PageHeader
         eyebrow="Platform Subscription Management"
         title={organization.name}
