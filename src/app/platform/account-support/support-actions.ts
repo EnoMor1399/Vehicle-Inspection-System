@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
