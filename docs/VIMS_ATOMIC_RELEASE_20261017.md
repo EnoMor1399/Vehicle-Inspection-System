@@ -28,3 +28,12 @@ Release branch: `release/vims-unified-20261017`. Source PRs: #86, #87, #88, #89,
 - Native browser screenshot review of all redesigned pages and authenticated MFA support workflow should be completed as final sign-off.
 
 This manifest does not indicate production release until a verified deployment and database checkpoint exist.
+
+## Vercel production release trigger — 2026-10-17
+
+- GitHub PR #91 was squash-merged as `ecdf3aea5c7bce3fd0fa4b94b774266156fce0ff` after additive CMS and payment migrations succeeded on Neon production.
+- Source `vercel.json` has an intentionally restrictive `ignoreCommand`: it cancels all single-parent commits pushed to `main`, including a reviewed squash merge. Vercel canceled the automatic build for `ecdf3aea` for exactly that reason, not because application source or schema tests failed.
+- The original protective `ignoreCommand` is retained. This release-trigger PR **must be merged using the GitHub `merge` method (two-parent merge commit), NOT `squash` or `rebase`**, so Vercel builds production normally from the same code, with this runbook update.
+- Confirm Vercel deployment's target is `production` and its built SHA equals the final `main` merge SHA; verify aliases and public sign-in/readiness checks before reporting a successful deployment.
+- Do not enable live Paystack charges. Confirm production recovery branch `br-steep-rice-af6pjjt4` remains intact.
+- For future releases, account for the ignored-build-step policy before choosing a GitHub merge strategy. Do not bypass or disable build protection globally.
