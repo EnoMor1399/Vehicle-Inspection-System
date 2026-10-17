@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS subscription_payments (
   id varchar(36) PRIMARY KEY,
   organization_id varchar(36) NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
   subscription_id varchar(36) NOT NULL REFERENCES organization_subscriptions(id) ON DELETE RESTRICT,
+  billing_period_start timestamp NOT NULL,
   initiated_by varchar(36) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   provider varchar(24) NOT NULL DEFAULT 'paystack',
   reference varchar(90) NOT NULL UNIQUE,
@@ -21,6 +22,6 @@ CREATE TABLE IF NOT EXISTS subscription_payments (
 CREATE INDEX IF NOT EXISTS subscription_payment_org_created_idx
   ON subscription_payments (organization_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS subscription_payment_subscription_idx
-  ON subscription_payments (subscription_id);
+  ON subscription_payments (subscription_id, billing_period_start);
 CREATE INDEX IF NOT EXISTS subscription_payment_status_idx
   ON subscription_payments (status);
