@@ -50,6 +50,8 @@ test("checkout enforces organization ownership and billed invoice amount", () =>
   assert.match(actions, /current\.subscription\.amount/);
   assert.match(actions, /toGhsPesewas/);
   assert.match(actions, /pg_advisory_xact_lock/);
+  assert.match(actions, /billingPeriodStart/);
+  assert.match(actions, /This subscription billing period is already paid/);
   assert.match(provider, /PAYSTACK_LIVE_PAYMENTS_ENABLED/);
   assert.match(provider, /channels: \[input\.channel\]/);
   assert.match(provider, /checkout\.paystack\.com/);
