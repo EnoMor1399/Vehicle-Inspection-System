@@ -88,7 +88,7 @@ export async function completeRequiredPasswordChange(input: {
     ? "/organization/account"
     : user.role === "transporter_user"
       ? "/portal"
-      : user.role === "driver_training_admin" || user.role === "instructor"
+      : user.role === "driver_training_admin"
         ? "/driver-training"
         : "/";
   return { ok: true, destination };
