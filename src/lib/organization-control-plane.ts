@@ -252,6 +252,16 @@ export async function convertOnboardingRequest(input: {
     .limit(1);
   if (!plan) throw new Error("Selected subscription plan is unavailable");
 
+  const isolation = await verifyTenantDataPlaneReadiness();
+  if (!isolation.ready) {
+    throw new Error(
+      `Subscriber onboarding is paused until tenant isolation is verified ` +
+      `(${isolation.tenantColumns}/${isolation.expectedTenantColumns} tables, ` +
+      `${isolation.requiredGuards}/${isolation.expectedRequiredGuards} database guards). ` +
+      "A platform administrator must complete the database tenant cutover.",
+    );
+  }
+
   const organizationId = newId();
   const subscriptionId = newId();
   const invitationId = newId();
@@ -639,9 +649,10 @@ export async function verifyTenantDataPlaneReadiness() {
             AND table_name = ANY($1::text[])
        ) AS tenant_columns,
        (
-         SELECT count(*)::int
+         SELECT count(DISTINCT tgname)::int
            FROM pg_trigger
           WHERE NOT tgisinternal
+            AND tgenabled IN ('O', 'A')
             AND tgname = ANY($2::text[])
        ) AS required_guards`,
     [[...TENANT_DATA_PLANE_TABLES], [...REQUIRED_TENANT_GUARDS]],
@@ -665,7 +676,7 @@ export async function verifyTenantDataPlaneReadiness() {
  * Never return invitation token hashes in page props.
  */
 export async function getOrganizationActivationReadiness(organizationId: string) {
-  const [[organization], subscription, accountRows, [ownerInvite]] = await Promise.all([
+  const [[organization], subscription, accountRows, [ownerInvite], isolation] = await Promise.all([
     db.select({
       id: organizations.id,
       status: organizations.status,
@@ -686,6 +697,7 @@ export async function getOrganizationActivationReadiness(organizationId: string)
       eq(organizationInvitations.organizationId, organizationId),
       eq(organizationInvitations.role, "organization_owner"),
     )).orderBy(desc(organizationInvitations.createdAt)).limit(1),
+    verifyTenantDataPlaneReadiness(),
   ]);
 
   const activeCount = (role: typeof users.$inferSelect.role) =>
@@ -723,7 +735,9 @@ export async function getOrganizationActivationReadiness(organizationId: string)
     organizationReady,
     canAttemptActivation: Boolean(
       ownerReady && inspectionReady && trainingReady && subscriptionReady && organizationReady
+      && isolation.ready
     ),
+    isolation,
     ownerInvitationStatus: invitationStatus,
     ownerInvitationEmailInUse,
     ownerInvitationEmail: ownerInvite?.email ?? null,

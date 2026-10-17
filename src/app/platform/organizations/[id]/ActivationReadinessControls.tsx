@@ -18,6 +18,13 @@ type Readiness = {
   trainingReady: boolean;
   subscriptionReady: boolean;
   organizationReady: boolean;
+  isolation: {
+    ready: boolean;
+    tenantColumns: number;
+    expectedTenantColumns: number;
+    requiredGuards: number;
+    expectedRequiredGuards: number;
+  };
   canAttemptActivation: boolean;
   ownerInvitationStatus: string;
   ownerInvitationEmail: string | null;
@@ -46,6 +53,10 @@ export function ActivationReadinessControls({
         <div className="mt-3 space-y-2 text-xs">
           <Requirement ok={readiness.organizationReady} label="Organization permitted to operate" />
           <Requirement ok={readiness.subscriptionReady} label="Subscription and billing period eligible" />
+          <Requirement
+            ok={readiness.isolation.ready}
+            label={`Database tenant isolation (${readiness.isolation.tenantColumns}/${readiness.isolation.expectedTenantColumns} tables, ${readiness.isolation.requiredGuards}/${readiness.isolation.expectedRequiredGuards} guards)`}
+          />
           <Requirement ok={readiness.ownerReady} label="Active Organization Owner account" />
           {readiness.inspectionRequired && (
             <Requirement ok={readiness.inspectionReady} label="Active Vehicle Inspection Administrator" />
@@ -143,10 +154,17 @@ export function ActivationReadinessControls({
           {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
           {activating ? "Verifying..." : "Verify & activate workspace"}
         </button>
+        {!readiness.isolation.ready && (
+          <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+            Platform tenant-isolation protection is incomplete. The Super Administrator must finish
+            the database tenant cutover before any subscriber workspace can be activated.
+            Existing organization access remains unchanged.
+          </p>
+        )}
         {!readiness.canAttemptActivation && (
           <p className="text-xs leading-5 text-slate-600">
-            Complete the requirements above to enable this action. Database tenant-isolation checks
-            also run during final verification.
+            Complete every activation requirement above to enable this action.
+            Database isolation will be checked again on submission.
           </p>
         )}
         {activation.message && (

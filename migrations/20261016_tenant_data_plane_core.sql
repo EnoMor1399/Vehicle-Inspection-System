@@ -24,15 +24,11 @@ BEGIN
     'security_events'
   ]
   LOOP
+    -- The legacy organization is assigned ONLY to existing rows that need backfill.
+    -- A repeated upgrade must never restore an implicit tenant default.
     EXECUTE format(
-      'ALTER TABLE %I ADD COLUMN IF NOT EXISTS organization_id varchar(36) DEFAULT %L',
-      table_name,
-      '00000000-0000-4000-8000-000000000101'
-    );
-    EXECUTE format(
-      'ALTER TABLE %I ALTER COLUMN organization_id SET DEFAULT %L',
-      table_name,
-      '00000000-0000-4000-8000-000000000101'
+      'ALTER TABLE %I ADD COLUMN IF NOT EXISTS organization_id varchar(36)',
+      table_name
     );
     EXECUTE format(
       'UPDATE %I SET organization_id = %L WHERE organization_id IS NULL',
@@ -40,6 +36,9 @@ BEGIN
       '00000000-0000-4000-8000-000000000101'
     );
     EXECUTE format('ALTER TABLE %I ALTER COLUMN organization_id SET NOT NULL', table_name);
+    -- Explicit tenant ownership is mandatory on every future write.
+    -- Also repairs legacy defaults if this migration is rerun.
+    EXECUTE format('ALTER TABLE %I ALTER COLUMN organization_id DROP DEFAULT', table_name);
 
     IF NOT EXISTS (
       SELECT 1

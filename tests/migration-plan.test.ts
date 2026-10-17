@@ -96,7 +96,9 @@ test("enterprise migration runner applies core and Driver Training tenant data-p
 });
 
 test("core tenant migration backfills RSL, requires organization ownership and rejects cross-organization references", () => {
-  assert.match(tenantCoreMigration, /ADD COLUMN IF NOT EXISTS organization_id varchar\(36\) DEFAULT/);
+  assert.match(tenantCoreMigration, /ADD COLUMN IF NOT EXISTS organization_id varchar\(36\)/);
+  assert.doesNotMatch(tenantCoreMigration, /ALTER COLUMN organization_id SET DEFAULT/);
+  assert.match(tenantCoreMigration, /ALTER COLUMN organization_id DROP DEFAULT/);
   assert.match(tenantCoreMigration, /ALTER TABLE %I ALTER COLUMN organization_id SET NOT NULL/);
   assert.match(tenantCoreMigration, /00000000-0000-4000-8000-000000000101/);
   assert.match(tenantCoreMigration, /vims_enforce_tenant_references/);
@@ -116,7 +118,8 @@ test("Driver Training tenant migration covers all training domains and preserves
   assert.match(tenantTrainingMigration, /training_safety_incidents/);
   assert.match(tenantTrainingMigration, /training_session_compliance_reviews/);
   assert.match(tenantTrainingMigration, /ALTER TABLE %I ALTER COLUMN organization_id SET NOT NULL/);
-  assert.match(tenantTrainingMigration, /SET DEFAULT/);
+  assert.doesNotMatch(tenantTrainingMigration, /ALTER COLUMN organization_id SET DEFAULT/);
+  assert.match(tenantTrainingMigration, /ALTER COLUMN organization_id DROP DEFAULT/);
   assert.match(tenantTrainingMigration, /training_sessions_tenant_reference_guard/);
   assert.match(tenantTrainingMigration, /training_assessments_tenant_reference_guard/);
   assert.match(tenantTrainingMigration, /training_certificate_number_uidx/);
