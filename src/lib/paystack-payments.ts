@@ -1,6 +1,8 @@
 import "server-only";
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { matchesOriginalInvoice, type VerifiedPaystackTransaction } from "@/lib/paystack-validation";
+export { toGhsPesewas, verifyPaystackSignature } from "@/lib/paystack-validation";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { subscriptionPayments } from "@/db/schema";
@@ -23,23 +25,6 @@ function paystackSecret() {
 
 export function paymentsAvailable() {
   try { paystackSecret(); return true; } catch { return false; }
-}
-
-export function toGhsPesewas(amount: string) {
-  if (!/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(amount)) throw new Error("Invalid subscription amount.");
-  const [cedi, fraction = ""] = amount.split(".");
-  const value = Number(cedi) * 100 + Number(fraction.padEnd(2, "0"));
-  if (!Number.isSafeInteger(value) || value <= 0 || value > 2_000_000_000) {
-    throw new Error("This subscription amount cannot be paid through checkout.");
-  }
-  return value;
-}
-
-export function verifyPaystackSignature(rawBody: string, header: string | null, secret: string) {
-  if (!header || !/^[a-fA-F0-9]{128}$/.test(header)) return false;
-  const provided = Buffer.from(header, "hex");
-  const computed = createHmac("sha512", secret).update(rawBody, "utf8").digest();
-  return timingSafeEqual(provided, computed);
 }
 
 async function paystackRequest<T>(path: string, method: "GET" | "POST", body?: Record<string, unknown>): Promise<T> {
@@ -102,17 +87,6 @@ export async function initializePaystack(input: {
   return destination.toString();
 }
 
-type VerifiedPaystackTransaction = {
-  id: number | string;
-  reference: string;
-  amount: number;
-  currency: string;
-  status: string;
-  domain: string;
-  customer?: { email?: string };
-  gateway_response?: string;
-};
-
 export async function verifyAndRecordPayment(reference: string) {
   if (!/^vims_[a-f0-9]{32}$/.test(reference)) throw new Error("Invalid payment reference.");
   const [payment] = await db.select().from(subscriptionPayments)
@@ -125,10 +99,13 @@ export async function verifyAndRecordPayment(reference: string) {
   );
   const txn = response.data;
   const { mode } = paystackSecret();
-  if (!txn || txn.reference !== reference || txn.currency !== payment.currency
-      || txn.amount !== payment.amountSubunits
-      || txn.customer?.email?.toLowerCase() !== payment.customerEmail.toLowerCase()
-      || txn.domain !== mode) {
+  if (!matchesOriginalInvoice(txn, {
+    reference,
+    currency: payment.currency,
+    amountSubunits: payment.amountSubunits,
+    customerEmail: payment.customerEmail,
+    mode,
+  })) {
     throw new Error("Payment verification did not match the original invoice. Contact support.");
   }
   const currentStatus = txn.status === "success" ? "success"
