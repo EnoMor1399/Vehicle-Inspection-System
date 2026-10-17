@@ -1007,6 +1007,26 @@ export const sessions = pgTable(
   })
 );
 
+// Super Admin support sessions remain distinct from the target user's login.
+export const supportSessions = pgTable("support_sessions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  actorUserId: varchar("actor_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "restrict" }),
+  actorSessionId: varchar("actor_session_id", { length: 36 }).notNull().references(() => sessions.id, { onDelete: "cascade" }),
+  targetUserId: varchar("target_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "restrict" }),
+  organizationId: varchar("organization_id", { length: 36 }).notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  reason: varchar("reason", { length: 500 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  endedAt: timestamp("ended_at"),
+}, (t) => ({
+  tokenIdx: uniqueIndex("support_session_token_idx").on(t.tokenHash),
+  actorIdx: index("support_session_actor_idx").on(t.actorUserId, t.createdAt.desc()),
+  targetIdx: index("support_session_target_idx").on(t.organizationId, t.targetUserId, t.createdAt.desc()),
+  expiryIdx: index("support_session_expiry_idx").on(t.expiresAt),
+}));
+
 export const securityEvents = pgTable(
   "security_events",
   {
