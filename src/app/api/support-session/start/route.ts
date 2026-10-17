@@ -5,6 +5,33 @@ import { readJsonBody } from "@/lib/request-body";
 export const runtime = "nodejs";
 
 const privateHeaders = { "Cache-Control": "no-store" };
+/**
+ * A reverse proxy may supply a different internal Next URL than the browser's
+ * Host header. Accept matching browser/Host origins only; a missing Origin is
+ * permitted strictly for a browser that provides same-origin Fetch Metadata.
+ * Cross-site and same-site-but-cross-origin requests remain denied.
+ */
+function trustedBrowserOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin") return false;
+  if (!origin) return site === "same-origin";
+
+  try {
+    const submitted = new URL(origin);
+    if (!["http:", "https:"].includes(submitted.protocol)
+      || submitted.username || submitted.password
+      || submitted.search || submitted.hash || submitted.pathname !== "/") return false;
+    if (submitted.origin === request.nextUrl.origin) return true;
+
+    const host = request.headers.get("host");
+    return Boolean(host && submitted.host.toLowerCase() === host.toLowerCase()
+      && submitted.protocol === request.nextUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 
 function messageForSupportError(error: unknown) {
   if (!(error instanceof Error)) return { message: "The support view could not be started. Try again.", status: 500 };
@@ -40,9 +67,7 @@ function messageForSupportError(error: unknown) {
  * support cookie, and support sessions intentionally reject POST renders.
  */
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (!origin || origin !== request.nextUrl.origin || (fetchSite && fetchSite !== "same-origin")) {
+  if (!trustedBrowserOrigin(request)) {
     return NextResponse.json({ error: "Cross-origin support requests are not permitted." }, { status: 403, headers: privateHeaders });
   }
   const contentType = request.headers.get("content-type");
