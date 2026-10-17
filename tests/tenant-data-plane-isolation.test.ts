@@ -146,3 +146,19 @@ test("public verification paths resolve globally unique verification tokens inst
   assert.match(trainingVerification, /verificationCode/);
   assert.doesNotMatch(trainingVerification, /searchParams[\s\S]*organizationId/);
 });
+
+
+test("maintenance risk dashboard and API enforce the same authenticated tenant boundary", () => {
+  const page = source("src/app/predictive/page.tsx");
+  const api = source("src/app/api/v1/predictive-maintenance/route.ts");
+
+  assert.match(page, /const user = await requirePermission\("reports"\)/);
+  assert.match(page, /eq\(vehicles\.organizationId, user\.organizationId\)/);
+  assert.match(page, /eq\(inspections\.organizationId, user\.organizationId\)/);
+  assert.match(page, /eq\(inspections\.vehicleId, v\.id\)/);
+  assert.doesNotMatch(page, /\.from\(vehicles\)\.limit\(/);
+  assert.match(api, /eq\(vehicles\.organizationId, auth\.user\.organizationId\)/);
+  assert.match(api, /eq\(inspections\.organizationId, auth\.user\.organizationId\)/);
+  assert.match(api, /Cache-Control.*private, no-store/);
+  assert.match(api, /export const dynamic = "force-dynamic"/);
+});
