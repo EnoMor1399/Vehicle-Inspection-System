@@ -104,7 +104,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/users", label: "Vehicle Inspection Users", icon: Users, resource: "users" },
       { href: "/documents", label: "Documents", icon: FileText, resource: "documents" },
-      { href: "/notifications", label: "Notifications", icon: Bell, resource: "notifications" },
       { href: "/import", label: "Import / Export", icon: Upload, resource: "import" },
       { href: "/settings", label: "Settings", icon: SettingsIcon, resource: "settings" },
       { href: "/audit", label: "Audit Log", icon: ScrollText, resource: "audit" },
@@ -116,6 +115,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/platform/organizations", label: "Subscriber Companies", icon: Building2, superAdminOnly: true },
       { href: "/platform/account-support", label: "Account Support", icon: ShieldCheck, superAdminOnly: true },
       { href: "/platform/content", label: "Content Management Centre", icon: BookOpen, superAdminOnly: true },
+      { href: "/platform/notices", label: "System Change Notices", icon: Bell, superAdminOnly: true },
       { href: "/platform/payments", label: "Subscription Payments", icon: CreditCard, superAdminOnly: true },
     ],
   },
@@ -124,6 +124,7 @@ const NAV_GROUPS: NavGroup[] = [
     collapsible: true,
     items: [
       { href: "/organization/account", label: "Organization Account", icon: Building2, organizationOwnerOnly: true },
+      { href: "/notifications", label: "Notifications", icon: Bell },
       { href: "/portal", label: "Transporter Portal", icon: Truck, superAdminOnly: true },
       { href: "/apps", label: "App Access", icon: Smartphone },
       { href: "/api-docs", label: "API & Integrations", icon: FileBarChart, resource: "api_module" },
@@ -135,7 +136,7 @@ const NAV_GROUPS: NavGroup[] = [
 const TRANSPORTER_NAV_GROUPS: NavGroup[] = [
   {
     label: "Workspace",
-    items: [{ href: "/portal", label: "Transporter Portal", icon: Truck }],
+    items: [{ href: "/portal", label: "Transporter Portal", icon: Truck }, { href: "/notifications", label: "Notifications", icon: Bell }],
   },
 ];
 
@@ -168,6 +169,7 @@ export function AppShell({
   allowedResources = [],
   appearanceControl,
   supportContext,
+  changeNoticeBanner,
 }: {
   children: ReactNode;
   branding?: AppBranding;
@@ -176,6 +178,7 @@ export function AppShell({
   allowedResources?: string[];
   appearanceControl?: ReactNode;
   supportContext?: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null;
+  changeNoticeBanner?: { title: string; severity: "critical" | "important"; effectiveAt: string } | null;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -338,6 +341,13 @@ export function AppShell({
           <div role="status" className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-2 border-b border-amber-300 bg-amber-100 px-4 py-3 text-sm text-amber-950">
             <span><strong>Read-only support view:</strong> {supportContext.actorName} viewing as {supportContext.targetName} ({supportContext.targetEmail}). Expires {new Date(supportContext.expiresAt).toLocaleTimeString()}.</span>
             <form action="/api/support-session/end" method="POST"><button className="rounded-lg bg-amber-950 px-4 py-2 font-semibold text-white" type="submit">Exit support view</button></form>
+          </div>
+        )}
+{changeNoticeBanner && userRole && (
+          <div role="status" className={`border-b px-4 py-3 text-sm ${changeNoticeBanner.severity === "critical" ? "border-red-200 bg-red-50 text-red-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
+            <strong>{changeNoticeBanner.severity === "critical" ? "Critical system update" : "Important update"}:</strong>{" "}
+            {changeNoticeBanner.title} · Effective {new Date(changeNoticeBanner.effectiveAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC.{" "}
+            <Link href="/notifications" className="font-semibold underline">Read impact and required actions</Link>
           </div>
         )}
 <header className={supportContext ? "sticky top-[60px] z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8" : "sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"}>
