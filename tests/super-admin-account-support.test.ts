@@ -106,3 +106,12 @@ test("administrative resets mandate password rotation and persist security evide
   assert.match(page, /ChangePasswordForm/);
   assert.doesNotMatch(reset, /twoFactorEnabled: false/);
 });
+
+test("browser REST API uses the support subject identity and locks pending password rotation", () => {
+  const api = src("src/lib/api-auth.ts");
+  assert.match(api, /effectiveUserForRequest\(session, jar\.get\(SUPPORT_COOKIE_NAME\)\?\.value\)/);
+  assert.match(api, /user = effective\.user/);
+  assert.match(api, /Password change required before API access/);
+  assert.match(api, /if \(user\.mustChangePassword\)/);
+  assert.match(api, /Support session is invalid or not permitted/);
+});
