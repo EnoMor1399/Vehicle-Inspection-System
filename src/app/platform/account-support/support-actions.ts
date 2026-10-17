@@ -12,7 +12,7 @@ import { getOrganizationSubscriptionState } from "@/lib/organization-access";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/request-context";
 import { validateSession, verifyTwoFactorToken } from "@/lib/security";
-import { SUPPORT_COOKIE_NAME, SUPPORT_TTL_SECONDS } from "@/lib/support-session";
+import { SUPPORT_COOKIE_NAME, SUPPORT_TTL_SECONDS, SUPPORT_GUARD_COOKIE_SECONDS } from "@/lib/support-session";
 import { newId } from "@/lib/utils";
 
 export async function beginUserSupportView(input: {
@@ -102,7 +102,7 @@ export async function beginUserSupportView(input: {
   jar.set(SUPPORT_COOKIE_NAME, token, {
     path: "/", httpOnly: true, sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SUPPORT_TTL_SECONDS,
+    maxAge: SUPPORT_GUARD_COOKIE_SECONDS,
   });
   const destination = target.role === "organization_owner"
     ? "/organization/account"
