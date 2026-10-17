@@ -58,3 +58,34 @@ test("owner invitation reissue never mints or elevates a user account", () => {
   assert.match(ui, /Reissue one-time owner invitation/);
   assert.match(ui, /Copy owner invitation link/);
 });
+
+test("VIMS invitations use configured SMTP and distinguish acceptance from delivery", () => {
+  const mail = src("src/lib/invitation-mail.ts");
+  const platform = src("src/app/platform/organizations/actions.ts");
+  const organization = src("src/app/organization/account/actions.ts");
+  const account = src("src/app/platform/organizations/[id]/ActivationReadinessControls.tsx");
+  assert.match(mail, /process\.env\.SMTP_HOST/);
+  assert.match(mail, /process\.env\.SMTP_PORT/);
+  assert.match(mail, /process\.env\.SMTP_USER/);
+  assert.match(mail, /process\.env\.SMTP_PASSWORD/);
+  assert.match(mail, /process\.env\.SMTP_FROM/);
+  assert.match(mail, /process\.env\.NEXT_PUBLIC_APP_URL/);
+  assert.match(mail, /requireTLS: smtpPort !== 465/);
+  assert.match(mail, /info\.accepted\.some/);
+  assert.match(mail, /inbox delivery is not yet confirmed/);
+  assert.match(platform, /await sendWorkspaceInvitationEmail/);
+  assert.match(organization, /await sendWorkspaceInvitationEmail/);
+  assert.match(account, /ownerInvitationEmailInUse/);
+  assert.match(account, /name="email"/);
+});
+
+test("the owner replacement email must be unregistered and reissue remains audited", () => {
+  const source = src("src/lib/organization-control-plane.ts");
+  const action = src("src/app/platform/organizations/actions.ts");
+  assert.match(source, /ownerInvitationEmailInUse/);
+  assert.match(source, /input\.email\?\.trim\(\)\.toLowerCase\(\) \|\| priorInvite\.email/);
+  assert.match(source, /where\(eq\(users\.email, email\)\)/);
+  assert.match(source, /This email is already registered in VIMS/);
+  assert.match(action, /smtpAccepted: delivery\.accepted/);
+  assert.match(action, /recipient: result\.recipientEmail/);
+});
