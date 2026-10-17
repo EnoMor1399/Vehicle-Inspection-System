@@ -99,3 +99,38 @@ export async function superAdminResetUserPassword(targetUserId: string, authenti
   revalidatePath("/driver-training/users");
   return { ok: true as const, temporaryPassword, accountEmail: target.email };
 }
+
+
+// Expected MFA and account-validation failures must be returned as safe results,
+// not thrown through the React Server Components transport (production #441).
+// The underlying reset retains the same authentication, MFA, rate limit, session
+// revocation, tenant checks and mandatory password rotation.
+export async function trySuperAdminResetUserPassword(
+  targetUserId: string,
+  authenticationCode: string,
+): Promise<
+  | { ok: true; temporaryPassword: string; accountEmail: string }
+  | { ok: false; message: string }
+> {
+  try {
+    return await superAdminResetUserPassword(targetUserId, authenticationCode);
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "";
+    const safeMessages = new Set([
+      "Enter your authenticator code",
+      "Authenticator code was not accepted",
+      "Too many account recovery attempts",
+      "Invalid user identifier",
+      "Use your own account security settings to change your password",
+      "Account not found",
+      "Another Super Administrator must use verified self-service account recovery",
+      "An active Super Administrator with enrolled MFA is required",
+    ]);
+    return {
+      ok: false,
+      message: safeMessages.has(text)
+        ? text
+        : "Password reset failed. Check your authorization and try again.",
+    };
+  }
+}
