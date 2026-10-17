@@ -137,7 +137,7 @@ test("support view start runs as a same-origin JSON POST and never triggers a co
   assert.match(route, /export async function POST\(request: NextRequest\)/);
   assert.match(route, /origin !== request\.nextUrl\.origin/);
   assert.match(route, /fetchSite && fetchSite !== "same-origin"/);
-  assert.match(route, /Content-Type/);
+  assert.match(route, /content-type/i);
   assert.match(route, /beginUserSupportView\(/);
   assert.match(route, /"Cache-Control": "no-store"/);
   assert.match(route, /readJsonBody\(request, 4096\)/);
