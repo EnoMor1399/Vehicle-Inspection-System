@@ -88,7 +88,7 @@ export async function initializePaystack(input: {
 }
 
 export async function verifyAndRecordPayment(reference: string) {
-  if (!/^vims_[a-f0-9]{32}$/.test(reference)) throw new Error("Invalid payment reference.");
+  if (!/^vims-[a-f0-9]{32}$/.test(reference)) throw new Error("Invalid payment reference.");
   const [payment] = await db.select().from(subscriptionPayments)
     .where(eq(subscriptionPayments.reference, reference)).limit(1);
   if (!payment) throw new Error("Payment record not found.");
@@ -137,5 +137,5 @@ export async function getSubscriptionPaymentHistory(organizationId: string) {
 }
 
 export function newPaymentReference() {
-  return `vims_${randomBytes(16).toString("hex")}`;
+  return `vims-${randomBytes(16).toString("hex")}`;
 }
