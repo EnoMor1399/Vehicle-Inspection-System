@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./theme-system.css";
@@ -12,7 +12,7 @@ import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
 import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
-import { getActiveSupportContext } from "@/lib/support-session";
+import { getActiveSupportContext, SUPPORT_COOKIE_NAME } from "@/lib/support-session";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +122,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       allowedResources,
     };
   } catch {
-    // Public and login routes intentionally render without an authenticated shell identity.
+    // Fail closed on stale support credentials, but keep an exit control
+    // visible so the original administrator can clear the unusable cookie.
+    if ((await cookies()).has(SUPPORT_COOKIE_NAME)) {
+      supportContext = {
+        actorName: "Administrator",
+        targetName: "session unavailable",
+        targetEmail: "exit to return to your account",
+        expiresAt: new Date().toISOString(),
+      };
+    }
   }
 
   const settings = await getSettings(shellUser?.organizationId);
