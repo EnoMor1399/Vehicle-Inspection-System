@@ -49,6 +49,20 @@ export async function approveSubscriberRequest(
       role: "organization_owner",
       invitationPath,
     });
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "create",
+      entityType: "organization_owner_invitation",
+      entityId: converted.invitationId,
+      summary: "Created subscriber owner invitation and attempted email delivery",
+      after: {
+        subscriberOrganizationId: converted.organizationId,
+        recipient: converted.invitationEmail,
+        smtpAccepted: delivery.accepted,
+      },
+    });
     revalidatePath("/platform/organizations");
     return {
       ok: true,
