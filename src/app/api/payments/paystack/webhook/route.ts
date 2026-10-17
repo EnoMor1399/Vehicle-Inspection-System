@@ -41,7 +41,12 @@ export async function POST(request: NextRequest) {
   try {
     // Never trust webhook status/amount alone. Requery Paystack and verify
     // original server-side invoice reference, exact pesewas, currency and mode.
-    await verifyAndRecordPayment(reference);
+    const status = await verifyAndRecordPayment(reference);
+    if (status !== "success") {
+      // A signed success event may arrive before the verification API confirms
+      // settlement. Request Paystack retry instead of acknowledging early.
+      return NextResponse.json({ error: "Settlement not yet confirmed" }, { status: 503 });
+    }
     return NextResponse.json({ received: true });
   } catch (error) {
     // Signed events are retried by the payment provider; do not acknowledge
