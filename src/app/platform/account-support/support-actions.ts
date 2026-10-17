@@ -108,7 +108,7 @@ export async function beginUserSupportView(input: {
     ? "/organization/account"
     : target.role === "transporter_user"
       ? "/portal"
-      : target.role === "driver_training_admin" || target.role === "instructor"
+      : target.role === "driver_training_admin"
         ? "/driver-training"
         : "/";
   return { ok: true, destination };
