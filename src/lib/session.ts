@@ -18,7 +18,7 @@ const MAX_NAME_LENGTH = 200;
 const MAX_PHONE_LENGTH = 50;
 
 export type AuthResult =
-  | { ok: true; userId: string; userName: string; role: string }
+  | { ok: true; userId: string; userName: string; role: string; passwordChangeRequired?: boolean }
   | { ok: false; error: string; field?: string; requires2FA?: boolean };
 
 export async function signIn(
@@ -83,6 +83,7 @@ export async function signIn(
     userId: result.user.id,
     userName: result.user.name,
     role: result.user.role,
+    passwordChangeRequired: Boolean(result.user.mustChangePassword),
   };
 }
 
