@@ -78,3 +78,31 @@ test("platform password reset requires fresh MFA and revokes sessions", () => {
   assert.match(action, /update\(sessions\)/);
   assert.match(ui, /superAdminResetUserPassword\(resetTarget\.id, resetCode\)/);
 });
+
+test("administrative resets mandate password rotation and persist security evidence atomically", () => {
+  const schema = src("src/db/schema.ts");
+  const migration = src("migrations/20261017_super_admin_support_sessions.sql");
+  const reset = src("src/app/platform/organizations/super-admin-account-recovery.ts");
+  const auth = src("src/lib/auth.ts");
+  const requirement = src("src/lib/require-auth.ts");
+  const signIn = src("src/lib/session.ts");
+  const login = src("src/app/login/AuthForm.tsx");
+  const action = src("src/app/security/change-password/actions.ts");
+  const page = src("src/app/security/change-password/page.tsx");
+
+  assert.match(schema, /mustChangePassword: boolean\("must_change_password"\)/);
+  assert.match(migration, /ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password/);
+  assert.match(reset, /mustChangePassword: true/);
+  assert.match(reset, /tx\.insert\(securityEvents\)/);
+  assert.match(reset, /actorUserId: actor\.id/);
+  assert.match(auth, /effective\.user\.mustChangePassword/);
+  assert.match(requirement, /redirect\("\/security\/change-password"\)/);
+  assert.match(signIn, /passwordChangeRequired: Boolean\(result\.user\.mustChangePassword\)/);
+  assert.match(login, /res\.passwordChangeRequired/);
+  assert.match(action, /verifyPassword\(input\.currentPassword, fresh\.passwordHash\)/);
+  assert.match(action, /mustChangePassword: false/);
+  assert.match(action, /update\(sessions\)/);
+  assert.match(action, /ne\(sessions\.id, session\.sessionId/);
+  assert.match(page, /ChangePasswordForm/);
+  assert.doesNotMatch(reset, /twoFactorEnabled: false/);
+});
