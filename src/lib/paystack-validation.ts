@@ -23,6 +23,7 @@ export type VerifiedPaystackTransaction = {
   amount: number;
   currency: string;
   status: string;
+  channel: string;
   domain: string;
   customer?: { email?: string };
   gateway_response?: string;
@@ -33,6 +34,7 @@ export function matchesOriginalInvoice(txn: VerifiedPaystackTransaction | null |
   amountSubunits: number;
   currency: string;
   customerEmail: string;
+  channel: "card" | "mobile_money";
   mode: string;
 }) {
   return Boolean(txn
@@ -40,5 +42,6 @@ export function matchesOriginalInvoice(txn: VerifiedPaystackTransaction | null |
     && txn.amount === input.amountSubunits
     && txn.currency === input.currency
     && txn.customer?.email?.toLowerCase() === input.customerEmail.toLowerCase()
-    && txn.domain === input.mode);
+    && txn.domain === input.mode
+    && txn.channel === input.channel);
 }
