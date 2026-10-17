@@ -1,8 +1,7 @@
 import { AuthForm } from "./AuthForm";
 import { getSettings } from "@/lib/settings";
 import Link from "next/link";
-import { Building2, CheckCircle2, ClipboardCheck, QrCode, ShieldCheck } from "lucide-react";
-import type { ReactNode } from "react";
+import { ShieldCheck } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +12,6 @@ export default async function LoginPage() {
 
   return (
     <div className="login-theme relative min-h-screen overflow-hidden bg-[var(--vims-page)] p-3 pt-16 text-[var(--vims-ink)] sm:p-6 sm:pt-20 lg:p-8 lg:pt-20">
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-slate-900/10 dark:bg-cyan-500/5 blur-3xl" />
-      </div>
 
       <div className="relative mx-auto grid min-h-[calc(100vh-7rem)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-[var(--vims-line)] bg-[var(--vims-panel-solid)] shadow-[var(--vims-shadow)] lg:grid-cols-[0.92fr_1.08fr]">
         <section className="relative hidden overflow-hidden bg-[#0b1525] p-10 text-white dark:bg-[#050b13] lg:flex lg:flex-col lg:justify-between xl:p-12">
@@ -49,20 +44,18 @@ export default async function LoginPage() {
               </div>
             </div>
 
-            <div className="mt-20 max-w-md">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Enterprise operations</p>
+            <div className="mt-16 max-w-md">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-300">Secure workspace</p>
               <h1 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-white xl:text-5xl">
-                Controlled inspection operations in one secure workspace.
+                Vehicle inspection, made simpler.
               </h1>
               <p className="mt-5 max-w-sm text-sm leading-6 text-slate-300">
-                Manage vehicle records, inspections, approvals, certificates, compliance reporting, and audit history with clear operational controls.
+                Manage your fleet, inspections and compliance in one secure workspace.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-3">
-              <Feature icon={<ClipboardCheck className="h-4 w-4" />} title="Structured inspection workflow" text="From inspection capture through review and authorization." />
-              <Feature icon={<QrCode className="h-4 w-4" />} title="Signed certificate verification" text="QR-based certificate validation with controlled status checks." />
-              <Feature icon={<CheckCircle2 className="h-4 w-4" />} title="Auditable administration" text="Roles, security events, approvals, and operational history." />
+            <div className="mt-10 border-l-2 border-emerald-400/60 pl-4 text-sm leading-6 text-slate-300">
+              Inspection workflows · Certificate verification · Audit-ready records
             </div>
           </div>
 
@@ -91,29 +84,17 @@ export default async function LoginPage() {
 
             <AuthForm allowSignUp={allowPublicSignup} />
 
-            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-              <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white">
-                  <Building2 className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[var(--vims-ink)]">Need VIMS for another company?</p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--vims-ink-muted)]">
-                    Request a dedicated organization subscription with its own branding, administrators, plan limits and controlled tenant provisioning.
-                  </p>
-                  <Link
-                    href="/subscribe"
-                    className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
-                  >
-                    Subscribe your company
-                  </Link>
-                </div>
-              </div>
+            <div className="mt-6 border-t border-[var(--vims-line)] pt-5">
+              <p className="text-sm text-[var(--vims-ink-muted)]">
+                Setting up a company?{" "}
+                <Link href="/subscribe" className="font-semibold text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
+                  Request a subscription
+                </Link>
+              </p>
+              <p className="mt-4 text-xs leading-5 text-[var(--vims-ink-muted)]">
+                Authorized access only. Activity may be recorded for security and audit purposes.
+              </p>
             </div>
-
-            <p className="mt-7 text-center text-[11px] leading-5 text-[var(--vims-ink-muted)]">
-              By signing in, you are accessing a controlled business system. Activity may be logged for security and audit purposes.
-            </p>
           </div>
         </section>
       </div>
@@ -121,14 +102,3 @@ export default async function LoginPage() {
   );
 }
 
-function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
-      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">{icon}</div>
-      <div>
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">{text}</p>
-      </div>
-    </div>
-  );
-}

@@ -103,17 +103,13 @@ html.theme-transition [data-app-shell] aside {
   transition-timing-function: ease !important;
 }
 
+/* Keep administrative surfaces neutral; reserve accent colour for meaningful actions. */
 .app-shell {
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand-color) 5%, transparent), transparent 22rem),
-    var(--surface-page);
+  background: var(--surface-page);
 }
 
 html.dark .app-shell {
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand-color) 10%, transparent), transparent 28rem),
-    radial-gradient(circle at 0% 100%, rgba(37, 99, 235, 0.07), transparent 32rem),
-    var(--surface-page);
+  background: var(--surface-page);
 }
 
 .app-shell-content {
