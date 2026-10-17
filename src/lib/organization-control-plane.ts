@@ -699,6 +699,11 @@ export async function getOrganizationActivationReadiness(organizationId: string)
   const organizationReady = Boolean(organization
     && !["suspended", "cancelled"].includes(organization.status));
 
+  const [existingInvitationAccount] = ownerInvite
+    ? await db.select({ id: users.id }).from(users).where(eq(users.email, ownerInvite.email)).limit(1)
+    : [];
+  const ownerInvitationEmailInUse = Boolean(existingInvitationAccount);
+
   const invitationStatus = !ownerInvite ? "missing"
     : ownerInvite.acceptedAt ? "accepted"
     : ownerInvite.revokedAt ? "revoked"
@@ -717,6 +722,7 @@ export async function getOrganizationActivationReadiness(organizationId: string)
       ownerReady && inspectionReady && trainingReady && subscriptionReady && organizationReady
     ),
     ownerInvitationStatus: invitationStatus,
+    ownerInvitationEmailInUse,
     ownerInvitationEmail: ownerInvite?.email ?? null,
   };
 }
@@ -729,12 +735,14 @@ export async function getOrganizationActivationReadiness(organizationId: string)
 export async function reissueOrganizationOwnerInvitation(input: {
   organizationId: string;
   actorUserId: string;
+  email?: string;
+  name?: string;
 }) {
   const token = randomBytes(32).toString("base64url");
   const tokenHash = invitationHash(token);
-  await db.transaction(async (tx) => {
+  const selectedRecipient = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.organizationId}))`);
-    const [organization] = await tx.select({ status: organizations.status })
+    const [organization] = await tx.select({ status: organizations.status, name: organizations.name })
       .from(organizations).where(eq(organizations.id, input.organizationId)).limit(1);
     if (!organization || ["suspended", "cancelled"].includes(organization.status)) {
       throw new Error("This organization cannot accept an owner invitation");
@@ -755,9 +763,14 @@ export async function reissueOrganizationOwnerInvitation(input: {
       eq(organizationInvitations.role, "organization_owner"),
     )).orderBy(desc(organizationInvitations.createdAt)).limit(1);
     if (!priorInvite) throw new Error("No original owner invitation is recorded. Review subscriber onboarding before creating ownership.");
+    const email = input.email?.trim().toLowerCase() || priorInvite.email;
+    if (!validateEmail(email) || email.length > 200) throw new Error("Enter a valid Organization Owner email address");
+    const name = input.name?.trim().slice(0, 200) || priorInvite.name;
     const [existingUser] = await tx.select({ id: users.id })
-      .from(users).where(eq(users.email, priorInvite.email)).limit(1);
-    if (existingUser) throw new Error("This owner email already has a user account. Resolve account ownership before reissuing.");
+      .from(users).where(eq(users.email, email)).limit(1);
+    if (existingUser) {
+      throw new Error("This email is already registered in VIMS. Enter a different email for the Organization Owner.");
+    }
 
     const [subscription] = await tx.select({
       row: organizationSubscriptions,
@@ -796,15 +809,16 @@ export async function reissueOrganizationOwnerInvitation(input: {
     await tx.insert(organizationInvitations).values({
       id: newId(),
       organizationId: input.organizationId,
-      email: priorInvite.email,
-      name: priorInvite.name,
+      email,
+      name,
       role: "organization_owner",
       tokenHash,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       createdBy: input.actorUserId,
     });
+    return { recipientEmail: email, recipientName: name, organizationName: organization.name };
   });
-  return { invitationPath: `/invite/${token}` };
+  return { invitationPath: `/invite/${token}`, ...selectedRecipient };
 }
 
 export async function activateOrganizationWorkspace(input: {
