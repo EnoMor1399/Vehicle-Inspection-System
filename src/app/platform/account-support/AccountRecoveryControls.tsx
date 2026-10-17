@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { superAdminResetUserPassword } from "../organizations/super-admin-account-recovery";
+import { trySuperAdminResetUserPassword } from "../organizations/super-admin-account-recovery";
 
 type Account = {
   id: string; name: string; email: string; role: string;
@@ -42,8 +42,14 @@ export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
             setResult(null); setError("");
             startTransition(async () => {
               try {
-                setResult(await superAdminResetUserPassword(resetTarget.id, resetCode));
-                setResetCode(""); setResetTarget(null);
+                const outcome = await trySuperAdminResetUserPassword(resetTarget.id, resetCode);
+                setResetCode("");
+                if (!outcome.ok) {
+                  setError(outcome.message);
+                  return;
+                }
+                setResult({ accountEmail: outcome.accountEmail, temporaryPassword: outcome.temporaryPassword });
+                setResetTarget(null);
               } catch (e) {
                 setResetCode("");
                 setError(e instanceof Error ? e.message : "Password reset failed");
