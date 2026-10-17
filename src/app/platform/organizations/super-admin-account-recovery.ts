@@ -60,6 +60,7 @@ export async function superAdminResetUserPassword(targetUserId: string, authenti
   await db.transaction(async (tx) => {
     const [updated] = await tx.update(users).set({
       passwordHash,
+      mustChangePassword: true,
       failedLoginAttempts: 0,
       lockedUntil: null,
       updatedAt: new Date(),
