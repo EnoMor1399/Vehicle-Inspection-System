@@ -20,7 +20,7 @@ function paystackSecret() {
   if (mode === "live" && process.env.PAYSTACK_LIVE_PAYMENTS_ENABLED !== "true") {
     throw new Error("Live payments require explicit activation.");
   }
-  return { secret, mode };
+  return { secret, mode: mode as "test" | "live" };
 }
 
 export function paymentsAvailable() {
