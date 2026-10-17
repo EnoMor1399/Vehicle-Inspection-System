@@ -21,6 +21,7 @@ type Readiness = {
   canAttemptActivation: boolean;
   ownerInvitationStatus: string;
   ownerInvitationEmail: string | null;
+  ownerInvitationEmailInUse: boolean;
 };
 
 export function ActivationReadinessControls({
@@ -64,10 +65,36 @@ export function ActivationReadinessControls({
             The intended owner must open the one-time invitation link, set a password,
             and activate their account before workspace verification can succeed.
           </p>
+          {readiness.ownerInvitationEmailInUse && (
+            <p role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-900">
+              This address is already registered in VIMS. A second account cannot use the same
+              email. Enter a different address for the Organization Owner; the existing account
+              and its permissions will remain unchanged.
+            </p>
+          )}
+          <p className="mt-2 text-xs leading-5">
+            SMTP delivery is attempted automatically when a replacement invitation is created.
+            Email acceptance will be reported; inbox delivery is not guaranteed.
+          </p>
           {readiness.ownerInvitationEmail ? (
             <div className="mt-3 space-y-3">
-              <form action={reissue}>
+              <form action={reissue} className="space-y-3">
                 <input type="hidden" name="organizationId" value={organizationId} />
+                <label className="block text-xs font-semibold">
+                  Organization Owner email
+                  <input type="email" name="email" required maxLength={200}
+                    autoComplete="off" defaultValue={readiness.ownerInvitationEmail || ""}
+                    className="mt-1 block w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900"
+                    aria-describedby="owner-email-hint" />
+                </label>
+                <p id="owner-email-hint" className="text-xs">
+                  Choose an address not already registered in VIMS. Confirm the intended recipient before reissuing.
+                </p>
+                <label className="block text-xs font-semibold">
+                  Owner name (optional)
+                  <input type="text" name="name" maxLength={200} placeholder="Intended Organization Owner"
+                    className="mt-1 block w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900" />
+                </label>
                 <button type="submit" disabled={reissuing || invitation.ok}
                   className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-600 bg-white px-3 text-xs font-semibold text-amber-950 disabled:opacity-60">
                   {reissuing && <Loader2 className="h-4 w-4 animate-spin" />}
