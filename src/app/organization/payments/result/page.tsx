@@ -16,14 +16,14 @@ export default async function PaystackResultPage({
   }
   const { reference, trxref } = await searchParams;
   const selected = reference || trxref;
-  let status: "success" | "processing" | "failed" | "pending" = "pending";
+  let status: string = "pending";
   let message = "Your payment is waiting for provider confirmation.";
   if (selected && /^vims_[a-f0-9]{32}$/.test(selected)) {
     const [record] = await db.select().from(subscriptionPayments)
       .where(and(eq(subscriptionPayments.organizationId, user.organizationId),
         eq(subscriptionPayments.reference, selected))).limit(1);
     if (record) {
-      status = record.status as typeof status;
+      status = record.status;
       if (status !== "success") {
         try { status = await verifyAndRecordPayment(record.reference); }
         catch { message = "We could not reach the payment provider yet. Please check your payment history shortly."; }
