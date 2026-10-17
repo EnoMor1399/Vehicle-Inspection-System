@@ -1,4 +1,4 @@
-import { authenticateApiRequest, json, apiError } from "@/lib/api-auth";
+import { authenticateApiRequest, json } from "@/lib/api-auth";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
 import { eq, desc, inArray, lte, sql, and } from "drizzle-orm";
@@ -12,13 +12,19 @@ type HistoryRecord = Pick<
 // Historical maintenance-risk endpoint.
 // This endpoint intentionally reports evidence-based risk indicators rather than
 // claiming to predict an exact component failure date.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const privateRiskHeaders = { "Cache-Control": "private, no-store, max-age=0", Vary: "Cookie, Authorization, X-API-Key" };
+
 export async function GET(request: Request) {
   const auth = await authenticateApiRequest({ scopes: ["read"], permission: "reports" });
-  if (!auth.ok) return apiError(auth.status, auth.message);
+  if (!auth.ok) return Response.json({ error: { status: auth.status, message: auth.message } }, { status: auth.status, headers: privateRiskHeaders });
+  if (!auth.user.organizationId) return Response.json({ error: { status: 403, message: "Organization context is required" } }, { status: 403, headers: privateRiskHeaders });
 
   const url = new URL(request.url);
   const vehicleId = url.searchParams.get("vehicle_id")?.trim() || null;
-  if (vehicleId && vehicleId.length > 64) return apiError(400, "vehicle_id is invalid");
+  if (vehicleId && vehicleId.length > 64) return Response.json({ error: { status: 400, message: "vehicle_id is invalid" } }, { status: 400, headers: privateRiskHeaders });
 
   if (!vehicleId) {
     const selectedVehicles = await db
@@ -33,7 +39,7 @@ export async function GET(request: Request) {
         methodology: "deterministic_historical_heuristic_v2",
         disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
         data: [],
-      });
+      }, 200, privateRiskHeaders);
     }
 
     const vehicleIds = selectedVehicles.map((vehicle) => vehicle.id);
@@ -83,7 +89,7 @@ export async function GET(request: Request) {
       methodology: "deterministic_historical_heuristic_v2",
       disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
       data: assessments.slice(0, 20),
-    });
+    }, 200, privateRiskHeaders);
   }
 
   const [vehicle] = await db
@@ -94,7 +100,7 @@ export async function GET(request: Request) {
       eq(vehicles.id, vehicleId),
     ))
     .limit(1);
-  if (!vehicle) return apiError(404, "Vehicle not found");
+  if (!vehicle) return Response.json({ error: { status: 404, message: "Vehicle not found" } }, { status: 404, headers: privateRiskHeaders });
 
   const history = await db
     .select({
@@ -114,7 +120,7 @@ export async function GET(request: Request) {
     methodology: "deterministic_historical_heuristic_v2",
     disclaimer: "Risk indicators summarize recorded inspection history. They are not a prediction of a specific future failure and do not replace physical inspection or qualified maintenance assessment.",
     data: assessVehicleRiskFromHistory(vehicle, history),
-  });
+  }, 200, privateRiskHeaders);
 }
 
 export function assessVehicleRiskFromHistory(vehicle: VehicleRecord, history: HistoryRecord[]) {
