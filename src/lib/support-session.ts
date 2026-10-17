@@ -8,6 +8,9 @@ import { getOrganizationSubscriptionState } from "@/lib/organization-access";
 
 export const SUPPORT_COOKIE_NAME = "vims_support_token";
 export const SUPPORT_TTL_SECONDS = 15 * 60;
+// Keep a fail-closed cookie marker beyond the longest 30-day remembered login.
+// The DB session expires at 15 minutes; explicit exit is required to restore admin mode.
+export const SUPPORT_GUARD_COOKIE_SECONDS = 31 * 24 * 60 * 60;
 
 type AuthenticatedSession = Awaited<ReturnType<typeof validateSession>>;
 
