@@ -96,7 +96,7 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8 xl:p-10">
       <PageHeader
         eyebrow="Vehicle Inspection"
-        title="Operations Dashboard"
+        title="Executive Dashboard"
         description="Fleet activity, inspection results and work requiring attention."
         action={
           <div className="flex flex-wrap gap-2">
