@@ -48,6 +48,17 @@ export default async function OrganizationPaymentsPage() {
             : <PaystackCheckoutForm enabled={permitted} />}
       </section>
 
+      <section aria-label="How to pay" className="rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:p-7">
+        <h2 className="text-lg font-bold text-blue-950">How to pay securely</h2>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-blue-900">
+          <li>Review the invoice amount above, then choose Card or Ghana Mobile Money.</li>
+          <li>Continue to Paystack's secure checkout; for MoMo, choose your operator and confirm the request on your phone.</li>
+          <li>Do not enter a card number or mobile money PIN anywhere inside VIMS.</li>
+          <li>Return here to review the payment result. If still pending, use Check status in Payment history instead of paying twice.</li>
+          <li>Keep your payment reference for support. Payment confirmation does not itself activate an unverified workspace.</li>
+        </ol>
+      </section>
+
       <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
         <h2 className="text-lg font-bold text-slate-950">Payment history</h2>
         <p className="mt-1 text-xs text-slate-500">Payment confirmations are server-verified. A receipt alone does not bypass tenant security or workspace activation.</p>
