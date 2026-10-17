@@ -14,6 +14,7 @@ import {
   CalendarClock,
   Car,
   ChevronRight,
+  ChevronDown,
   ClipboardCheck,
   FileBarChart,
   FileText,
@@ -63,6 +64,7 @@ type NavItem = {
 type NavGroup = {
   label: string;
   items: NavItem[];
+  collapsible?: boolean;
 };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -86,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Vehicle Inspection Intelligence",
+    collapsible: true,
     items: [
       { href: "/reports", label: "Reports & Analytics", icon: FileBarChart, resource: "reports" },
       { href: "/compliance", label: "Compliance Centre", icon: ShieldCheck, resource: "reports" },
@@ -96,6 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Vehicle Inspection Administration",
+    collapsible: true,
     items: [
       { href: "/users", label: "Vehicle Inspection Users", icon: Users, resource: "users" },
       { href: "/documents", label: "Documents", icon: FileText, resource: "documents" },
@@ -113,6 +117,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Access & Support",
+    collapsible: true,
     items: [
       { href: "/organization/account", label: "Organization Account", icon: Building2, organizationOwnerOnly: true },
       { href: "/portal", label: "Transporter Portal", icon: Truck, superAdminOnly: true },
@@ -218,7 +223,7 @@ export function AppShell({
     <div data-app-shell className="app-shell min-h-screen lg:flex">
       <aside
         aria-label="Primary navigation"
-        className={`fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-white/10 bg-[#0b1525] text-slate-100 shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[16rem] flex-col border-r border-white/10 bg-[#0b1525] text-slate-100 shadow-xl transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -241,7 +246,7 @@ export function AppShell({
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-500">{branding.tagline}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">{branding.tagline}</p>
             </div>
             <button
               type="button"
@@ -254,10 +259,10 @@ export function AppShell({
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navGroups.map((group) => (
-            <div key={group.label} className="mb-4 last:mb-0">
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{group.label}</p>
+        <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary sections">
+          {navGroups.map((group) => {
+            const groupHasCurrentPage = group.items.some((item) => isActivePath(pathname, item.href));
+            const items = (
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const active = isActivePath(pathname, item.href);
@@ -268,32 +273,36 @@ export function AppShell({
                       href={item.href}
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
-                      className={`group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                      className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                         active
-                          ? "bg-white text-slate-950"
+                          ? "bg-white/12 text-white ring-1 ring-white/10"
                           : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
                       }`}
                     >
-                      {active && (
-                        <span
-                          aria-hidden="true"
-                          className="absolute inset-y-2 left-0 w-0.5 rounded-full"
-                          style={{ backgroundColor: branding.themeColor }}
-                        />
-                      )}
-                      <Icon
-                        className={`h-[18px] w-[18px] shrink-0 ${
-                          active ? "text-[var(--brand-color)]" : "text-slate-500 group-hover:text-slate-300"
-                        }`}
-                      />
+                      <Icon className={`h-[17px] w-[17px] shrink-0 ${active ? "text-emerald-300" : "text-slate-500 group-hover:text-slate-300"}`} />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      {active && <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />}
+                      {active && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
                     </Link>
                   );
                 })}
               </div>
-            </div>
-          ))}
+            );
+
+            return group.collapsible ? (
+              <details key={`${group.label}:${pathname}`} defaultOpen={groupHasCurrentPage} className="group/section mb-2 rounded-lg">
+                <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.07em] text-slate-400 hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 [&::-webkit-details-marker]:hidden">
+                  <span>{group.label}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open/section:rotate-180" />
+                </summary>
+                <div className="mt-1 pl-1">{items}</div>
+              </details>
+            ) : (
+              <div key={group.label} className="mb-4 last:mb-0">
+                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{group.label}</p>
+                {items}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="border-t border-white/10 p-3">
