@@ -27,7 +27,7 @@ export async function superAdminResetUserPassword(targetUserId: string, authenti
   const ip = clientIpFromHeaders(await headers());
   const limiter = await rateLimit("twoFactor", `password-reset:${actor.id}:${ip}`);
   if (!limiter.allowed) throw new Error("Too many account recovery attempts");
-  if (typeof authenticationCode !== "string" || !/^\\d{6,8}$/.test(authenticationCode.trim())) {
+  if (typeof authenticationCode !== "string" || !/^\d{6,8}$/.test(authenticationCode.trim())) {
     throw new Error("Enter your authenticator code");
   }
   const verified = await verifyTwoFactorToken(
