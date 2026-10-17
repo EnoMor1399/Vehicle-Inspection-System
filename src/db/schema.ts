@@ -200,6 +200,20 @@ export const organizations = pgTable(
   }),
 );
 
+// Global platform copy is distinct from each subscriber's organization settings.
+export const platformContent = pgTable(
+  "platform_content",
+  {
+    key: varchar("key", { length: 100 }).primaryKey(),
+    draftText: text("draft_text"),
+    publishedText: text("published_text"),
+    revision: integer("revision").notNull().default(0),
+    updatedBy: varchar("updated_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    publishedAt: timestamp("published_at"),
+  },
+);
+
 export const subscriptionPlans = pgTable(
   "subscription_plans",
   {
