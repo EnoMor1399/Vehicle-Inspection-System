@@ -19,7 +19,7 @@ test("Paystack GHS amounts are exact integer pesewas, never client floating poin
 
 test("Paystack webhook signature compares raw bytes and rejects tampering", () => {
   const key = "sk_test_example_not_a_real_credential";
-  const raw = JSON.stringify({ event: "charge.success", data: { reference: "vims_aa" } });
+  const raw = JSON.stringify({ event: "charge.success", data: { reference: "vims-aa" } });
   const signature = createHmac("sha512", key).update(raw).digest("hex");
   assert.equal(verifyPaystackSignature(raw, signature, key), true);
   assert.equal(verifyPaystackSignature(raw + " ", signature, key), false);
@@ -30,11 +30,11 @@ test("Paystack webhook signature compares raw bytes and rejects tampering", () =
 });
 
 test("server independently matches reference, payer, environment, currency and exact amount", () => {
-  const input = { reference: "vims_00112233445566778899aabbccddeeff", amountSubunits: 24500, currency: "GHS", customerEmail: "owner@example.com", mode: "test" };
+  const input = { reference: "vims-00112233445566778899aabbccddeeff", amountSubunits: 24500, currency: "GHS", customerEmail: "owner@example.com", mode: "test" };
   const success: VerifiedPaystackTransaction = { id: 123, reference: input.reference, status: "success",
     amount: 24500, currency: "GHS", domain: "test", customer: { email: "OWNER@EXAMPLE.COM" } };
   assert.equal(matchesOriginalInvoice(success, input), true);
-  assert.equal(matchesOriginalInvoice({ ...success, reference: "vims_wrong" }, input), false);
+  assert.equal(matchesOriginalInvoice({ ...success, reference: "vims-wrong" }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, amount: 24501 }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, currency: "USD" }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, domain: "live" }, input), false);
