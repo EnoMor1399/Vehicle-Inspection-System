@@ -8,16 +8,17 @@ import {
   CarFront,
   ClipboardCheck,
   MapPin,
-  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import {
   getPlatformOrganizationSubscriptionDetail,
+  getOrganizationActivationReadiness,
   listSubscriptionPlans,
 } from "@/lib/organization-control-plane";
-import { activateSubscriberWorkspace, changeOrganizationStatus } from "../actions";
+import { changeOrganizationStatus } from "../actions";
+import { ActivationReadinessControls } from "./ActivationReadinessControls";
 import { SubscriptionLifecycleForm } from "./SubscriptionLifecycleForm";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +30,10 @@ export default async function PlatformOrganizationDetailPage({
 }) {
   await requirePlatformSuperAdmin();
   const { id } = await params;
-  const [detail, plans] = await Promise.all([
+  const [detail, plans, readiness] = await Promise.all([
     getPlatformOrganizationSubscriptionDetail(id),
     listSubscriptionPlans(),
+    getOrganizationActivationReadiness(id),
   ]);
 
   if (!detail.organization) notFound();
@@ -140,14 +142,11 @@ export default async function PlatformOrganizationDetailPage({
               </button>
             </form>
 
-            {!organization.operationalAccessEnabled && organization.status !== "cancelled" && organization.status !== "suspended" && (
-              <form action={activateSubscriberWorkspace} className="mt-3">
-                <input type="hidden" name="organizationId" value={organization.id} />
-                <button className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white hover:bg-emerald-800">
-                  <ShieldCheck className="h-4 w-4" />
-                  Verify & activate workspace
-                </button>
-              </form>
+            {!organization.operationalAccessEnabled && (
+              <ActivationReadinessControls
+                organizationId={organization.id}
+                readiness={readiness}
+              />
             )}
           </Card>
 

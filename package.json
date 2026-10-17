@@ -45,7 +45,8 @@
     "react-dom": "19.2.6",
     "react-hook-form": "^7.83.0",
     "recharts": "^3.10.1",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "nodemailer": "10.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",

@@ -200,6 +200,20 @@ export const organizations = pgTable(
   }),
 );
 
+// Global platform copy is distinct from each subscriber's organization settings.
+export const platformContent = pgTable(
+  "platform_content",
+  {
+    key: varchar("key", { length: 100 }).primaryKey(),
+    draftText: text("draft_text"),
+    publishedText: text("published_text"),
+    revision: integer("revision").notNull().default(0),
+    updatedBy: varchar("updated_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    publishedAt: timestamp("published_at"),
+  },
+);
+
 export const subscriptionPlans = pgTable(
   "subscription_plans",
   {
@@ -259,6 +273,39 @@ export const organizationSubscriptions = pgTable(
     organizationIdx: index("organization_subscription_org_idx").on(t.organizationId, t.createdAt.desc()),
     statusIdx: index("organization_subscription_status_idx").on(t.status),
     providerIdx: index("organization_subscription_provider_idx").on(t.provider, t.providerSubscriptionId),
+  }),
+);
+
+// Subscription payment attempts are tenant-bound; no card numbers, CVVs, MoMo PINs
+// or provider secret keys are persisted in VIMS.
+export const subscriptionPayments = pgTable(
+  "subscription_payments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 }).notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    subscriptionId: varchar("subscription_id", { length: 36 }).notNull()
+      .references(() => organizationSubscriptions.id, { onDelete: "restrict" }),
+    billingPeriodStart: timestamp("billing_period_start").notNull(),
+    initiatedBy: varchar("initiated_by", { length: 36 }).notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    provider: varchar("provider", { length: 24 }).notNull().default("paystack"),
+    reference: varchar("reference", { length: 90 }).notNull().unique(),
+    amountSubunits: integer("amount_subunits").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    channel: varchar("channel", { length: 20 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    customerEmail: varchar("customer_email", { length: 200 }).notNull(),
+    gatewayTransactionId: varchar("gateway_transaction_id", { length: 40 }),
+    gatewayMessage: varchar("gateway_message", { length: 240 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    paidAt: timestamp("paid_at"),
+  },
+  (t) => ({
+    organizationCreatedIdx: index("subscription_payment_org_created_idx").on(t.organizationId, t.createdAt.desc()),
+    subscriptionIdx: index("subscription_payment_subscription_idx").on(t.subscriptionId),
+    statusIdx: index("subscription_payment_status_idx").on(t.status),
   }),
 );
 
@@ -505,6 +552,7 @@ export const users = pgTable(
     role: userRoleEnum("role").notNull().default("viewer"),
     avatar: text("avatar"),
     passwordHash: text("password_hash"),
+    mustChangePassword: boolean("must_change_password").notNull().default(false),
     phone: varchar("phone", { length: 50 }),
     locationId: varchar("location_id", { length: 36 }).references(() => locations.id, { onDelete: "set null" }),
     transporterId: varchar("transporter_id", { length: 36 }).references(() => transporters.id, { onDelete: "set null" }),
@@ -1006,6 +1054,26 @@ export const sessions = pgTable(
       .where(sql`${t.isActive} = true`),
   })
 );
+
+// Super Admin support sessions remain distinct from the target user's login.
+export const supportSessions = pgTable("support_sessions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  actorUserId: varchar("actor_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "restrict" }),
+  actorSessionId: varchar("actor_session_id", { length: 36 }).notNull().references(() => sessions.id, { onDelete: "cascade" }),
+  targetUserId: varchar("target_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "restrict" }),
+  organizationId: varchar("organization_id", { length: 36 }).notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  reason: varchar("reason", { length: 500 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  endedAt: timestamp("ended_at"),
+}, (t) => ({
+  tokenIdx: uniqueIndex("support_session_token_idx").on(t.tokenHash),
+  actorIdx: index("support_session_actor_idx").on(t.actorUserId, t.createdAt.desc()),
+  targetIdx: index("support_session_target_idx").on(t.organizationId, t.targetUserId, t.createdAt.desc()),
+  expiryIdx: index("support_session_expiry_idx").on(t.expiresAt),
+}));
 
 export const securityEvents = pgTable(
   "security_events",
