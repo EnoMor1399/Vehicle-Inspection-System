@@ -1,8 +1,5 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
@@ -44,15 +41,14 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
   const session = await validateSession(sessionToken);
   if (!session.valid || !session.userId) redirect("/login");
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, session.userId));
-
-  if (!user || !user.isActive) redirect("/login");
+  const { effectiveUserForRequest, SUPPORT_COOKIE_NAME } = await import("@/lib/support-session");
+  const effective = await effectiveUserForRequest(session, jar.get(SUPPORT_COOKIE_NAME)?.value);
+  const user = effective.user;
+  if (!user.isActive) redirect("/login");
 
   if (
     privileged2FAEnforced()
+    && !effective.support
     && PRIVILEGED_2FA_ROLES.has(user.role)
     && !user.twoFactorEnabled
     && !options.allowPendingPrivileged2FA
