@@ -35,7 +35,7 @@ export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
       {resetTarget && (
         <section className="rounded-xl border border-slate-300 bg-slate-50 p-5" aria-label="Confirm password reset">
           <h2 className="text-lg font-semibold">Reset password: {resetTarget.name}</h2>
-          <p className="mt-1 text-sm text-slate-600">This revokes all the user's active sessions and generates a one-time temporary password.</p>
+          <p className="mt-1 text-sm text-slate-600">This revokes all the user&apos;s active sessions and generates a one-time temporary password.</p>
           <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={(event) => {
             event.preventDefault();
             setResult(null); setError("");
