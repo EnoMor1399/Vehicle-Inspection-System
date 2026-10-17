@@ -52,16 +52,20 @@ export async function getCurrentUser(options: CurrentUserOptions = {}) {
     throw new Error("Authentication required");
   }
 
+  const { effectiveUserForRequest, SUPPORT_COOKIE_NAME } = await import("./support-session");
+  const effective = await effectiveUserForRequest(session, jar.get(SUPPORT_COOKIE_NAME)?.value);
+
   if (
     privileged2FAEnrollmentEnforced()
-    && PRIVILEGED_2FA_ROLES.has(session.user.role)
-    && !session.user.twoFactorEnabled
+    && !effective.support
+    && PRIVILEGED_2FA_ROLES.has(effective.user.role)
+    && !effective.user.twoFactorEnabled
     && !options.allowPendingPrivileged2FA
   ) {
     throw new Error("Two-factor enrollment required");
   }
 
-  return session.user;
+  return effective.user;
 }
 
 export async function login(
