@@ -12,6 +12,7 @@ import {
   Building2,
   CalendarCheck,
   CalendarClock,
+  CreditCard,
   Car,
   ChevronRight,
   ClipboardCheck,
@@ -109,6 +110,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Platform Administration",
     items: [
       { href: "/platform/organizations", label: "Subscriber Companies", icon: Building2, superAdminOnly: true },
+      { href: "/platform/payments", label: "Subscription Payments", icon: CreditCard, superAdminOnly: true },
     ],
   },
   {

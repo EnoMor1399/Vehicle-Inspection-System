@@ -262,6 +262,39 @@ export const organizationSubscriptions = pgTable(
   }),
 );
 
+// Subscription payment attempts are tenant-bound; no card numbers, CVVs, MoMo PINs
+// or provider secret keys are persisted in VIMS.
+export const subscriptionPayments = pgTable(
+  "subscription_payments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 }).notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    subscriptionId: varchar("subscription_id", { length: 36 }).notNull()
+      .references(() => organizationSubscriptions.id, { onDelete: "restrict" }),
+    billingPeriodStart: timestamp("billing_period_start").notNull(),
+    initiatedBy: varchar("initiated_by", { length: 36 }).notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    provider: varchar("provider", { length: 24 }).notNull().default("paystack"),
+    reference: varchar("reference", { length: 90 }).notNull().unique(),
+    amountSubunits: integer("amount_subunits").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    channel: varchar("channel", { length: 20 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    customerEmail: varchar("customer_email", { length: 200 }).notNull(),
+    gatewayTransactionId: varchar("gateway_transaction_id", { length: 40 }),
+    gatewayMessage: varchar("gateway_message", { length: 240 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    paidAt: timestamp("paid_at"),
+  },
+  (t) => ({
+    organizationCreatedIdx: index("subscription_payment_org_created_idx").on(t.organizationId, t.createdAt.desc()),
+    subscriptionIdx: index("subscription_payment_subscription_idx").on(t.subscriptionId),
+    statusIdx: index("subscription_payment_status_idx").on(t.status),
+  }),
+);
+
 export const organizationInvitations = pgTable(
   "organization_invitations",
   {
