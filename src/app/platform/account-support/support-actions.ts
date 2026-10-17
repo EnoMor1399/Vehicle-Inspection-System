@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { sessions, supportSessions, users } from "@/db/schema";
+import { supportSessions, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { decryptField } from "@/lib/field-encryption";
