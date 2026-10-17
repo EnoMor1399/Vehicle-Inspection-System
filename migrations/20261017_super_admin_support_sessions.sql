@@ -17,3 +17,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS support_session_token_idx ON support_sessions(
 CREATE INDEX IF NOT EXISTS support_session_actor_idx ON support_sessions(actor_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS support_session_target_idx ON support_sessions(organization_id, target_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS support_session_expiry_idx ON support_sessions(expires_at);
+
+-- Passwords issued by support must be replaced by the owner before operational access.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
