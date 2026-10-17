@@ -328,7 +328,7 @@ export function AppShell({
             <form action="/api/support-session/end" method="POST"><button className="rounded-lg bg-amber-950 px-4 py-2 font-semibold text-white" type="submit">Exit support view</button></form>
           </div>
         )}
-        <header className={supportContext ? "sticky top-[60px] z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8" : "sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"} z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+        <header className={supportContext ? "sticky top-[60px] z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8" : "sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"}>
           <div className="mx-auto flex max-w-[1600px] items-center gap-3">
             <button
               type="button"
