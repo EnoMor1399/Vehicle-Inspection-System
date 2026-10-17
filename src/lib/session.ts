@@ -18,7 +18,7 @@ const MAX_NAME_LENGTH = 200;
 const MAX_PHONE_LENGTH = 50;
 
 export type AuthResult =
-  | { ok: true; userId: string; userName: string; role: string }
+  | { ok: true; userId: string; userName: string; role: string; passwordChangeRequired?: boolean }
   | { ok: false; error: string; field?: string; requires2FA?: boolean };
 
 export async function signIn(
@@ -57,7 +57,25 @@ export async function signIn(
     }
   }
 
-  const result = await secureLogin(normalized, password, ipAddress, userAgent, twoFactorToken, remember);
+  // An unapplied database migration must not leak a production React Server
+  // Components exception (error #441) into the sign-in form.
+  let result: Awaited<ReturnType<typeof secureLogin>>;
+  try {
+    result = await secureLogin(normalized, password, ipAddress, userAgent, twoFactorToken, remember);
+  } catch (error: unknown) {
+    let cause: unknown = error;
+    for (let depth = 0; depth < 4 && cause && typeof cause === "object"; depth += 1) {
+      const code = (cause as { code?: unknown }).code;
+      if (code === "42703" || code === "42P01") {
+        return {
+          ok: false,
+          error: "Sign-in is temporarily unavailable while a required system update is completed. Please contact your administrator.",
+        };
+      }
+      cause = (cause as { cause?: unknown }).cause;
+    }
+    throw error;
+  }
 
   if (!result.success) {
     if (result.requires2FA) {
@@ -83,6 +101,7 @@ export async function signIn(
     userId: result.user.id,
     userName: result.user.name,
     role: result.user.role,
+    passwordChangeRequired: Boolean(result.user.mustChangePassword),
   };
 }
 

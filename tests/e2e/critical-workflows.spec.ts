@@ -130,3 +130,24 @@ test("mobile Driver Training pages remain responsive inside the training domain"
     expect(overflow).toBeLessThanOrEqual(2);
   }
 });
+
+test("non-platform users cannot open the Super Administrator support centre", async ({ page }) => {
+  await signIn(page, inspectionEmail, inspectionPassword, "/");
+  await page.goto(`${baseURL}/platform/account-support`);
+  await page.waitForURL(`${baseURL}/`);
+  await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
+});
+
+test("support-mode cookie blocks HTTP mutations even if no support record exists", async ({ page }) => {
+  await signIn(page, inspectionEmail, inspectionPassword, "/");
+  await page.context().addCookies([{
+    name: "vims_support_token",
+    value: "invalid-support-identity",
+    url: baseURL,
+    httpOnly: true,
+    sameSite: "Strict",
+  }]);
+  const response = await page.request.post(`${baseURL}/api/auth/logout`, { data: {} });
+  expect(response.status()).toBe(403);
+  expect((await response.json()).error).toContain("Read-only support mode");
+});

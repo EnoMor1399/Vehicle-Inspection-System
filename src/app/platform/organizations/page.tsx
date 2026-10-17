@@ -10,7 +10,7 @@ import {
   listSubscriptionPlans,
 } from "@/lib/organization-control-plane";
 import { OnboardingApprovalForm } from "./PlatformOrganizationActions";
-import { activateSubscriberWorkspace, changeOrganizationStatus } from "./actions";
+import { changeOrganizationStatus } from "./actions";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -135,16 +135,13 @@ export default async function PlatformOrganizationsPage() {
                           <button type="submit" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Save</button>
                         </form>
                         {!organization.operationalAccessEnabled && organization.status !== "cancelled" && organization.status !== "suspended" && (
-                          <form action={activateSubscriberWorkspace}>
-                            <input type="hidden" name="organizationId" value={organization.id} />
-                            <button
-                              type="submit"
-                              className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
-                              title="Checks subscription, required administrators, tenant columns and database guard triggers before enabling operations"
-                            >
-                              Verify & activate
-                            </button>
-                          </form>
+                          <Link
+                            href={`/platform/organizations/${organization.id}`}
+                            className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+                            title="Review the subscriber owner and administrator requirements before workspace activation"
+                          >
+                            Review activation
+                          </Link>
                         )}
                       </div>
                     </td>

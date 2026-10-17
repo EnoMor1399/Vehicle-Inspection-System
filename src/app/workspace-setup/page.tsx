@@ -9,12 +9,13 @@ import {
   organizationAccessMessage,
 } from "@/lib/organization-access";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
+import { getPublishedPlatformContent } from "@/lib/platform-content";
 
 export const dynamic = "force-dynamic";
 
 export default async function WorkspaceSetupPage() {
   const user = await requireAuth();
-  const state = await getOrganizationSubscriptionState(user.organizationId);
+  const [state, copy] = await Promise.all([getOrganizationSubscriptionState(user.organizationId), getPublishedPlatformContent()]);
 
   if (state.operationalAccess && user.role !== "organization_owner") {
     if (canAccessVehicleInspection(user)) redirect("/");
@@ -60,7 +61,7 @@ export default async function WorkspaceSetupPage() {
       </div>
 
       <Card className="mt-6 p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-slate-950">Onboarding progress</h2>
+        <h2 className="text-lg font-semibold text-slate-950">{copy["workspace.setup_title"]}</h2>
         <div className="mt-4 space-y-3">
           <Step done={Boolean(organization)} title="Company profile created" />
           <Step done={Boolean(subscription)} title="Subscription assigned" />
