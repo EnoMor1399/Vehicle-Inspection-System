@@ -11,13 +11,6 @@ const email = (process.env.E2E_USER_EMAIL || "e2e.inspector@vims.local").toLower
 const trainingEmail = (process.env.E2E_TRAINING_USER_EMAIL || "e2e.training.admin@vims.local").toLowerCase();
 const tenantInspectionEmail = (process.env.E2E_TENANT_USER_EMAIL || "e2e.tenant.inspector@vims.local").toLowerCase();
 const tenantTrainingEmail = (process.env.E2E_TENANT_TRAINING_USER_EMAIL || "e2e.tenant.training.admin@vims.local").toLowerCase();
-// Isolated CI-only Super Admin and recovery fixtures. Never seed production with these.
-const supportAdminEmail = "e2e.platform.admin@vims.local";
-const supportAdminPassword = "E2eOnly!Support2026";
-const supportAdminTotpSecret = "JBSWY3DPEHPK3PXP";
-const recoveryEmail = "e2e.recovery@vims.local";
-const supportAdminId = "e2e0000-0000-4000-8000-000000000009";
-const recoveryUserId = "e2e0000-0000-4000-8000-000000000010";
 const password = process.env.E2E_USER_PASSWORD || "E2eOnly!Passw0rd2026";
 const trainingPassword = process.env.E2E_TRAINING_USER_PASSWORD || password;
 const tenantPassword = process.env.E2E_TENANT_USER_PASSWORD || password;
@@ -54,8 +47,6 @@ try {
   const tenantSessionId = "e2e10000-0000-4000-8000-000000000009";
   const tenantParticipantId = "e2e10000-0000-4000-8000-000000000010";
 
-  const supportAdminPasswordHash = await bcrypt.hash(supportAdminPassword, 10);
-  const recoveryPasswordHash = await bcrypt.hash(password, 10);
   const passwordHash = await bcrypt.hash(password, 10);
   const trainingPasswordHash = await bcrypt.hash(trainingPassword, 10);
   const tenantPasswordHash = await bcrypt.hash(tenantPassword, 10);
@@ -112,45 +103,6 @@ try {
        seats = excluded.seats,
        updated_at = now()`,
     [tenantSubscriptionId, tenantOrganizationId],
-  );
-
-  await client.query(
-    `insert into users
-      (id, organization_id, name, email, role, password_hash, permissions,
-       is_active, two_factor_enabled, two_factor_secret, must_change_password)
-     values ($1, $2, 'E2E Platform Super Admin', $3, 'super_admin', $4, '{"*":true}'::jsonb,
-       true, true, $5, false)
-     on conflict (email) do update set
-       name = excluded.name,
-       role = excluded.role,
-       organization_id = excluded.organization_id,
-       password_hash = excluded.password_hash,
-       permissions = excluded.permissions,
-       is_active = true,
-       two_factor_enabled = true,
-       two_factor_secret = excluded.two_factor_secret,
-       must_change_password = false,
-       failed_login_attempts = 0,
-       locked_until = null`,
-    [supportAdminId, organizationId, supportAdminEmail, supportAdminPasswordHash, supportAdminTotpSecret],
-  );
-
-  await client.query(
-    `insert into users
-      (id, organization_id, name, email, role, password_hash, permissions,
-       is_active, two_factor_enabled, must_change_password)
-     values ($1, $2, 'E2E Recovery User', $3, 'viewer', $4,
-       '{"vehicle_inspection":true,"training":false}'::jsonb, true, false, false)
-     on conflict (email) do update set
-       name = excluded.name,
-       role = excluded.role,
-       organization_id = excluded.organization_id,
-       password_hash = excluded.password_hash,
-       is_active = true,
-       must_change_password = false,
-       failed_login_attempts = 0,
-       locked_until = null`,
-    [recoveryUserId, organizationId, recoveryEmail, recoveryPasswordHash],
   );
 
   await client.query(
