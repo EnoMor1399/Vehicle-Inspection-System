@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { CarFront, ClipboardCheck, CreditCard, MapPin, ShieldCheck, UsersRound } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requireOrganizationAccountManager } from "@/lib/require-auth";
@@ -52,6 +53,7 @@ export default async function OrganizationAccountPage() {
         <div className="space-y-6">
           <Card className="p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-slate-950">Subscription</h2>
+            <Link href="/organization/payments" className="mt-3 inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white">Pay subscription online</Link>
             <div className="mt-4 space-y-3 text-sm">
               <Row label="Status"><Badge tone={subscription.subscription.status === "active" || subscription.subscription.status === "trialing" ? "emerald" : "amber"}>{subscription.subscription.status}</Badge></Row>
               <Row label="Billing">{Number(subscription.subscription.amount) > 0 ? `${subscription.subscription.currency} ${Number(subscription.subscription.amount).toLocaleString()}` : "Custom agreement"}</Row>

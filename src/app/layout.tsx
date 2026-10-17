@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./theme-system.css";
@@ -12,6 +12,7 @@ import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
 import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
+import { getActiveSupportContext, SUPPORT_COOKIE_NAME } from "@/lib/support-session";
 
 export const dynamic = "force-dynamic";
 
@@ -86,9 +87,17 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const nonce = (await headers()).get("x-nonce") || undefined;
   let shellUser: { role: string; name: string; organizationId: string; allowedResources: string[] } | null = null;
   let accountTheme: ThemeMode | null = null;
+  let supportContext: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null = null;
 
   try {
     const user = await getCurrentUser();
+    const activeSupport = await getActiveSupportContext();
+    if (activeSupport) supportContext = {
+      actorName: activeSupport.actor.name,
+      targetName: activeSupport.target.name,
+      targetEmail: activeSupport.target.email,
+      expiresAt: activeSupport.support.expiresAt.toISOString(),
+    };
     accountTheme = await getUserThemePreference(user.id);
     const organizationState = await getOrganizationSubscriptionState(user.organizationId);
     const allowedResources = SHELL_RESOURCES.filter((resource) => {
@@ -113,7 +122,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       allowedResources,
     };
   } catch {
-    // Public and login routes intentionally render without an authenticated shell identity.
+    // Fail closed on stale support credentials, but keep an exit control
+    // visible so the original administrator can clear the unusable cookie.
+    if ((await cookies()).has(SUPPORT_COOKIE_NAME)) {
+      supportContext = {
+        actorName: "Administrator",
+        targetName: "session unavailable",
+        targetEmail: "exit to return to your account",
+        expiresAt: new Date().toISOString(),
+      };
+    }
   }
 
   const settings = await getSettings(shellUser?.organizationId);
@@ -145,6 +163,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             userName={shellUser?.name}
             allowedResources={shellUser?.allowedResources || []}
             appearanceControl={appearanceControl}
+            supportContext={supportContext}
           >
             {children}
           </AppShell>

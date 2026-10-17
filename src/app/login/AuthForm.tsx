@@ -48,7 +48,7 @@ export function AuthForm({ allowSignUp = false }: { allowSignUp?: boolean }) {
             setFieldError(res.field || null);
             return;
           }
-          router.push("/");
+          router.push(res.passwordChangeRequired ? "/security/change-password" : "/");
           router.refresh();
         } else {
           if (!allowSignUp) {

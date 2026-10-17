@@ -95,9 +95,9 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8 xl:p-10">
       <PageHeader
-        eyebrow="Operations command centre"
+        eyebrow="Vehicle Inspection"
         title="Executive Dashboard"
-        description="A focused view of fleet activity, inspection outcomes, compliance risk, and operational workload."
+        description="Fleet activity, inspection results and work requiring attention."
         action={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -120,9 +120,7 @@ export default async function DashboardPage() {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 id="overview-metrics" className="text-sm font-semibold text-slate-900">Core operating metrics</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Current fleet and inspection performance</p>
           </div>
-          <Badge tone="slate">{stats.totalInspections} inspections recorded</Badge>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -169,7 +167,17 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
-      <section className="mt-5 grid gap-4 lg:grid-cols-2">
+      <details className="group mt-6 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm sm:p-5">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block text-base">Detailed performance analytics</span>
+            <span className="mt-1 block text-xs font-normal text-slate-500">Stations, transporters, defects, regions and historical comparisons</span>
+          </span>
+          <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 group-open:hidden">Show insights ↓</span>
+          <span className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 group-open:inline-flex">Hide insights ↑</span>
+        </summary>
+        <div className="mt-5 space-y-4 border-t border-slate-100 pt-5">
+      <section className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4 sm:p-6">
           <SectionTitle title="Station performance" description="Inspection performance by station" />
           <div className="mt-4"><StationChart data={stations as any} /></div>
@@ -207,6 +215,9 @@ export default async function DashboardPage() {
         />
         <div className="mt-4"><RegionHeatMap data={regions as any} /></div>
       </Card>
+
+        </div>
+      </details>
 
       <Card className="mt-5 overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">

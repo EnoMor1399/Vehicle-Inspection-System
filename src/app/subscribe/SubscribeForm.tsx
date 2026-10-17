@@ -88,12 +88,7 @@ export function SubscribeForm({ plans }: { plans: Plan[] }) {
 
       <input name="website" className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" />
 
-      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-        <div className="flex gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-          <p>Each subscriber receives a separate organization identity, subscription policy and administrator lifecycle. Operational access remains locked until the tenant data boundary is provisioned and verified.</p>
-        </div>
-      </div>
+
 
       <button
         type="submit"

@@ -97,5 +97,9 @@ test("subscriber workspace activation verifies tenant data plane and required ad
   assert.match(control, /onboardingStage: "complete"/);
   assert.match(actions, /activateOrganizationWorkspace/);
   assert.match(actions, /entityType: "organization_workspace"/);
-  assert.match(page, /Verify & activate/);
+  const detail = readFileSync("src/app/platform/organizations/[id]/page.tsx", "utf8");
+  const activationUi = readFileSync("src/app/platform/organizations/[id]/ActivationReadinessControls.tsx", "utf8");
+  assert.match(page, /Review activation/);
+  assert.match(detail, /ActivationReadinessControls/);
+  assert.match(activationUi, /Verify & activate workspace/);
 });

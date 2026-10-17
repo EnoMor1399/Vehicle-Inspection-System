@@ -82,6 +82,14 @@ function rejected(message: string, status: number, requestId: string) {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // A support-view cookie cannot authorize any mutation. The only permitted
+  // POST explicitly closes the actor-bound support session.
+  if (request.cookies.has("vims_support_token")
+      && !["GET", "HEAD"].includes(request.method)
+      && !(request.method === "POST" && pathname === "/api/support-session/end")) {
+    return NextResponse.json({ error: "Read-only support mode: exit before making changes" },
+      { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   const ip = clientIpFromHeaders(request.headers);
   const requestId = normalizeRequestId(request.headers.get("x-request-id"), crypto.randomUUID());
   const nonce = crypto.randomUUID().replaceAll("-", "");
@@ -125,6 +133,8 @@ export async function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
+  requestHeaders.set("x-vims-request-method", request.method);
+  requestHeaders.set("x-vims-request-path", pathname);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
 
