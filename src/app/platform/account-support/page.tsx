@@ -16,6 +16,9 @@ export default async function AccountSupportPage() {
     id: users.id, name: users.name, email: users.email,
     role: users.role, isActive: users.isActive,
     organizationName: organizations.name,
+    organizationStatus: organizations.status,
+    operationalAccessEnabled: organizations.operationalAccessEnabled,
+    dataIsolationVerifiedAt: organizations.dataIsolationVerifiedAt,
   }).from(users)
     .innerJoin(organizations, eq(organizations.id, users.organizationId))
     .orderBy(asc(organizations.name), asc(users.name));
@@ -24,7 +27,13 @@ export default async function AccountSupportPage() {
     <main className="mx-auto max-w-5xl p-6">
       <h1 className="text-2xl font-bold">Platform Account Support</h1>
       <p className="my-3 text-sm text-slate-600">Super Administrator only. Password resets revoke all active sessions. Never transmit temporary passwords over public channels.</p>
-      <AccountRecoveryControls accounts={accounts.filter((item) => item.id !== actor.id && item.role !== "super_admin")} />
+      <AccountRecoveryControls accounts={accounts
+        .filter((item) => item.id !== actor.id && item.role !== "super_admin")
+        .map(({ organizationStatus, operationalAccessEnabled, dataIsolationVerifiedAt, ...item }) => ({
+          ...item,
+          supportAvailable: organizationStatus === "active"
+            && operationalAccessEnabled && Boolean(dataIsolationVerifiedAt),
+        }))} />
     </main>
   );
 }

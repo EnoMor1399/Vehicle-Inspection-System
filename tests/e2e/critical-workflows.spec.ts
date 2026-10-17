@@ -136,6 +136,31 @@ test("non-platform users cannot open the Super Administrator support centre", as
   await page.goto(`${baseURL}/platform/account-support`);
   await page.waitForURL(`${baseURL}/`);
   await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
+  // Reuse this authenticated session to avoid false negatives from shared
+  // login/MFA rate limits after the full E2E account-isolation suite.
+  const result = await page.evaluate(async () => {
+    const response = await fetch("/api/support-session/start", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "e2e0000-0000-4000-8000-000000000004",
+        reason: "Check an account's dashboard access",
+        authenticationCode: "123456",
+      }),
+    });
+    return { status: response.status, payload: await response.json() };
+  });
+  expect(result.status).toBe(403);
+  expect(result.payload.error).toContain("Super Administrator");
+  expect(JSON.stringify(result.payload)).not.toContain("Minified React error #441");
+
+  const crossSite = await page.request.post(`${baseURL}/api/support-session/start`, {
+    headers: { Origin: "https://malicious.invalid", "Content-Type": "application/json" },
+    data: { userId: "any", reason: "Unauthorized account test", authenticationCode: "123456" },
+  });
+  expect(crossSite.status()).toBe(403);
+  expect((await crossSite.json()).error).toContain("Cross-origin");
 });
 
 test("support-mode cookie blocks HTTP mutations even if no support record exists", async ({ page }) => {

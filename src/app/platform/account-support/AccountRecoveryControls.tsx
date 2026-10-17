@@ -1,17 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { superAdminResetUserPassword } from "../organizations/super-admin-account-recovery";
-import { beginUserSupportView } from "./support-actions";
+import { trySuperAdminResetUserPassword } from "../organizations/super-admin-account-recovery";
 
 type Account = {
   id: string; name: string; email: string; role: string;
-  isActive: boolean; organizationName: string;
+  isActive: boolean; organizationName: string; supportAvailable: boolean;
 };
 
 export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ accountEmail: string; temporaryPassword: string } | null>(null);
   const [supportTarget, setSupportTarget] = useState<Account | null>(null);
@@ -31,7 +28,11 @@ export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
           <button type="button" className="mt-3 rounded border px-3 py-2" onClick={() => setResult(null)}>Clear from screen</button>
         </section>
       )}
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" aria-live="assertive" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </p>
+      )}
       {resetTarget && (
         <section className="rounded-xl border border-slate-300 bg-slate-50 p-5" aria-label="Confirm password reset">
           <h2 className="text-lg font-semibold">Reset password: {resetTarget.name}</h2>
@@ -41,8 +42,14 @@ export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
             setResult(null); setError("");
             startTransition(async () => {
               try {
-                setResult(await superAdminResetUserPassword(resetTarget.id, resetCode));
-                setResetCode(""); setResetTarget(null);
+                const outcome = await trySuperAdminResetUserPassword(resetTarget.id, resetCode);
+                setResetCode("");
+                if (!outcome.ok) {
+                  setError(outcome.message);
+                  return;
+                }
+                setResult({ accountEmail: outcome.accountEmail, temporaryPassword: outcome.temporaryPassword });
+                setResetTarget(null);
               } catch (e) {
                 setResetCode("");
                 setError(e instanceof Error ? e.message : "Password reset failed");
@@ -67,17 +74,35 @@ export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
           <p className="mt-1 text-sm text-amber-900">
             Read-only for 15 minutes. HTTP mutations are blocked. Your administrator identity is retained and the support session is logged.
           </p>
+          <p className="mt-2 text-xs text-amber-900">
+            Only active subscriber workspaces can be opened in support mode. Your authenticator code is verified securely and is never stored in the browser.
+          </p>
           <form className="mt-3 grid gap-3" onSubmit={(event) => {
             event.preventDefault();
             setResult(null); setError("");
             startTransition(async () => {
               try {
-                const response = await beginUserSupportView({
-                  userId: supportTarget.id, reason, authenticationCode,
+                const response = await fetch("/api/support-session/start", {
+                  method: "POST",
+                  credentials: "same-origin",
+                  headers: { "Content-Type": "application/json" },
+                  cache: "no-store",
+                  body: JSON.stringify({ userId: supportTarget.id, reason, authenticationCode }),
                 });
+                const body: unknown = await response.json();
+                if (!body || typeof body !== "object") throw new Error("Support request failed. Try again.");
+                const outcome = body as { ok?: boolean; destination?: string; error?: string };
+                if (!response.ok || !outcome.ok || !outcome.destination) {
+                  throw new Error(typeof outcome.error === "string" ? outcome.error : "Could not start support view.");
+                }
+                // Full navigation applies the new, read-only support cookie on a
+                // GET, not a Server Action POST / RSC render (React error #441).
+                const allowedDestinations = ["/", "/organization/account", "/portal", "/driver-training"];
+                if (!allowedDestinations.includes(outcome.destination)) {
+                  throw new Error("Unexpected support destination.");
+                }
                 setAuthenticationCode("");
-                router.push(response.destination);
-                router.refresh();
+                window.location.assign(outcome.destination);
               } catch (e) {
                 setAuthenticationCode("");
                 setError(e instanceof Error ? e.message : "Could not start support view");
@@ -126,11 +151,16 @@ export function AccountRecoveryControls({ accounts }: { accounts: Account[] }) {
                     onClick={() => {
                       setResult(null); setError(""); setResetCode(""); setSupportTarget(null); setResetTarget(account);
                     }}>Reset password</button>
-                  <button type="button" disabled={pending || !account.isActive}
+                  <button type="button" disabled={pending || !account.isActive || !account.supportAvailable}
                     className="rounded border border-amber-600 px-3 py-2 text-amber-900 disabled:opacity-50"
                     onClick={() => { setResult(null); setError(""); setReason(""); setAuthenticationCode(""); setResetTarget(null); setSupportTarget(account); }}>
                     View as user
                   </button>
+                  {!account.supportAvailable && (
+                    <span className="self-center text-xs text-amber-800">
+                      Workspace not operational — activate it before using support view
+                    </span>
+                  )}
                 </div>
               </td>
             </tr>
