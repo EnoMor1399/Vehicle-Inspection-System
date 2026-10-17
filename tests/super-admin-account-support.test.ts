@@ -77,7 +77,9 @@ test("platform password reset requires fresh MFA and revokes sessions", () => {
   assert.match(action, /target\.role === "super_admin"/);
   assert.match(action, /ne\(users\.role, "super_admin"\)/);
   assert.match(action, /update\(sessions\)/);
-  assert.match(ui, /superAdminResetUserPassword\(resetTarget\.id, resetCode\)/);
+  assert.match(ui, /trySuperAdminResetUserPassword\(resetTarget\.id, resetCode\)/);
+  assert.match(action, /export async function trySuperAdminResetUserPassword/);
+  assert.match(action, /await superAdminResetUserPassword\(targetUserId, authenticationCode\)/);
 });
 
 test("administrative resets mandate password rotation and persist security evidence atomically", () => {
@@ -124,4 +126,33 @@ test("sign-in returns a safe maintenance message for missing database migration 
   assert.match(signIn, /code === "42703" \|\| code === "42P01"/);
   assert.match(signIn, /Sign-in is temporarily unavailable while a required system update/);
   assert.match(signIn, /throw error/);
+});
+
+test("support view start runs as a same-origin JSON POST and never triggers a cookie-setting Server Action render", () => {
+  const route = src("src/app/api/support-session/start/route.ts");
+  const server = src("src/app/platform/account-support/support-actions.ts");
+  const ui = src("src/app/platform/account-support/AccountRecoveryControls.tsx");
+  const page = src("src/app/platform/account-support/page.tsx");
+  const middleware = src("src/proxy.ts");
+  assert.match(route, /export async function POST\(request: NextRequest\)/);
+  assert.match(route, /origin !== request\.nextUrl\.origin/);
+  assert.match(route, /fetchSite && fetchSite !== "same-origin"/);
+  assert.match(route, /Content-Type/);
+  assert.match(route, /beginUserSupportView\(/);
+  assert.match(route, /"Cache-Control": "no-store"/);
+  assert.match(route, /request\.json\(\)/);
+  assert.match(route, /messageForSupportError/);
+  assert.match(route, /This organization's workspace is not operational/);
+  assert.match(route, /The authenticator code was not accepted/);
+  assert.match(server, /import "server-only";/);
+  assert.doesNotMatch(server, /^"use server";/);
+  assert.match(server, /jar\.set\(SUPPORT_COOKIE_NAME, token/);
+  assert.match(ui, /fetch\("\/api\/support-session\/start"/);
+  assert.match(ui, /credentials: "same-origin"/);
+  assert.match(ui, /window\.location\.assign\(outcome\.destination\)/);
+  assert.doesNotMatch(ui, /router\.push\(response\.destination\)/);
+  assert.match(page, /supportAvailable: organizationStatus === "active"/);
+  assert.match(ui, /!account\.supportAvailable/);
+  assert.match(middleware, /Read-only support mode: exit before making changes/);
+  assert.match(src("src/app/api/support-session/end/route.ts"), /finishUserSupportView/);
 });
