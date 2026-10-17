@@ -13,6 +13,7 @@ import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/syste
 import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
 import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
 import { getActiveSupportContext, SUPPORT_COOKIE_NAME } from "@/lib/support-session";
+import { listVisibleChangeNotices } from "@/lib/platform-change-notices";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const nonce = (await headers()).get("x-nonce") || undefined;
   let shellUser: { role: string; name: string; organizationId: string; allowedResources: string[] } | null = null;
   let accountTheme: ThemeMode | null = null;
+  let changeNoticeBanner: { title: string; severity: "important" | "critical"; effectiveAt: string } | null = null;
   let supportContext: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null = null;
 
   try {
@@ -99,6 +101,23 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       expiresAt: activeSupport.support.expiresAt.toISOString(),
     };
     accountTheme = await getUserThemePreference(user.id);
+    try {
+      const notices = await listVisibleChangeNotices({ id: user.id, organizationId: user.organizationId });
+      const important = notices.filter(({ notice, acknowledgedAt }) =>
+        !acknowledgedAt && (notice.severity === "critical" || notice.severity === "important"));
+      important.sort((a, b) =>
+        (b.notice.severity === "critical" ? 1 : 0) - (a.notice.severity === "critical" ? 1 : 0));
+      const item = important[0]?.notice;
+      if (item) changeNoticeBanner = {
+        title: item.title,
+        severity: item.severity as "critical" | "important",
+        effectiveAt: item.effectiveAt.toISOString(),
+      };
+    } catch (error) {
+      // An additive migration must never take down logins/operational screens.
+      // Keep the existing dashboard available if the notice feature is not yet provisioned.
+      console.warn("[notices] change notices are temporarily unavailable", error instanceof Error ? error.message : "unknown");
+    }
     const organizationState = await getOrganizationSubscriptionState(user.organizationId);
     const allowedResources = SHELL_RESOURCES.filter((resource) => {
       if (!hasPermission(user, resource)) return false;
@@ -164,6 +183,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             allowedResources={shellUser?.allowedResources || []}
             appearanceControl={appearanceControl}
             supportContext={supportContext}
+            changeNoticeBanner={changeNoticeBanner}
           >
             {children}
           </AppShell>

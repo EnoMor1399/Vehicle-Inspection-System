@@ -5,12 +5,16 @@ import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Bell, Calendar, Mail, MessageSquare, CheckCircle2, AlertTriangle, ShieldAlert, FileText, Activity } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { markAllRead, markRead } from "./actions";
-import { requirePermission } from "@/lib/require-auth";
+import { requireAuth } from "@/lib/require-auth";
+import { listVisibleChangeNotices } from "@/lib/platform-change-notices";
+import { acknowledgeChangeNotice } from "./change-actions";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
-  const user = await requirePermission("notifications");
+  const user = await requireAuth();
+  const changeNotices = await listVisibleChangeNotices({ id: user.id, organizationId: user.organizationId });
   const all = await db
     .select()
     .from(notifications)
@@ -19,7 +23,9 @@ export default async function NotificationsPage() {
       eq(notifications.userId, user.id),
     ))
     .orderBy(desc(notifications.createdAt)).limit(100);
-  const unread = all.filter((n) => !n.readAt).length;
+  const reminderUnread = all.filter((n) => !n.readAt).length;
+  const changeUnread = changeNotices.filter((n) => !n.acknowledgedAt).length;
+  const unread = reminderUnread + changeUnread;
   const byType: Record<string, number> = {};
   all.forEach((n) => { byType[n.type] = (byType[n.type] || 0) + 1; });
 
@@ -49,10 +55,10 @@ export default async function NotificationsPage() {
         title="Notifications & Reminders"
         description="Your account alerts and operational reminders. Delivery channels shown here reflect the notification records configured for your account."
         action={
-          unread > 0 ? (
+          reminderUnread > 0 ? (
             <form action={markAllRead}>
               <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">
-                <CheckCircle2 className="h-4 w-4 inline mr-1" /> Mark all read ({unread})
+                <CheckCircle2 className="h-4 w-4 inline mr-1" /> Mark reminders read ({reminderUnread})
               </button>
             </form>
           ) : undefined
@@ -65,6 +71,42 @@ export default async function NotificationsPage() {
         <Card className="p-4"><p className="text-xs text-slate-500">Inspections Due</p><p className="text-2xl font-semibold text-blue-600 mt-1">{byType.inspection_due || 0}</p></Card>
         <Card className="p-4"><p className="text-xs text-slate-500">Failed Results</p><p className="text-2xl font-semibold text-red-600 mt-1">{byType.inspection_failed || 0}</p></Card>
       </div>
+
+      <section aria-label="System updates and critical changes" className="mb-6 space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">Updates and critical changes</h2>
+          <p className="mt-1 text-sm text-slate-600">Published platform notices show what will change, its impact and what you should do. Scheduled notices appear at their delivery time.</p>
+        </div>
+        {changeNotices.length === 0 ? (
+          <Card className="p-5"><p className="text-sm text-slate-600">No active system-change notices for your organisation.</p></Card>
+        ) : changeNotices.map(({ notice, acknowledgedAt }) => (
+          <Card key={notice.id} className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold">{notice.title}</h3>
+              <Badge tone={notice.severity === "critical" ? "red" : notice.severity === "important" ? "amber" : "blue"}>
+                {notice.severity === "critical" ? "Critical" : notice.severity === "important" ? "Important" : "Information"}
+              </Badge>
+              <Badge tone={acknowledgedAt ? "emerald" : "slate"}>{acknowledgedAt ? "Acknowledged" : "New"}</Badge>
+            </div>
+            <p className="mt-2 text-sm text-slate-800">{notice.summary}</p>
+            <p className="mt-2 text-sm text-slate-700"><strong>Why it matters:</strong> {notice.impact}</p>
+            <p className="mt-2 text-sm text-slate-700"><strong>What to do:</strong> {notice.actionRequired}</p>
+            <p className="mt-2 text-xs text-slate-500">Effective: {formatDateTime(notice.effectiveAt)} UTC
+              {notice.expiresAt && <> · Available until: {formatDateTime(notice.expiresAt)} UTC</>}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {notice.actionUrl && <Link href={notice.actionUrl} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">View action details →</Link>}
+              {!acknowledgedAt && (
+                <form action={acknowledgeChangeNotice}>
+                  <input type="hidden" name="noticeId" value={notice.id} />
+                  <button type="submit" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Acknowledge notice</button>
+                </form>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Acknowledging means you have read this notice; it does not confirm the requested action was completed.</p>
+          </Card>
+        ))}
+      </section>
 
       {all.length === 0 ? (
         <Card><EmptyState icon={<Bell className="h-10 w-10" />} title="No notifications" description="You're all caught up." /></Card>

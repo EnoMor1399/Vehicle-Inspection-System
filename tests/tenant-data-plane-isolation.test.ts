@@ -162,3 +162,22 @@ test("maintenance risk dashboard and API enforce the same authenticated tenant b
   assert.match(api, /Cache-Control.*private, no-store/);
   assert.match(api, /export const dynamic = "force-dynamic"/);
 });
+
+
+test("system-change notices do not cross subscriber organizations or impersonated sessions", () => {
+  const query = source("src/lib/platform-change-notices.ts");
+  const receipt = source("src/app/notifications/change-actions.ts");
+  const administration = source("src/app/platform/notices/actions.ts");
+  const shell = source("src/app/layout.tsx");
+  assert.match(query, /eq\(platformChangeNotices\.status, "published"\)/);
+  assert.match(query, /lte\(platformChangeNotices\.publishAt, now\)/);
+  assert.match(query, /eq\(platformChangeNotices\.organizationId, viewer\.organizationId\)/);
+  assert.match(query, /eq\(platformChangeNoticeReceipts\.userId, viewer\.id\)/);
+  assert.match(receipt, /await requireAuth\(\)/);
+  assert.match(receipt, /await getActiveSupportContext\(\)/);
+  assert.match(receipt, /eq\(platformChangeNotices\.organizationId, user\.organizationId\)/);
+  assert.match(receipt, /onConflictDoNothing/);
+  assert.match(administration, /await requirePlatformSuperAdmin\(\)/);
+  assert.match(administration, /safeNoticePath\(input\.actionUrl\)/);
+  assert.match(shell, /listVisibleChangeNotices\(\{ id: user\.id, organizationId: user\.organizationId \}\)/);
+});

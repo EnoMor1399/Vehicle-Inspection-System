@@ -931,6 +931,54 @@ export const notifications = pgTable(
   })
 );
 
+// ============ PLATFORM CHANGE NOTICES ============
+// Null organizationId means an explicitly platform-wide notice. Other notices
+// are scoped to one subscriber organization and never exposed cross-tenant.
+export const platformChangeNotices = pgTable(
+  "platform_change_notices",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 36 })
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    createdBy: varchar("created_by", { length: 36 }).notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    summary: text("summary").notNull(),
+    impact: text("impact").notNull(),
+    actionRequired: text("action_required").notNull(),
+    actionUrl: varchar("action_url", { length: 300 }),
+    severity: varchar("severity", { length: 16 }).notNull().default("info"),
+    status: varchar("status", { length: 16 }).notNull().default("draft"),
+    publishAt: timestamp("publish_at").notNull(),
+    effectiveAt: timestamp("effective_at").notNull(),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    audienceIdx: index("platform_change_notice_audience_idx").on(t.organizationId, t.status, t.publishAt),
+    effectiveIdx: index("platform_change_notice_effective_idx").on(t.effectiveAt),
+  }),
+);
+
+export const platformChangeNoticeReceipts = pgTable(
+  "platform_change_notice_receipts",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    noticeId: varchar("notice_id", { length: 36 }).notNull()
+      .references(() => platformChangeNotices.id, { onDelete: "cascade" }),
+    userId: varchar("user_id", { length: 36 }).notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: varchar("organization_id", { length: 36 }).notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    acknowledgedAt: timestamp("acknowledged_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    uniqueReceipt: uniqueIndex("platform_change_notice_user_uidx").on(t.noticeId, t.userId),
+    userIdx: index("platform_change_notice_receipt_user_idx").on(t.organizationId, t.userId),
+  }),
+);
+
 // ============ IMPORT JOBS ============
 export const importJobs = pgTable(
   "import_jobs",
