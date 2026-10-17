@@ -89,6 +89,34 @@ try {
     await client.query(sql);
     console.log(`Applied ${migrationPath}`);
   }
+  // Never declare an enterprise upgrade successful if a legacy compatibility
+  // migration has left a default organization on any operational table.
+  const cutoverSql = await readFile(
+    resolve("migrations/20261016_tenant_data_plane_fail_closed.sql"), "utf8",
+  );
+  const requiredTenantTables = [
+    ...new Set([...cutoverSql.matchAll(/'([a-z_]+)'/g)].map((match) => match[1])),
+  ];
+  if (requiredTenantTables.length !== 49) {
+    throw new Error("Tenant isolation manifest drift: expected 49 managed tables");
+  }
+  const verified = await client.query(
+    `SELECT count(*)::int AS ready
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name = 'organization_id'
+        AND table_name = ANY($1::text[])
+        AND is_nullable = 'NO'
+        AND column_default IS NULL`,
+    [requiredTenantTables],
+  );
+  if (Number(verified.rows[0]?.ready) !== requiredTenantTables.length) {
+    throw new Error(
+      `Tenant isolation cutover incomplete: ${verified.rows[0]?.ready || 0}/${requiredTenantTables.length} tables. ` +
+      "Database upgrade cannot be marked complete.",
+    );
+  }
+  console.log("Tenant isolation verified: 49/49 columns require explicit organization ownership");
   console.log("Enterprise database upgrades applied successfully.");
 } finally {
   await client.end();
