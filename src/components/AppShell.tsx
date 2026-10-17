@@ -300,13 +300,13 @@ export function AppShell({
         </nav>
 
         <div className="border-t border-white/10 p-3">
-          <form action="/api/auth/logout" method="POST">
+          <form action={supportContext ? "/api/support-session/end" : "/api/auth/logout"} method="POST">
             <button
               type="submit"
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-red-500/10 hover:text-red-200"
             >
               <LogOut className="h-[18px] w-[18px]" />
-              Sign out
+              {supportContext ? "Exit support view" : "Sign out"}
             </button>
           </form>
         </div>
