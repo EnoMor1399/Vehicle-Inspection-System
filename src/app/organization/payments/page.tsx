@@ -17,8 +17,13 @@ export default async function OrganizationPaymentsPage() {
     getSubscriptionPaymentHistory(user.organizationId),
   ]);
   const payAmount = subscription ? Number(subscription.subscription.amount) : 0;
+  const alreadyPaid = Boolean(subscription && payments.some(row =>
+    row.status === "success" &&
+    row.subscriptionId === subscription.subscription.id &&
+    row.billingPeriodStart.getTime() === subscription.subscription.currentPeriodStart.getTime(),
+  ));
   const permitted = Boolean(subscription && subscription.subscription.currency === "GHS" &&
-    Number.isFinite(payAmount) && payAmount > 0 && paymentsAvailable());
+    Number.isFinite(payAmount) && payAmount > 0 && !alreadyPaid && paymentsAvailable());
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6 lg:p-10">
@@ -36,7 +41,11 @@ export default async function OrganizationPaymentsPage() {
           {subscription ? `${subscription.subscription.currency} ${Number(subscription.subscription.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "No invoice"}
         </p>
         <p className="mb-6 mt-1 text-sm text-slate-600">Current subscription billing amount. Payments are one-time; renewals require a new checkout. No recurring MoMo deductions.</p>
-        {subscription && payAmount === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">No online payment is due for this subscription amount. Contact the platform administrator if billing is expected.</p> : <PaystackCheckoutForm enabled={permitted} />}
+        {alreadyPaid
+          ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">This subscription billing period is already paid. Another charge is blocked.</p>
+          : subscription && payAmount === 0
+            ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">No online payment is due for this subscription amount. Contact the platform administrator if billing is expected.</p>
+            : <PaystackCheckoutForm enabled={permitted} />}
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
