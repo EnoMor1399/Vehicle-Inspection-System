@@ -8,6 +8,7 @@ test("support sessions are actor-bound, time-limited, and cannot mint a target l
   const support = src("src/lib/support-session.ts");
   const actions = src("src/app/platform/account-support/support-actions.ts");
   assert.match(support, /SUPPORT_TTL_SECONDS = 15 \* 60/);
+  assert.match(support, /SUPPORT_GUARD_COOKIE_SECONDS = 31 \* 24 \* 60 \* 60/);
   assert.match(support, /actorSessionId, session\.sessionId/);
   assert.match(support, /actorUserId, session\.userId/);
   assert.match(support, /supportSessions\.expiresAt/);
@@ -18,6 +19,7 @@ test("support sessions are actor-bound, time-limited, and cannot mint a target l
   assert.match(actions, /getOrganizationSubscriptionState/);
   assert.match(actions, /actorSessionId: original\.sessionId/);
   assert.match(actions, /tokenHash/);
+  assert.match(actions, /maxAge: SUPPORT_GUARD_COOKIE_SECONDS/);
   assert.doesNotMatch(actions, /createSession\(/);
 });
 
