@@ -42,7 +42,7 @@ export default async function SubscribePage() {
                 Compare plans and prices
                 <ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" />
               </summary>
-  <div className="mt-4 grid gap-3">
+              <div className="mt-4 grid gap-3">
                 {plans.map((plan) => (
                   <div key={plan.id} className="rounded-xl border border-slate-200 bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
