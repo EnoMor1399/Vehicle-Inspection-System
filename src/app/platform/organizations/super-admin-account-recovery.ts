@@ -6,7 +6,7 @@ import { decryptField } from "@/lib/field-encryption";
 import { rateLimit } from "@/lib/rate-limit";
 import { verifyTwoFactorToken } from "@/lib/security";
 import { clientIpFromHeaders } from "@/lib/request-context";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { securityEvents, sessions, users } from "@/db/schema";
@@ -65,7 +65,7 @@ export async function superAdminResetUserPassword(targetUserId: string, authenti
       failedLoginAttempts: 0,
       lockedUntil: null,
       updatedAt: new Date(),
-    }).where(and(eq(users.id, target.id), eq(users.organizationId, target.organizationId)))
+    }).where(and(eq(users.id, target.id), eq(users.organizationId, target.organizationId), ne(users.role, "super_admin")))
       .returning({ id: users.id });
     if (!updated) throw new Error("Password reset could not be completed");
     await tx.update(sessions).set({ isActive: false }).where(eq(sessions.userId, target.id));
