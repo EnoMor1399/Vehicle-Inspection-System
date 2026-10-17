@@ -18,16 +18,16 @@ export default async function PlatformOversightPage() {
         description="Review company accounts, operational resources, security posture and activity without crossing subscriber data boundaries or taking over users' sessions."
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          ["Organisations", orgs.length, Building2],
-          ["User accounts", total("users"), UsersRound],
-          ["Registered vehicles", total("vehicles"), Activity],
-          ["Open security events", orgs.reduce((n, o) => n + o.unresolvedSecurityEvents, 0), ShieldAlert],
-        ].map(([label, value, Icon]) => (
-          <Card key={String(label)} className="p-4">
+        {([
+          { label: "Organisations", value: orgs.length, Icon: Building2 },
+          { label: "User accounts", value: total("users"), Icon: UsersRound },
+          { label: "Registered vehicles", value: total("vehicles"), Icon: Activity },
+          { label: "Open security events", value: orgs.reduce((n, o) => n + o.unresolvedSecurityEvents, 0), Icon: ShieldAlert },
+        ]).map(({ label, value, Icon }) => (
+          <Card key={label} className="p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{String(label)}</p>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-2xl font-bold text-slate-950">{Number(value).toLocaleString()}</span>
+              <span className="text-2xl font-bold text-slate-950">{value.toLocaleString()}</span>
               <Icon className="h-5 w-5 text-emerald-700" />
             </div>
           </Card>
