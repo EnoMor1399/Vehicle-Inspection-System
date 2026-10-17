@@ -23,7 +23,9 @@ export default async function NotificationsPage() {
       eq(notifications.userId, user.id),
     ))
     .orderBy(desc(notifications.createdAt)).limit(100);
-  const unread = all.filter((n) => !n.readAt).length;
+  const reminderUnread = all.filter((n) => !n.readAt).length;
+  const changeUnread = changeNotices.filter((n) => !n.acknowledgedAt).length;
+  const unread = reminderUnread + changeUnread;
   const byType: Record<string, number> = {};
   all.forEach((n) => { byType[n.type] = (byType[n.type] || 0) + 1; });
 
@@ -53,10 +55,10 @@ export default async function NotificationsPage() {
         title="Notifications & Reminders"
         description="Your account alerts and operational reminders. Delivery channels shown here reflect the notification records configured for your account."
         action={
-          unread > 0 ? (
+          reminderUnread > 0 ? (
             <form action={markAllRead}>
               <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">
-                <CheckCircle2 className="h-4 w-4 inline mr-1" /> Mark all read ({unread})
+                <CheckCircle2 className="h-4 w-4 inline mr-1" /> Mark reminders read ({reminderUnread})
               </button>
             </form>
           ) : undefined
