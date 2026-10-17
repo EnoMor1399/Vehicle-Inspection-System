@@ -8,7 +8,7 @@ test("role-scoped navigation keeps all operational entry points while collapsing
   const nav = read("src/components/AppShell.tsx");
   assert.match(nav, /collapsible\?: boolean/);
   assert.match(nav, /group\.collapsible \? \(/);
-  assert.match(nav, /defaultOpen=\{groupHasCurrentPage\}/);
+  assert.match(nav, /open=\{groupHasCurrentPage\}/);
   assert.match(nav, /aria-current=\{active \? "page"/);
   assert.match(nav, /item\.superAdminOnly/);
   assert.match(nav, /item\.organizationOwnerOnly/);
