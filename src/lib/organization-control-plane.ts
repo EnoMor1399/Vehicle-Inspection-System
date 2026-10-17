@@ -344,6 +344,9 @@ export async function convertOnboardingRequest(input: {
   return {
     organizationId,
     organizationSlug: slug,
+    organizationName: request.companyName,
+    invitationEmail: request.contactEmail,
+    invitationName: request.contactName,
     invitationToken,
     invitationId,
   };
@@ -654,6 +657,171 @@ export async function verifyTenantDataPlaneReadiness() {
     requiredGuards: Number(row.required_guards),
     expectedRequiredGuards: REQUIRED_TENANT_GUARDS.length,
   };
+}
+
+/**
+ * Explain workspace blockers before a Super Administrator attempts activation.
+ * A subscription being "active" is not itself a ready subscriber workspace.
+ * Never return invitation token hashes in page props.
+ */
+export async function getOrganizationActivationReadiness(organizationId: string) {
+  const [[organization], subscription, accountRows, [ownerInvite]] = await Promise.all([
+    db.select({
+      id: organizations.id,
+      status: organizations.status,
+      operationalAccessEnabled: organizations.operationalAccessEnabled,
+    }).from(organizations).where(eq(organizations.id, organizationId)).limit(1),
+    getLatestOrganizationSubscription(organizationId),
+    db.select({ role: users.role, active: users.isActive, n: count() })
+      .from(users).where(and(
+        eq(users.organizationId, organizationId),
+        inArray(users.role, ["organization_owner", "vehicle_inspection_admin", "driver_training_admin"]),
+      )).groupBy(users.role, users.isActive),
+    db.select({
+      email: organizationInvitations.email,
+      acceptedAt: organizationInvitations.acceptedAt,
+      revokedAt: organizationInvitations.revokedAt,
+      expiresAt: organizationInvitations.expiresAt,
+    }).from(organizationInvitations).where(and(
+      eq(organizationInvitations.organizationId, organizationId),
+      eq(organizationInvitations.role, "organization_owner"),
+    )).orderBy(desc(organizationInvitations.createdAt)).limit(1),
+  ]);
+
+  const activeCount = (role: typeof users.$inferSelect.role) =>
+    accountRows.filter((row) => row.role === role && row.active)
+      .reduce((n, row) => n + Number(row.n || 0), 0);
+  const ownerReady = activeCount("organization_owner") > 0;
+  const inspectionRequired = Boolean(subscription?.plan.modules.includes("vehicle_inspection"));
+  const trainingRequired = Boolean(subscription?.plan.modules.includes("driver_training"));
+  const inspectionReady = !inspectionRequired || activeCount("vehicle_inspection_admin") > 0;
+  const trainingReady = !trainingRequired || activeCount("driver_training_admin") > 0;
+  const subscriptionReady = Boolean(subscription
+    && ["active", "trialing", "grace"].includes(subscription.subscription.status)
+    && periodAllowsAccess(subscription.subscription));
+  const organizationReady = Boolean(organization
+    && !["suspended", "cancelled"].includes(organization.status));
+
+  const [existingInvitationAccount] = ownerInvite
+    ? await db.select({ id: users.id }).from(users).where(eq(users.email, ownerInvite.email)).limit(1)
+    : [];
+  const ownerInvitationEmailInUse = Boolean(existingInvitationAccount);
+
+  const invitationStatus = !ownerInvite ? "missing"
+    : ownerInvite.acceptedAt ? "accepted"
+    : ownerInvite.revokedAt ? "revoked"
+    : ownerInvite.expiresAt <= new Date() ? "expired"
+    : "pending";
+
+  return {
+    ownerReady,
+    inspectionRequired,
+    inspectionReady,
+    trainingRequired,
+    trainingReady,
+    subscriptionReady,
+    organizationReady,
+    canAttemptActivation: Boolean(
+      ownerReady && inspectionReady && trainingReady && subscriptionReady && organizationReady
+    ),
+    ownerInvitationStatus: invitationStatus,
+    ownerInvitationEmailInUse,
+    ownerInvitationEmail: ownerInvite?.email ?? null,
+  };
+}
+
+/**
+ * Replace a lost or expired one-time Organization Owner invitation.
+ * This only reissues to the address already approved on the onboarding request.
+ * It never activates a user, changes roles, or bypasses workspace verification.
+ */
+export async function reissueOrganizationOwnerInvitation(input: {
+  organizationId: string;
+  actorUserId: string;
+  email?: string;
+  name?: string;
+}) {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = invitationHash(token);
+  const selectedRecipient = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.organizationId}))`);
+    const [organization] = await tx.select({ status: organizations.status, name: organizations.name })
+      .from(organizations).where(eq(organizations.id, input.organizationId)).limit(1);
+    if (!organization || ["suspended", "cancelled"].includes(organization.status)) {
+      throw new Error("This organization cannot accept an owner invitation");
+    }
+    const [activeOwner] = await tx.select({ id: users.id })
+      .from(users).where(and(
+        eq(users.organizationId, input.organizationId),
+        eq(users.role, "organization_owner"),
+        eq(users.isActive, true),
+      )).limit(1);
+    if (activeOwner) throw new Error("An active Organization Owner already exists");
+
+    const [priorInvite] = await tx.select({
+      email: organizationInvitations.email,
+      name: organizationInvitations.name,
+    }).from(organizationInvitations).where(and(
+      eq(organizationInvitations.organizationId, input.organizationId),
+      eq(organizationInvitations.role, "organization_owner"),
+    )).orderBy(desc(organizationInvitations.createdAt)).limit(1);
+    if (!priorInvite) throw new Error("No original owner invitation is recorded. Review subscriber onboarding before creating ownership.");
+    const email = input.email?.trim().toLowerCase() || priorInvite.email;
+    if (!validateEmail(email) || email.length > 200) throw new Error("Enter a valid Organization Owner email address");
+    const name = input.name?.trim().slice(0, 200) || priorInvite.name;
+    const [existingUser] = await tx.select({ id: users.id })
+      .from(users).where(eq(users.email, email)).limit(1);
+    if (existingUser) {
+      throw new Error("This email is already registered in VIMS. Enter a different email for the Organization Owner.");
+    }
+
+    const [subscription] = await tx.select({
+      row: organizationSubscriptions,
+      plan: subscriptionPlans,
+    }).from(organizationSubscriptions)
+      .innerJoin(subscriptionPlans, eq(subscriptionPlans.id, organizationSubscriptions.planId))
+      .where(eq(organizationSubscriptions.organizationId, input.organizationId))
+      .orderBy(desc(organizationSubscriptions.createdAt)).limit(1);
+    if (!subscription || !["trialing", "active", "grace"].includes(subscription.row.status)
+      || !periodAllowsAccess(subscription.row)) {
+      throw new Error("An eligible subscription is required before reissuing an owner invitation");
+    }
+
+    const [activeUsers] = await tx.select({ n: count() }).from(users)
+      .where(and(eq(users.organizationId, input.organizationId), eq(users.isActive, true)));
+    const [pendingNonOwner] = await tx.select({ n: count() }).from(organizationInvitations)
+      .where(and(
+        eq(organizationInvitations.organizationId, input.organizationId),
+        ne(organizationInvitations.role, "organization_owner"),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+        gt(organizationInvitations.expiresAt, new Date()),
+      ));
+    const capacity = Math.min(subscription.plan.maxUsers, subscription.row.seats);
+    if (Number(activeUsers?.n || 0) + Number(pendingNonOwner?.n || 0) + 1 > capacity) {
+      throw new Error("No subscriber seat is available for the Organization Owner");
+    }
+
+    await tx.update(organizationInvitations).set({ revokedAt: new Date() })
+      .where(and(
+        eq(organizationInvitations.organizationId, input.organizationId),
+        eq(organizationInvitations.role, "organization_owner"),
+        isNull(organizationInvitations.acceptedAt),
+        isNull(organizationInvitations.revokedAt),
+      ));
+    await tx.insert(organizationInvitations).values({
+      id: newId(),
+      organizationId: input.organizationId,
+      email,
+      name,
+      role: "organization_owner",
+      tokenHash,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdBy: input.actorUserId,
+    });
+    return { recipientEmail: email, recipientName: name, organizationName: organization.name };
+  });
+  return { invitationPath: `/invite/${token}`, ...selectedRecipient };
 }
 
 export async function activateOrganizationWorkspace(input: {
