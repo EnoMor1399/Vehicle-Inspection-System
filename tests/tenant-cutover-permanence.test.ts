@@ -52,6 +52,7 @@ test("activation is blocked before submission when global database guards fail",
   const end = control.indexOf("export async function reissueOrganizationOwnerInvitation", begin);
   const section = control.slice(begin, end);
   assert.match(section, /verifyTenantDataPlaneReadiness\(\)/);
+  assert.match(control, /tgenabled IN \('O', 'A'\)/);
   assert.match(section, /&& isolation.ready/);
   assert.match(section, /\s+isolation,/);
   assert.match(controls, /Database tenant isolation/);
