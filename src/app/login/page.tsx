@@ -1,5 +1,6 @@
 import { AuthForm } from "./AuthForm";
 import { getSettings } from "@/lib/settings";
+import { getPublishedPlatformContent } from "@/lib/platform-content";
 import Link from "next/link";
 import { Building2, CheckCircle2, ClipboardCheck, QrCode, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
@@ -7,7 +8,7 @@ import type { ReactNode } from "react";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const settings = await getSettings();
+  const [settings, copy] = await Promise.all([getSettings(), getPublishedPlatformContent()]);
   const allowPublicSignup = process.env.NODE_ENV !== "production"
     || process.env.ALLOW_PUBLIC_SIGNUP === "true";
 
@@ -50,12 +51,12 @@ export default async function LoginPage() {
             </div>
 
             <div className="mt-20 max-w-md">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Enterprise operations</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">{copy["login.eyebrow"]}</p>
               <h1 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-white xl:text-5xl">
-                Controlled inspection operations in one secure workspace.
+                {copy["login.headline"]}
               </h1>
               <p className="mt-5 max-w-sm text-sm leading-6 text-slate-300">
-                Manage vehicle records, inspections, approvals, certificates, compliance reporting, and audit history with clear operational controls.
+                {copy["login.description"]}
               </p>
             </div>
 
@@ -97,9 +98,9 @@ export default async function LoginPage() {
                   <Building2 className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[var(--vims-ink)]">Need VIMS for another company?</p>
+                  <p className="text-sm font-semibold text-[var(--vims-ink)]">{copy["login.subscription_title"]}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--vims-ink-muted)]">
-                    Request a dedicated organization subscription with its own branding, administrators, plan limits and controlled tenant provisioning.
+                    {copy["login.subscription_description"]}
                   </p>
                   <Link
                     href="/subscribe"

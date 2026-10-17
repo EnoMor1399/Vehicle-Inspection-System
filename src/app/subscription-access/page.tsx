@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Boxes, CheckCircle2, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Badge, Card, PageHeader } from "@/components/ui";
+import { getPublishedPlatformContent } from "@/lib/platform-content";
 import { requireAuth } from "@/lib/require-auth";
 import {
   getOrganizationSubscriptionState,
@@ -27,7 +28,7 @@ export default async function SubscriptionAccessPage({
   const requestedModule = KNOWN_MODULES.has(query.module as OrganizationModule)
     ? query.module as OrganizationModule
     : null;
-  const state = await getOrganizationSubscriptionState(user.organizationId);
+  const [state, copy] = await Promise.all([getOrganizationSubscriptionState(user.organizationId), getPublishedPlatformContent()]);
 
   const includedModules = state.plan?.modules.filter((module): module is OrganizationModule =>
     KNOWN_MODULES.has(module as OrganizationModule),
@@ -38,7 +39,7 @@ export default async function SubscriptionAccessPage({
       <PageHeader
         eyebrow="Subscription Access"
         title={requestedModule ? `${organizationModuleLabel(requestedModule)} is not included` : "Subscription module access"}
-        description="Your organization can only use operational modules included in its current VIMS subscription plan."
+        description={copy["subscription.access_description"]}
       />
 
       <div className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">

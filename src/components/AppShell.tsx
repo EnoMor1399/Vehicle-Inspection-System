@@ -109,6 +109,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Platform Administration",
     items: [
       { href: "/platform/organizations", label: "Subscriber Companies", icon: Building2, superAdminOnly: true },
+      { href: "/platform/content", label: "Content Management Centre", icon: BookOpen, superAdminOnly: true },
     ],
   },
   {
