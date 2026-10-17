@@ -109,6 +109,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Platform Administration",
     items: [
       { href: "/platform/organizations", label: "Subscriber Companies", icon: Building2, superAdminOnly: true },
+      { href: "/platform/account-support", label: "Account Support", icon: ShieldCheck, superAdminOnly: true },
     ],
   },
   {
@@ -158,6 +159,7 @@ export function AppShell({
   userName,
   allowedResources = [],
   appearanceControl,
+  supportContext,
 }: {
   children: ReactNode;
   branding?: AppBranding;
@@ -165,6 +167,7 @@ export function AppShell({
   userName?: string | null;
   allowedResources?: string[];
   appearanceControl?: ReactNode;
+  supportContext?: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -319,7 +322,13 @@ export function AppShell({
       )}
 
       <div className="min-w-0 flex-1 bg-[var(--surface-page)]">
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+        {supportContext && (
+          <div role="status" className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-2 border-b border-amber-300 bg-amber-100 px-4 py-3 text-sm text-amber-950">
+            <span><strong>Read-only support view:</strong> {supportContext.actorName} viewing as {supportContext.targetName} ({supportContext.targetEmail}). Expires {new Date(supportContext.expiresAt).toLocaleTimeString()}.</span>
+            <form action="/api/support-session/end" method="POST"><button className="rounded-lg bg-amber-950 px-4 py-2 font-semibold text-white" type="submit">Exit support view</button></form>
+          </div>
+        )}
+        <header className={supportContext ? "sticky top-[60px] z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8" : "sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"} z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-[1600px] items-center gap-3">
             <button
               type="button"
