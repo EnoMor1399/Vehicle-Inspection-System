@@ -5,8 +5,9 @@ import { db } from "@/db";
 import {
   auditLogs, documents, inspections, locations, organizations,
   organizationSubscriptions, securityEvents, subscriptionPlans,
-  trainingSessions, transporters, users, vehicles,
+  transporters, users, vehicles,
 } from "@/db/schema";
+import { trainingSessions } from "@/db/training-schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 
 // This is a strictly privileged control-plane read model. Operational pages
