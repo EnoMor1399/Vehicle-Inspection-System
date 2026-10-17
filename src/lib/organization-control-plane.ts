@@ -649,9 +649,10 @@ export async function verifyTenantDataPlaneReadiness() {
             AND table_name = ANY($1::text[])
        ) AS tenant_columns,
        (
-         SELECT count(*)::int
+         SELECT count(DISTINCT tgname)::int
            FROM pg_trigger
           WHERE NOT tgisinternal
+            AND tgenabled IN ('O', 'A')
             AND tgname = ANY($2::text[])
        ) AS required_guards`,
     [[...TENANT_DATA_PLANE_TABLES], [...REQUIRED_TENANT_GUARDS]],
