@@ -170,6 +170,7 @@ export function AppShell({
   appearanceControl,
   supportContext,
   changeNoticeBanner,
+  notificationUnreadCount = 0,
 }: {
   children: ReactNode;
   branding?: AppBranding;
@@ -179,6 +180,7 @@ export function AppShell({
   appearanceControl?: ReactNode;
   supportContext?: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null;
   changeNoticeBanner?: { title: string; severity: "critical" | "important"; effectiveAt: string } | null;
+  notificationUnreadCount?: number;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -370,7 +372,30 @@ export function AppShell({
               </p>
             </div>
 
+
             <div className="flex items-center gap-2 sm:gap-3">
+              {userRole && (
+                <Link
+                  href="/notifications"
+                  title="Notifications and system updates"
+                  aria-label={notificationUnreadCount > 0
+                    ? `Open notifications (${notificationUnreadCount} unread)`
+                    : "Open notifications"}
+                  className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                >
+                  <Bell className="h-5 w-5" aria-hidden="true" />
+                  {notificationUnreadCount > 0 && (
+                    <span aria-hidden="true" className="absolute -right-1 -top-1 min-w-[1.2rem] rounded-full bg-red-600 px-1 py-0.5 text-center text-[10px] font-bold leading-none text-white">
+                      {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+              {isSuperAdmin && (
+                <Link href="/platform/notices" className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 xl:inline-flex">
+                  Manage notices
+                </Link>
+              )}
               {appearanceControl}
               <div className="hidden items-center gap-3 md:flex">
                 <div className="h-8 w-px bg-slate-200" />

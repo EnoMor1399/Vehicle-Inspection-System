@@ -9,6 +9,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { getSettings } from "@/lib/settings";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { db } from "@/db";
+import { notifications } from "@/db/schema";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences";
 import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
@@ -89,6 +92,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   let shellUser: { role: string; name: string; organizationId: string; allowedResources: string[] } | null = null;
   let accountTheme: ThemeMode | null = null;
   let changeNoticeBanner: { title: string; severity: "important" | "critical"; effectiveAt: string } | null = null;
+  let notificationUnreadCount = 0;
   let supportContext: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null = null;
 
   try {
@@ -102,7 +106,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     };
     accountTheme = await getUserThemePreference(user.id);
     try {
-      const notices = await listVisibleChangeNotices({ id: user.id, organizationId: user.organizationId });
+      const [notices, unreadReminders] = await Promise.all([
+        listVisibleChangeNotices({ id: user.id, organizationId: user.organizationId }),
+        db.select({ total: count() }).from(notifications).where(and(
+          eq(notifications.organizationId, user.organizationId),
+          eq(notifications.userId, user.id),
+          isNull(notifications.readAt),
+        )),
+      ]);
+      notificationUnreadCount = notices.filter((item) => !item.acknowledgedAt).length
+        + Number(unreadReminders[0]?.total || 0);
       const important = notices.filter(({ notice, acknowledgedAt }) =>
         !acknowledgedAt && (notice.severity === "critical" || notice.severity === "important"));
       important.sort((a, b) =>
@@ -184,6 +197,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             appearanceControl={appearanceControl}
             supportContext={supportContext}
             changeNoticeBanner={changeNoticeBanner}
+            notificationUnreadCount={notificationUnreadCount}
           >
             {children}
           </AppShell>

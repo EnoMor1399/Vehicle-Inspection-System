@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { count, eq } from "drizzle-orm";
-import { BookOpenText, ChevronLeft, CreditCard, Layers3, ShieldCheck } from "lucide-react";
+import { BookOpenText, Bell, ChevronLeft, CreditCard, Layers3, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
 import { organizationSubscriptions, subscriptionPlans } from "@/db/schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
@@ -46,6 +46,7 @@ export default async function PlatformContentCentrePage() {
       <nav aria-label="Content centre sections" className="flex flex-wrap gap-3">
         <a href="#content" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 hover:border-emerald-400"><BookOpenText className="h-4 w-4" /> Platform content</a>
         <a href="#packages" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 hover:border-emerald-400"><CreditCard className="h-4 w-4" /> Subscription packages</a>
+        <Link href="/platform/notices" className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 hover:border-emerald-400"><Bell className="h-4 w-4" /> System change notices</Link>
       </nav>
 
       <section id="content" className="scroll-mt-10 space-y-5">
