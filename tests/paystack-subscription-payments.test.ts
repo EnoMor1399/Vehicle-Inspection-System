@@ -30,14 +30,15 @@ test("Paystack webhook signature compares raw bytes and rejects tampering", () =
 });
 
 test("server independently matches reference, payer, environment, currency and exact amount", () => {
-  const input = { reference: "vims-00112233445566778899aabbccddeeff", amountSubunits: 24500, currency: "GHS", customerEmail: "owner@example.com", mode: "test" };
+  const input = { reference: "vims-00112233445566778899aabbccddeeff", amountSubunits: 24500, currency: "GHS", customerEmail: "owner@example.com", channel: "mobile_money" as const, mode: "test" };
   const success: VerifiedPaystackTransaction = { id: 123, reference: input.reference, status: "success",
-    amount: 24500, currency: "GHS", domain: "test", customer: { email: "OWNER@EXAMPLE.COM" } };
+    amount: 24500, currency: "GHS", domain: "test", channel: "mobile_money", customer: { email: "OWNER@EXAMPLE.COM" } };
   assert.equal(matchesOriginalInvoice(success, input), true);
   assert.equal(matchesOriginalInvoice({ ...success, reference: "vims-wrong" }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, amount: 24501 }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, currency: "USD" }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, domain: "live" }, input), false);
+  assert.equal(matchesOriginalInvoice({ ...success, channel: "card" }, input), false);
   assert.equal(matchesOriginalInvoice({ ...success, customer: { email: "fraud@example.com" } }, input), false);
   assert.equal(matchesOriginalInvoice(null, input), false);
 });
