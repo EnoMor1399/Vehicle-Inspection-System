@@ -70,11 +70,11 @@ export async function initializePaystack(input: {
     channels: [input.channel],
     reference: input.reference,
     callback_url: new URL("/organization/payments/result", url.origin).toString(),
-    metadata: {
+    metadata: JSON.stringify({
       application: "VIMS",
       organization_id: input.organizationId,
       subscription_id: input.subscriptionId,
-    },
+    }),
   });
   if (result.data?.reference !== input.reference) throw new Error("Checkout reference mismatch.");
   let destination: URL;
