@@ -75,6 +75,7 @@ test("platform password reset requires fresh MFA and revokes sessions", () => {
   assert.match(action, /verifyTwoFactorToken/);
   assert.match(action, /rateLimit\("twoFactor"/);
   assert.match(action, /target\.role === "super_admin"/);
+  assert.match(action, /ne\(users\.role, "super_admin"\)/);
   assert.match(action, /update\(sessions\)/);
   assert.match(ui, /superAdminResetUserPassword\(resetTarget\.id, resetCode\)/);
 });
