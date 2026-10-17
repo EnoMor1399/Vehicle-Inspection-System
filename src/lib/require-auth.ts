@@ -45,6 +45,7 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
   const effective = await effectiveUserForRequest(session, jar.get(SUPPORT_COOKIE_NAME)?.value);
   const user = effective.user;
   if (!user.isActive) redirect("/login");
+  if (user.mustChangePassword && !effective.support) redirect("/security/change-password");
 
   if (
     privileged2FAEnforced()
