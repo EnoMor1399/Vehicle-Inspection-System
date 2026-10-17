@@ -54,7 +54,7 @@ BEGIN
       AND n.status = 'published'
       AND (n.organization_id IS NULL OR n.organization_id = NEW.organization_id)
  ) THEN
-   RAISE EXCEPTION 'Notice is not available to this organization';
+   RAISE EXCEPTION 'Cross-organization notice receipt rejected: unavailable notice';
  END IF;
  RETURN NEW;
 END;
