@@ -136,25 +136,8 @@ test("non-platform users cannot open the Super Administrator support centre", as
   await page.goto(`${baseURL}/platform/account-support`);
   await page.waitForURL(`${baseURL}/`);
   await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
-});
-
-test("support-mode cookie blocks HTTP mutations even if no support record exists", async ({ page }) => {
-  await signIn(page, inspectionEmail, inspectionPassword, "/");
-  await page.context().addCookies([{
-    name: "vims_support_token",
-    value: "invalid-support-identity",
-    url: baseURL,
-    httpOnly: true,
-    sameSite: "Strict",
-  }]);
-  const response = await page.request.post(`${baseURL}/api/auth/logout`, { data: {} });
-  expect(response.status()).toBe(403);
-  expect((await response.json()).error).toContain("Read-only support mode");
-});
-
-
-test("read-only support start rejects non-Super Admins with safe JSON, not a React server-render error", async ({ page }) => {
-  await signIn(page, inspectionEmail, inspectionPassword, "/");
+  // Reuse this authenticated session to avoid false negatives from shared
+  // login/MFA rate limits after the full E2E account-isolation suite.
   const result = await page.evaluate(async () => {
     const response = await fetch("/api/support-session/start", {
       method: "POST",
@@ -178,4 +161,18 @@ test("read-only support start rejects non-Super Admins with safe JSON, not a Rea
   });
   expect(crossSite.status()).toBe(403);
   expect((await crossSite.json()).error).toContain("Cross-origin");
+});
+
+test("support-mode cookie blocks HTTP mutations even if no support record exists", async ({ page }) => {
+  await signIn(page, inspectionEmail, inspectionPassword, "/");
+  await page.context().addCookies([{
+    name: "vims_support_token",
+    value: "invalid-support-identity",
+    url: baseURL,
+    httpOnly: true,
+    sameSite: "Strict",
+  }]);
+  const response = await page.request.post(`${baseURL}/api/auth/logout`, { data: {} });
+  expect(response.status()).toBe(403);
+  expect((await response.json()).error).toContain("Read-only support mode");
 });
