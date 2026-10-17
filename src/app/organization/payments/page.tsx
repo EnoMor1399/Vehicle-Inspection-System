@@ -62,7 +62,12 @@ export default async function OrganizationPaymentsPage() {
                 <td className="py-3 pr-3 font-mono text-xs">{item.reference}</td>
                 <td className="py-3 pr-3">{item.channel === "mobile_money" ? "Mobile Money" : "Card"}</td>
                 <td className="py-3 pr-3">{item.currency} {(item.amountSubunits / 100).toFixed(2)}</td>
-                <td className="py-3"><span className={`rounded-full px-2 py-1 text-xs font-bold ${item.status === "success" ? "bg-emerald-50 text-emerald-800" : item.status === "failed" ? "bg-rose-50 text-rose-800" : "bg-amber-50 text-amber-800"}`}>{item.status}</span></td>
+                <td className="py-3">
+                  <span className={`rounded-full px-2 py-1 text-xs font-bold ${item.status === "success" ? "bg-emerald-50 text-emerald-800" : item.status === "failed" ? "bg-rose-50 text-rose-800" : "bg-amber-50 text-amber-800"}`}>{item.status}</span>
+                  {item.status === "pending" || item.status === "processing"
+                    ? <Link className="ml-2 text-xs font-semibold text-blue-700 underline" href={`/organization/payments/result?reference=${encodeURIComponent(item.reference)}`}>Check status</Link>
+                    : null}
+                </td>
               </tr>
             ))}</tbody>
           </table>
