@@ -140,7 +140,7 @@ test("support view start runs as a same-origin JSON POST and never triggers a co
   assert.match(route, /Content-Type/);
   assert.match(route, /beginUserSupportView\(/);
   assert.match(route, /"Cache-Control": "no-store"/);
-  assert.match(route, /request\.json\(\)/);
+  assert.match(route, /readJsonBody\(request, 4096\)/);
   assert.match(route, /messageForSupportError/);
   assert.match(route, /This organization's workspace is not operational/);
   assert.match(route, /The authenticator code was not accepted/);
