@@ -272,6 +272,7 @@ export const subscriptionPayments = pgTable(
       .references(() => organizations.id, { onDelete: "restrict" }),
     subscriptionId: varchar("subscription_id", { length: 36 }).notNull()
       .references(() => organizationSubscriptions.id, { onDelete: "restrict" }),
+    billingPeriodStart: timestamp("billing_period_start").notNull(),
     initiatedBy: varchar("initiated_by", { length: 36 }).notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     provider: varchar("provider", { length: 24 }).notNull().default("paystack"),
