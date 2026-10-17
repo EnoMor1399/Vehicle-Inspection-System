@@ -149,5 +149,5 @@ test("support-mode cookie blocks HTTP mutations even if no support record exists
   }]);
   const response = await page.request.post(`${baseURL}/api/auth/logout`, { data: {} });
   expect(response.status()).toBe(403);
-  expect(await response.json()).toMatchObject({ error: /Read-only support mode/ });
+  expect((await response.json()).error).toContain("Read-only support mode");
 });
