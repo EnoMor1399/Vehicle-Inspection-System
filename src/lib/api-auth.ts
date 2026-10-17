@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/auth";
 import { hashApiKey, legacyApiKeyHash } from "@/lib/api-keys";
 import { shouldRefreshApiKeyUsage } from "@/lib/api-key-usage";
 import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
+import { effectiveUserForRequest, SUPPORT_COOKIE_NAME } from "@/lib/support-session";
 
 export type ApiScope = "read" | "write" | "inspect" | "admin";
 
@@ -77,6 +78,7 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
         return { ok: false, status: 403, message: "API key does not have the required scope" };
       }
       if (!user.isActive) return { ok: false, status: 401, message: "API key owner is inactive" };
+      if (user.mustChangePassword) return { ok: false, status: 403, message: "Password change required before API access" };
       if (user.role === "transporter_user") {
         return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
       }
@@ -116,8 +118,17 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
     const sessionToken = jar.get("rsl_session_token")?.value;
     if (sessionToken) {
       const session = await validateSession(sessionToken);
-      const user = session.user;
-      if (session.valid && session.userId && user?.isActive) {
+      if (session.valid && session.userId && session.user?.isActive) {
+        let user = session.user;
+        try {
+          const effective = await effectiveUserForRequest(session, jar.get(SUPPORT_COOKIE_NAME)?.value);
+          user = effective.user;
+        } catch {
+          return { ok: false, status: 403, message: "Support session is invalid or not permitted for this request" };
+        }
+        if (user.mustChangePassword) {
+          return { ok: false, status: 403, message: "Password change required before API access" };
+        }
         if (user.role === "transporter_user") {
           return { ok: false, status: 403, message: "Transporter portal accounts cannot access the internal integration API" };
         }
