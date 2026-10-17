@@ -11,6 +11,7 @@ import {
 } from "@/lib/organization-control-plane";
 import { updateSettings } from "@/lib/settings";
 import { sendWorkspaceInvitationEmail } from "@/lib/invitation-mail";
+import { logAudit } from "@/lib/audit";
 
 export type OrganizationAccountState = {
   ok: boolean;
@@ -125,6 +126,20 @@ export async function inviteOrganizationAdministrator(
       organizationName: organization?.name || "Your organization",
       role: parsed.data.role,
       invitationPath,
+    });
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "create",
+      entityType: "organization_administrator_invitation",
+      entityId: actor.organizationId,
+      summary: "Created operational administrator invitation and attempted email delivery",
+      after: {
+        recipient: parsed.data.email.trim().toLowerCase(),
+        role: parsed.data.role,
+        smtpAccepted: delivery.accepted,
+      },
     });
     revalidatePath("/organization/account");
     return {
