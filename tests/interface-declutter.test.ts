@@ -65,3 +65,20 @@ test("subscriber onboarding keeps plan comparisons and the complete request form
   }
   assert.match(form, /submitSubscriptionRequest/);
 });
+
+
+test("system notifications are always discoverable from the signed-in header", () => {
+  const shell = read("src/components/AppShell.tsx");
+  const layout = read("src/app/layout.tsx");
+  const content = read("src/app/platform/content/page.tsx");
+  assert.match(shell, /aria-label=\{notificationUnreadCount > 0/);
+  assert.match(shell, /href="\/notifications"/);
+  assert.match(shell, /href="\/platform\/notices"/);
+  assert.match(shell, /notificationUnreadCount > 99 \? "99\+"/);
+  assert.match(layout, /eq\(notifications\.organizationId, user\.organizationId\)/);
+  assert.match(layout, /eq\(notifications\.userId, user\.id\)/);
+  assert.match(layout, /isNull\(notifications\.readAt\)/);
+  assert.match(layout, /notificationUnreadCount=\{notificationUnreadCount\}/);
+  assert.match(content, /System change notices/);
+  assert.match(content, /href="\/platform\/notices"/);
+});

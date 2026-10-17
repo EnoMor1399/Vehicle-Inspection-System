@@ -81,7 +81,9 @@ test("separate subscriber organizations cannot see each other's operational reco
   await expect(page.getByText("E2E-INSP-001")).toBeVisible();
   await expect(page.getByText("TENANT-INSP-001")).toHaveCount(0);
 
-  await page.goto(`${baseURL}/notifications`);
+  await expect(page.getByRole("link", { name: /Open notifications/ })).toBeVisible();
+  await page.getByRole("link", { name: /Open notifications/ }).click();
+  await expect(page).toHaveURL(/\/notifications$/);
   await expect(page.getByRole("heading", { name: "E2E Platform Change Notice" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "E2E RSL-Only Alert" })).toBeVisible();
   await expect(page.getByText("E2E Tenant-Only Alert")).toHaveCount(0);
