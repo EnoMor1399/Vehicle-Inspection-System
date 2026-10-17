@@ -1,17 +1,22 @@
 import { requirePermission } from "@/lib/require-auth";
 import { db } from "@/db";
 import { vehicles, inspections } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { Activity, AlertTriangle, CheckCircle2, Clock, TrendingDown, Wrench } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function PredictiveMaintenancePage() {
-  await requirePermission("reports");
+  // The signed-in organization's ID is the only permitted tenant boundary.
+  // Never use a request parameter, global fleet lookup, or super-admin role to
+  // widen this operational view across subscriber companies.
+  const user = await requirePermission("reports");
 
-  // Get all vehicles with their latest inspection data
-  const allVehicles = await db.select().from(vehicles).limit(50);
+  const allVehicles = await db.select().from(vehicles)
+    .where(eq(vehicles.organizationId, user.organizationId))
+    .orderBy(desc(vehicles.createdAt))
+    .limit(50);
   const predictions = await Promise.all(allVehicles.map(async (v) => {
     const history = await db
       .select({
@@ -20,7 +25,10 @@ export default async function PredictiveMaintenancePage() {
         sectionData: inspections.sectionData,
       })
       .from(inspections)
-      .where(eq(inspections.vehicleId, v.id))
+      .where(and(
+        eq(inspections.organizationId, user.organizationId),
+        eq(inspections.vehicleId, v.id),
+      ))
       .orderBy(desc(inspections.inspectionDate))
       .limit(10);
 
@@ -154,7 +162,7 @@ export default async function PredictiveMaintenancePage() {
                     {p.vehicle.registrationNumber} — {p.vehicle.make} {p.vehicle.model}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {p.stats.total} inspections · {p.stats.passes} pass · {p.stats.failures} fail
+                    {p.stats.total} {p.stats.total === 1 ? "inspection" : "inspections"} · {p.stats.passes} pass · {p.stats.failures} fail
                     {p.atRisk.length > 0 && ` · At-risk: ${p.atRisk[0].component}`}
                   </p>
                 </div>
