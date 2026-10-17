@@ -5,10 +5,12 @@ import { z } from "zod";
 import { requireOrganizationAccountManager } from "@/lib/require-auth";
 import {
   createOrganizationAdministratorInvitation,
+  getOrganizationAccountSnapshot,
   updateOrganizationProfile,
   type SubscriberAdminRole,
 } from "@/lib/organization-control-plane";
 import { updateSettings } from "@/lib/settings";
+import { sendWorkspaceInvitationEmail } from "@/lib/invitation-mail";
 
 export type OrganizationAccountState = {
   ok: boolean;
@@ -115,11 +117,22 @@ export async function inviteOrganizationAdministrator(
       name: parsed.data.name,
       role: parsed.data.role as SubscriberAdminRole,
     });
+    const { organization } = await getOrganizationAccountSnapshot(actor.organizationId);
+    const invitationPath = `/invite/${token}`;
+    const delivery = await sendWorkspaceInvitationEmail({
+      recipient: parsed.data.email.trim().toLowerCase(),
+      invitedName: parsed.data.name || null,
+      organizationName: organization?.name || "Your organization",
+      role: parsed.data.role,
+      invitationPath,
+    });
     revalidatePath("/organization/account");
     return {
       ok: true,
-      message: "Administrator invitation created. Copy and send the one-time link.",
-      invitationPath: `/invite/${token}`,
+      message: delivery.accepted
+        ? "Administrator invitation created. " + delivery.message
+        : "Administrator invitation created, but the email could not be sent. " + delivery.message,
+      invitationPath,
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Unable to create invitation." };
