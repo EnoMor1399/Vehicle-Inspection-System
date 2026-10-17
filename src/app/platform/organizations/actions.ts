@@ -11,6 +11,7 @@ import {
   updateOrganizationSubscriptionLifecycle,
 } from "@/lib/organization-control-plane";
 import { logAudit } from "@/lib/audit";
+import { sendWorkspaceInvitationEmail } from "@/lib/invitation-mail";
 
 export type PlatformOrganizationActionState = {
   ok: boolean;
@@ -40,11 +41,21 @@ export async function approveSubscriberRequest(
       actorUserId: actor.id,
       planCode: parsed.data.planCode,
     });
+    const invitationPath = `/invite/${converted.invitationToken}`;
+    const delivery = await sendWorkspaceInvitationEmail({
+      recipient: converted.invitationEmail,
+      invitedName: converted.invitationName,
+      organizationName: converted.organizationName,
+      role: "organization_owner",
+      invitationPath,
+    });
     revalidatePath("/platform/organizations");
     return {
       ok: true,
-      message: "Subscriber workspace created in provisioning mode. Send the one-time owner invitation link below.",
-      invitationPath: `/invite/${converted.invitationToken}`,
+      message: delivery.accepted
+        ? "Subscriber created in provisioning mode. " + delivery.message
+        : "Subscriber created, but invitation was not emailed. " + delivery.message,
+      invitationPath,
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Unable to approve subscriber." };
@@ -127,8 +138,12 @@ export async function reissueSubscriberOwnerInvitation(
   const actor = await requirePlatformSuperAdmin();
   const parsed = z.object({
     organizationId: z.string().uuid(),
+    email: z.string().trim().email().max(200),
+    name: z.string().trim().max(200).optional(),
   }).safeParse({
     organizationId: formData.get("organizationId"),
+    email: formData.get("email"),
+    name: formData.get("name"),
   });
   if (!parsed.success) return { ok: false, message: "Invalid owner invitation request." };
 
@@ -136,6 +151,15 @@ export async function reissueSubscriberOwnerInvitation(
     const result = await reissueOrganizationOwnerInvitation({
       organizationId: parsed.data.organizationId,
       actorUserId: actor.id,
+      email: parsed.data.email,
+      name: parsed.data.name,
+    });
+    const delivery = await sendWorkspaceInvitationEmail({
+      recipient: result.recipientEmail,
+      invitedName: result.recipientName,
+      organizationName: result.organizationName,
+      role: "organization_owner",
+      invitationPath: result.invitationPath,
     });
     await logAudit({
       organizationId: actor.organizationId,
@@ -145,12 +169,19 @@ export async function reissueSubscriberOwnerInvitation(
       entityType: "organization_owner_invitation",
       entityId: parsed.data.organizationId,
       summary: "Reissued subscriber Organization Owner invitation and revoked previous outstanding owner links",
-      after: { organizationId: parsed.data.organizationId, previousOwnerLinksRevoked: true },
+      after: {
+        organizationId: parsed.data.organizationId,
+        recipient: result.recipientEmail,
+        previousOwnerLinksRevoked: true,
+        smtpAccepted: delivery.accepted,
+      },
     });
     revalidatePath(`/platform/organizations/${parsed.data.organizationId}`);
     return {
       ok: true,
-      message: "New one-time Organization Owner invitation created. Copy and send this secure link to the intended owner. Earlier pending links are revoked.",
+      message: delivery.accepted
+        ? "Owner invitation reissued. " + delivery.message + " Earlier pending links are revoked."
+        : "Owner invitation reissued but not delivered by email. " + delivery.message,
       invitationPath: result.invitationPath,
     };
   } catch (error) {
