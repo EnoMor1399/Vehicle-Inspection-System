@@ -53,6 +53,10 @@ export async function authenticateApiRequest(options: AuthOptions = {}): Promise
     const authHeader = h.get("authorization") || "";
     const apiKeyHeader = h.get("x-api-key") || "";
     const apiKey = apiKeyHeader || authHeader.replace(/^Bearer\s+/i, "").trim();
+    // A support-view browser must never silently switch back to a privileged API key.
+    if (apiKey && (await cookies()).has(SUPPORT_COOKIE_NAME)) {
+      return { ok: false, status: 403, message: "Exit support view before using an API key" };
+    }
 
     if (apiKey) {
       const currentHash = hashApiKey(apiKey);
