@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   }
   const reference = event.data?.reference;
-  if (typeof reference !== "string" || !/^vims_[a-f0-9]{32}$/.test(reference)) {
+  if (typeof reference !== "string" || !/^vims-[a-f0-9]{32}$/.test(reference)) {
     return NextResponse.json({ received: true });
   }
 
