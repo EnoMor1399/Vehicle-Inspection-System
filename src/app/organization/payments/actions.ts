@@ -48,6 +48,14 @@ export async function startSubscriptionCheckout(
     await db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"subscription-payments:" + current.subscription.id}))`);
       // Prevent accidental double taps or simultaneous checkout attempts.
+      const [paid] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
+        .where(and(
+          eq(subscriptionPayments.subscriptionId, current.subscription.id),
+          eq(subscriptionPayments.organizationId, user.organizationId),
+          eq(subscriptionPayments.billingPeriodStart, current.subscription.currentPeriodStart),
+          eq(subscriptionPayments.status, "success"),
+        )).limit(1);
+      if (paid) throw new Error("This subscription billing period is already paid. Do not submit another payment.");
       const [recent] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
         .where(and(
           eq(subscriptionPayments.subscriptionId, current.subscription.id),
@@ -61,6 +69,7 @@ export async function startSubscriptionCheckout(
         id: newId(),
         organizationId: user.organizationId,
         subscriptionId: current.subscription.id,
+        billingPeriodStart: current.subscription.currentPeriodStart,
         initiatedBy: user.id,
         reference,
         amountSubunits,
