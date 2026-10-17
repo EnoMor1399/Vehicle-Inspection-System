@@ -58,6 +58,8 @@ const requiredTables = [
   "organization_subscriptions",
   "organization_invitations",
   "organization_onboarding_requests",
+  "platform_change_notices",
+  "platform_change_notice_receipts",
 ];
 
 const requiredAuditColumns = [
@@ -187,6 +189,10 @@ const requiredIndexes = [
   "audit_event_hash_idx",
   "rate_limit_reset_idx",
   "notification_user_unread_created_idx",
+  "platform_change_notice_audience_idx",
+  "platform_change_notice_effective_idx",
+  "platform_change_notice_user_uidx",
+  "platform_change_notice_receipt_user_idx",
   "training_session_reference_uidx",
   "training_session_status_start_idx",
   "training_participant_session_idx",
@@ -407,6 +413,17 @@ try {
     (name) => !presentCapacityTriggers.has(name),
   );
 
+  const noticeTriggerResult = await client.query(
+    `SELECT tgname
+       FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgname = 'platform_change_notice_receipt_tenant_guard'
+        AND tgrelid = 'platform_change_notice_receipts'::regclass`,
+  ).catch(() => ({ rows: [] }));
+  const noticeTenantGuardPresent = noticeTriggerResult.rows.some(
+    (row) => row.tgname === "platform_change_notice_receipt_tenant_guard",
+  );
+
   const assessmentColumnResult = await client.query(
     `SELECT column_name
        FROM information_schema.columns
@@ -518,6 +535,7 @@ try {
       auditColumnsExpected: requiredAuditColumns.length,
       requiredIndexesVerified: requiredIndexes.length - missing.length,
       requiredIndexesExpected: requiredIndexes.length,
+       noticeTenantGuardPresent,
       redundantIndexesRemaining: redundantStillPresent.length,
       administrationRolesVerified: requiredDomainRoles.length - missingDomainRoles.length,
       administrationRolesExpected: requiredDomainRoles.length,
@@ -561,6 +579,7 @@ try {
     || tenantColumnsWithDefaults.length > 0
     || missingTenantTriggers.length > 0
     || missingCapacityTriggers.length > 0
+     || !noticeTenantGuardPresent
   ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
@@ -581,6 +600,7 @@ try {
     if (tenantColumnsWithDefaults.length > 0) console.error(`Tenant columns still using compatibility defaults: ${tenantColumnsWithDefaults.join(", ")}`);
     if (missingTenantTriggers.length > 0) console.error(`Missing tenant reference guards: ${missingTenantTriggers.join(", ")}`);
     if (missingCapacityTriggers.length > 0) console.error(`Missing subscription capacity guards: ${missingCapacityTriggers.join(", ")}`);
+     if (!noticeTenantGuardPresent) console.error("Missing platform change notice receipt tenant guard");
     process.exitCode = 1;
   } else {
     console.log("Enterprise database upgrade verification passed.");

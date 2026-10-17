@@ -165,3 +165,17 @@ test("change-notification migration supports targeted scheduled delivery and ten
   assert.match(schema, /Cross-organization notice receipt rejected/);
   assert.match(schema, /platform_change_notice_user_uidx/);
 });
+
+
+test("production database verification fails closed without notice schema and tenant guard", () => {
+  const verifier = readFileSync("scripts/verify-enterprise-upgrade.mjs", "utf8");
+  for (const required of [
+    "platform_change_notices", "platform_change_notice_receipts",
+    "platform_change_notice_audience_idx", "platform_change_notice_effective_idx",
+    "platform_change_notice_user_uidx", "platform_change_notice_receipt_user_idx",
+    "platform_change_notice_receipt_tenant_guard",
+  ]) {
+    assert.ok(verifier.includes(required), `Production verification is missing ${required}`);
+  }
+  assert.match(verifier, /\|\| !noticeTenantGuardPresent/);
+});
