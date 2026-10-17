@@ -7,7 +7,7 @@ import { organizationSubscriptions, organizations, subscriptionPayments } from "
 import { getLatestOrganizationSubscription } from "@/lib/organization-control-plane";
 import { requireAuth } from "@/lib/require-auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { initializePaystack, newPaymentReference, toGhsPesewas, type CheckoutChannel } from "@/lib/paystack-payments";
+import { initializePaystack, newPaymentReference, paymentsAvailable, toGhsPesewas, type CheckoutChannel } from "@/lib/paystack-payments";
 import { newId } from "@/lib/utils";
 
 export type CheckoutState = { ok: boolean; message: string; checkoutUrl?: string };
@@ -23,6 +23,9 @@ export async function startSubscriptionCheckout(
   const channel = formData.get("channel");
   if (channel !== "card" && channel !== "mobile_money") {
     return { ok: false, message: "Select card or mobile money checkout." };
+  }
+  if (!paymentsAvailable()) {
+    return { ok: false, message: "Online checkout is not configured yet. Please contact VIMS billing support." };
   }
   const rate = await rateLimit("api", `subscription-checkout:${user.id}`);
   if (!rate.allowed) return { ok: false, message: "Too many payment attempts. Please try again later." };
@@ -91,14 +94,13 @@ export async function startSubscriptionCheckout(
     revalidatePath("/organization/payments");
     return { ok: true, checkoutUrl, message: "Your secure Paystack checkout is ready." };
   } catch (error) {
-    // If the request failed AFTER the row was created, show a failed attempt,
-    // but never falsely mark a provider-authorized payment as successful.
-    await db.update(subscriptionPayments).set({ status: "failed", updatedAt: new Date() })
-      .where(and(eq(subscriptionPayments.reference, reference), eq(subscriptionPayments.status, "pending")))
-      .catch(() => {});
+    // A timeout or lost gateway response cannot prove Paystack rejected the
+    // transaction. Retain the pending record to prevent an accidental second
+    // charge; the owner can verify the reference in payment history.
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Checkout unavailable. Try again later.",
+      message: (error instanceof Error ? error.message : "Checkout unavailable.") +
+        " If a payment was initiated, check its status in Payment History. Do not retry until it is resolved.",
     };
   }
 }
