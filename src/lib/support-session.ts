@@ -4,6 +4,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { supportSessions, users } from "@/db/schema";
 import { validateSession } from "@/lib/security";
+import { getOrganizationSubscriptionState } from "@/lib/organization-access";
 
 export const SUPPORT_COOKIE_NAME = "vims_support_token";
 export const SUPPORT_TTL_SECONDS = 15 * 60;
@@ -39,6 +40,11 @@ export async function resolveSupportSession(token: string, session: Authenticate
   if (!record || !record.target.isActive || record.target.role === "super_admin"
       || record.support.organizationId !== record.target.organizationId) {
     throw new Error("Support session expired or was revoked");
+  }
+  // A suspended or expired subscriber must lose support visibility immediately.
+  const entitlement = await getOrganizationSubscriptionState(record.support.organizationId);
+  if (!entitlement.operationalAccess) {
+    throw new Error("The target organization is no longer available for support");
   }
   return { actor: session.user, target: record.target, support: record.support };
 }
