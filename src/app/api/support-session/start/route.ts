@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { beginUserSupportView } from "@/app/platform/account-support/support-actions";
+import { readJsonBody } from "@/lib/request-body";
 
 export const runtime = "nodejs";
 
@@ -48,13 +49,13 @@ export async function POST(request: NextRequest) {
   if (!contentType?.toLowerCase().startsWith("application/json")) {
     return NextResponse.json({ error: "Expected a JSON request." }, { status: 415, headers: privateHeaders });
   }
-  const byteLength = request.headers.get("content-length");
-  if (byteLength && (!/^\d+$/.test(byteLength) || Number(byteLength) > 4096)) {
-    return NextResponse.json({ error: "Invalid support request size." }, { status: 413, headers: privateHeaders });
+  const parsed = await readJsonBody(request, 4096);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.message }, { status: parsed.status, headers: privateHeaders });
   }
 
   try {
-    const body: unknown = await request.json();
+    const body: unknown = parsed.value;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "Enter a valid support request." }, { status: 400, headers: privateHeaders });
     }
