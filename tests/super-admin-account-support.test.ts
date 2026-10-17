@@ -117,3 +117,11 @@ test("browser REST API uses the support subject identity and locks pending passw
   assert.match(api, /Support session is invalid or not permitted/);
   assert.match(api, /Exit support view before using an API key/);
 });
+
+test("sign-in returns a safe maintenance message for missing database migration instead of React #441", () => {
+  const signIn = src("src/lib/session.ts");
+  assert.match(signIn, /catch \(error: unknown\)/);
+  assert.match(signIn, /code === "42703" \|\| code === "42P01"/);
+  assert.match(signIn, /Sign-in is temporarily unavailable while a required system update/);
+  assert.match(signIn, /throw error/);
+});
