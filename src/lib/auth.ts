@@ -33,6 +33,7 @@ const PRIVILEGED_2FA_ROLES = new Set([
 
 type CurrentUserOptions = {
   allowPendingPrivileged2FA?: boolean;
+  allowPendingPasswordChange?: boolean;
 };
 
 function privileged2FAEnrollmentEnforced() {
@@ -54,6 +55,9 @@ export async function getCurrentUser(options: CurrentUserOptions = {}) {
 
   const { effectiveUserForRequest, SUPPORT_COOKIE_NAME } = await import("./support-session");
   const effective = await effectiveUserForRequest(session, jar.get(SUPPORT_COOKIE_NAME)?.value);
+  if (effective.user.mustChangePassword && !options.allowPendingPasswordChange) {
+    throw new Error("Password change required before account access");
+  }
 
   if (
     privileged2FAEnrollmentEnforced()
