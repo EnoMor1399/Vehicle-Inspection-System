@@ -114,4 +114,5 @@ test("browser REST API uses the support subject identity and locks pending passw
   assert.match(api, /Password change required before API access/);
   assert.match(api, /if \(user\.mustChangePassword\)/);
   assert.match(api, /Support session is invalid or not permitted/);
+  assert.match(api, /Exit support view before using an API key/);
 });
