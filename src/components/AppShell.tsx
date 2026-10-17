@@ -289,7 +289,7 @@ export function AppShell({
             );
 
             return group.collapsible ? (
-              <details key={`${group.label}:${pathname}`} defaultOpen={groupHasCurrentPage} className="group/section mb-2 rounded-lg">
+              <details key={`${group.label}:${pathname}`} open={groupHasCurrentPage} className="group/section mb-2 rounded-lg">
                 <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.07em] text-slate-400 hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 [&::-webkit-details-marker]:hidden">
                   <span>{group.label}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open/section:rotate-180" />
