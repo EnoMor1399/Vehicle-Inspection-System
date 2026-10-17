@@ -505,6 +505,7 @@ export const users = pgTable(
     role: userRoleEnum("role").notNull().default("viewer"),
     avatar: text("avatar"),
     passwordHash: text("password_hash"),
+    mustChangePassword: boolean("must_change_password").notNull().default(false),
     phone: varchar("phone", { length: 50 }),
     locationId: varchar("location_id", { length: 36 }).references(() => locations.id, { onDelete: "set null" }),
     transporterId: varchar("transporter_id", { length: 36 }).references(() => transporters.id, { onDelete: "set null" }),
