@@ -81,6 +81,12 @@ test("separate subscriber organizations cannot see each other's operational reco
   await expect(page.getByText("E2E-INSP-001")).toBeVisible();
   await expect(page.getByText("TENANT-INSP-001")).toHaveCount(0);
 
+  await page.goto(`${baseURL}/notifications`);
+  await expect(page.getByRole("heading", { name: "E2E Platform Change Notice" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E RSL-Only Alert" })).toBeVisible();
+  await expect(page.getByText("E2E Tenant-Only Alert")).toHaveCount(0);
+  await expect(page.getByText("E2E Future Scheduled Notice")).toHaveCount(0);
+
   // The Maintenance Risk page must not bypass tenant-scoped APIs through
   // its own server-side fleet and inspection-history queries.
   await page.goto(`${baseURL}/predictive`);
@@ -101,6 +107,12 @@ test("separate subscriber organizations cannot see each other's operational reco
   await page.goto(`${baseURL}/inspections`);
   await expect(page.getByText("TENANT-INSP-001")).toBeVisible();
   await expect(page.getByText("E2E-INSP-001")).toHaveCount(0);
+
+  await page.goto(`${baseURL}/notifications`);
+  await expect(page.getByRole("heading", { name: "E2E Platform Change Notice" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E Tenant-Only Alert" })).toBeVisible();
+  await expect(page.getByText("E2E RSL-Only Alert")).toHaveCount(0);
+  await expect(page.getByText("E2E Future Scheduled Notice")).toHaveCount(0);
 
   await page.goto(`${baseURL}/predictive`);
   await expect(page.getByRole("heading", { name: "Maintenance Risk Intelligence" })).toBeVisible();

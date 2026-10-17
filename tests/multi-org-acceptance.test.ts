@@ -41,3 +41,14 @@ test("workflow supplies credentials for both subscriber organizations", () => {
   assert.match(workflow, /E2E_TENANT_TRAINING_USER_EMAIL/);
   assert.match(workflow, /E2E_TENANT_TRAINING_USER_PASSWORD/);
 });
+
+
+test("browser acceptance verifies scheduled notice targeting in two subscriber accounts", () => {
+  assert.match(seed, /E2E Platform Change Notice/);
+  assert.match(seed, /E2E RSL-Only Alert/);
+  assert.match(seed, /E2E Tenant-Only Alert/);
+  assert.match(seed, /E2E Future Scheduled Notice/);
+  assert.match(seed, /platform_change_notice_receipts/);
+  assert.match(browser, /heading", \{ name: "E2E RSL-Only Alert" \}/);
+  assert.match(browser, /heading", \{ name: "E2E Tenant-Only Alert" \}/);
+});

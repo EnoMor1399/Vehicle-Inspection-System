@@ -392,6 +392,44 @@ try {
     "a tenant participant to reference the RSL training session",
   );
 
+  // Test delivery and strict targeting. These fixture notices exist ONLY in
+  // the isolated PostgreSQL browser-test database.
+  for (const [id, targetOrg, title] of [
+    ["e2e20000-0000-4000-8000-000000000001", null, "E2E Platform Change Notice"],
+    ["e2e20000-0000-4000-8000-000000000002", organizationId, "E2E RSL-Only Alert"],
+    ["e2e20000-0000-4000-8000-000000000003", tenantOrganizationId, "E2E Tenant-Only Alert"],
+  ]) {
+    await client.query(
+      `insert into platform_change_notices
+        (id, organization_id, created_by, title, summary, impact, action_required,
+         action_url, severity, status, publish_at, effective_at)
+       values ($1, $2, $3, $4, 'Security update with advanced user notification.',
+         'There may be a short service interruption.', 'Review your active work before the update.',
+         '/guide', 'important', 'published', now() - interval '1 day', now() + interval '2 days')
+       on conflict (id) do update set organization_id = excluded.organization_id,
+         title = excluded.title, status = excluded.status, publish_at = excluded.publish_at`,
+      [id, targetOrg, userId, title],
+    );
+  }
+  await client.query(
+    `insert into platform_change_notices
+      (id, organization_id, created_by, title, summary, impact, action_required,
+       severity, status, publish_at, effective_at)
+     values ('e2e20000-0000-4000-8000-000000000004', null, $1, 'E2E Future Scheduled Notice',
+       'Future delivery must not be visible yet.',
+       'Service updates will be announced.', 'Read the instructions when published.',
+       'critical', 'published', now() + interval '2 days', now() + interval '3 days')
+     on conflict (id) do update set publish_at = excluded.publish_at, effective_at = excluded.effective_at`,
+    [userId],
+  );
+  await expectTenantBoundaryRejection(
+    `insert into platform_change_notice_receipts (id, notice_id, user_id, organization_id)
+     values ('e2e29999-0000-4000-8000-000000000001',
+       'e2e20000-0000-4000-8000-000000000003', $1, $2)`,
+    [userId, organizationId],
+    "a subscriber to acknowledge another organization's system notice",
+  );
+
   await client.query("commit");
 
   console.log(JSON.stringify({

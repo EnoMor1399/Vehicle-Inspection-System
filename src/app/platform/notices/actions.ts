@@ -10,9 +10,8 @@ import { logAudit } from "@/lib/audit";
 import { newId } from "@/lib/utils";
 
 export type NoticeActionState = { ok: boolean; message: string };
-const initial = { ok: false, message: "Invalid notice." };
 
-export function safeNoticePath(value: string) {
+function safeNoticePath(value: string) {
   // Never permit open redirects, external or protocol-relative destinations,
   // backslashes or percent-encoded path manipulation.
   return /^\/[A-Za-z0-9/_-]*(?:\?[A-Za-z0-9=&_-]+)?$/.test(value) && !value.startsWith("//");
