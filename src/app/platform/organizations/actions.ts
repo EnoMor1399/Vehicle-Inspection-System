@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import {
   activateOrganizationWorkspace,
+  reissueOrganizationOwnerInvitation,
   convertOnboardingRequest,
   setOrganizationStatus,
   updateOrganizationSubscriptionLifecycle,
@@ -70,41 +71,95 @@ export async function changeOrganizationStatus(formData: FormData) {
 }
 
 
-export async function activateSubscriberWorkspace(formData: FormData) {
+export async function activateSubscriberWorkspace(
+  _previous: PlatformOrganizationActionState,
+  formData: FormData,
+): Promise<PlatformOrganizationActionState> {
   const actor = await requirePlatformSuperAdmin();
   const parsed = z.object({
     organizationId: z.string().uuid(),
   }).safeParse({
     organizationId: formData.get("organizationId"),
   });
-  if (!parsed.success) throw new Error("Invalid organization activation request");
+  if (!parsed.success) return { ok: false, message: "Invalid organization activation request." };
 
-  const result = await activateOrganizationWorkspace({
-    organizationId: parsed.data.organizationId,
-    actorUserId: actor.id,
-  });
+  try {
+    // Preserve all required role, subscription and tenant-isolation checks.
+    const result = await activateOrganizationWorkspace({
+      organizationId: parsed.data.organizationId,
+      actorUserId: actor.id,
+    });
 
-  await logAudit({
-    organizationId: actor.organizationId,
-    userId: actor.id,
-    userName: actor.name,
-    action: "approve",
-    entityType: "organization_workspace",
-    entityId: result.organization.id,
-    entityLabel: result.organization.name,
-    summary: `Verified tenant isolation and enabled operational access for ${result.organization.name}`,
-    after: {
-      status: result.organization.status,
-      operationalAccessEnabled: result.organization.operationalAccessEnabled,
-      dataIsolationVerifiedAt: result.organization.dataIsolationVerifiedAt,
-      tenantColumns: result.isolation.tenantColumns,
-      tenantGuards: result.isolation.requiredGuards,
-    },
-  });
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "approve",
+      entityType: "organization_workspace",
+      entityId: result.organization.id,
+      entityLabel: result.organization.name,
+      summary: `Verified tenant isolation and enabled operational access for ${result.organization.name}`,
+      after: {
+        status: result.organization.status,
+        operationalAccessEnabled: result.organization.operationalAccessEnabled,
+        dataIsolationVerifiedAt: result.organization.dataIsolationVerifiedAt,
+        tenantColumns: result.isolation.tenantColumns,
+        tenantGuards: result.isolation.requiredGuards,
+      },
+    });
 
-  revalidatePath("/platform/organizations");
+    revalidatePath("/platform/organizations");
+    revalidatePath(`/platform/organizations/${parsed.data.organizationId}`);
+    return { ok: true, message: "Workspace activated. Tenant isolation, subscription and required administrators verified." };
+  } catch (error) {
+    // Expected unmet prerequisites must not trigger the entire Next.js error boundary.
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Unable to activate the subscriber workspace.",
+    };
+  }
 }
 
+export async function reissueSubscriberOwnerInvitation(
+  _previous: PlatformOrganizationActionState,
+  formData: FormData,
+): Promise<PlatformOrganizationActionState> {
+  const actor = await requirePlatformSuperAdmin();
+  const parsed = z.object({
+    organizationId: z.string().uuid(),
+  }).safeParse({
+    organizationId: formData.get("organizationId"),
+  });
+  if (!parsed.success) return { ok: false, message: "Invalid owner invitation request." };
+
+  try {
+    const result = await reissueOrganizationOwnerInvitation({
+      organizationId: parsed.data.organizationId,
+      actorUserId: actor.id,
+    });
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "update",
+      entityType: "organization_owner_invitation",
+      entityId: parsed.data.organizationId,
+      summary: "Reissued subscriber Organization Owner invitation and revoked previous outstanding owner links",
+      after: { organizationId: parsed.data.organizationId, previousOwnerLinksRevoked: true },
+    });
+    revalidatePath(`/platform/organizations/${parsed.data.organizationId}`);
+    return {
+      ok: true,
+      message: "New one-time Organization Owner invitation created. Copy and send this secure link to the intended owner. Earlier pending links are revoked.",
+      invitationPath: result.invitationPath,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Unable to reissue the owner invitation.",
+    };
+  }
+}
 
 export type SubscriptionLifecycleActionState = {
   ok: boolean;
