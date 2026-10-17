@@ -344,6 +344,9 @@ export async function convertOnboardingRequest(input: {
   return {
     organizationId,
     organizationSlug: slug,
+    organizationName: request.companyName,
+    invitationEmail: request.contactEmail,
+    invitationName: request.contactName,
     invitationToken,
     invitationId,
   };
