@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS platform_change_notices (
  CONSTRAINT platform_change_notice_status_chk CHECK (status IN ('draft','published','withdrawn')),
  CONSTRAINT platform_change_notice_dates_chk CHECK (effective_at >= publish_at AND (expires_at IS NULL OR expires_at > publish_at)),
  CONSTRAINT platform_change_notice_internal_url_chk CHECK (
-   action_url IS NULL OR (action_url LIKE '/%' AND action_url NOT LIKE '//%' AND action_url NOT LIKE '/%\\%')
+   action_url IS NULL OR (action_url LIKE '/%' AND action_url NOT LIKE '//%' AND POSITION(CHR(92) IN action_url) = 0)
  )
 );
 CREATE INDEX IF NOT EXISTS platform_change_notice_audience_idx

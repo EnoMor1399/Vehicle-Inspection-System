@@ -154,3 +154,14 @@ test("subscription capacity migration serializes and rejects plan overages", () 
   assert.match(subscriptionCapacityMigration, /vehicles_subscription_capacity_guard/);
   assert.match(subscriptionCapacityMigration, /inspections_subscription_capacity_guard/);
 });
+
+
+test("change-notification migration supports targeted scheduled delivery and tenant receipt guard", () => {
+  const schema = readFileSync("migrations/20261017_platform_change_notices.sql", "utf8");
+  assert.match(runner, /20261017_platform_change_notices\.sql/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS platform_change_notices/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS platform_change_notice_receipts/);
+  assert.match(schema, /platform_change_notice_receipt_tenant_guard/);
+  assert.match(schema, /Cross-organization notice receipt rejected/);
+  assert.match(schema, /platform_change_notice_user_uidx/);
+});
