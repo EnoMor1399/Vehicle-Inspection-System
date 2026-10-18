@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import { useState } from "react";
 import {
@@ -141,6 +141,8 @@ const TRANSPORTER_NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+type OrganizationChoice = { id: string; name: string; slug: string; status: string };
+
 export interface AppBranding {
   logoUrl?: string | null;
   companyName: string;
@@ -172,6 +174,7 @@ export function AppShell({
   supportContext,
   changeNoticeBanner,
   notificationUnreadCount = 0,
+  organizationChoices = [],
 }: {
   children: ReactNode;
   branding?: AppBranding;
@@ -182,8 +185,10 @@ export function AppShell({
   supportContext?: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null;
   changeNoticeBanner?: { title: string; severity: "critical" | "important"; effectiveAt: string } | null;
   notificationUnreadCount?: number;
+  organizationChoices?: OrganizationChoice[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const isTransporter = userRole === "transporter_user";
   const isSuperAdmin = userRole === "super_admin";
@@ -230,6 +235,8 @@ export function AppShell({
       : roleLabel;
 
   const sessionLabel = userName || workspaceLabel;
+  const oversightMatch = pathname.match(/^\\/platform\\/oversight\\/([^/]+)$/);
+  const activeOversightOrganizationId = oversightMatch ? decodeURIComponent(oversightMatch[1]) : "";
 
   return (
     <div data-app-shell className="app-shell min-h-screen lg:flex">
@@ -375,6 +382,30 @@ export function AppShell({
 
 
             <div className="flex items-center gap-2 sm:gap-3">
+              {isSuperAdmin && organizationChoices.length > 0 && (
+                <label className="hidden min-w-0 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-950 sm:flex">
+                  <Building2 className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden="true" />
+                  <span className="sr-only">Select organization for read-only oversight</span>
+                  <select
+                    aria-label="Select organization for read-only oversight"
+                    value={organizationChoices.some((organization) => organization.id === activeOversightOrganizationId) ? activeOversightOrganizationId : ""}
+                    onChange={(event) => {
+                      const nextId = event.target.value;
+                      if (organizationChoices.some((organization) => organization.id === nextId)) {
+                        router.push(`/platform/oversight/${encodeURIComponent(nextId)}`);
+                      }
+                    }}
+                    className="max-w-[220px] min-w-[145px] bg-transparent text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                  >
+                    <option value="">Select organisation…</option>
+                    {organizationChoices.map((organization) => (
+                      <option key={organization.id} value={organization.id}>
+                        {organization.name} · {organization.status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {userRole && (
                 <Link
                   href="/notifications"
