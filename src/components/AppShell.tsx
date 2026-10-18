@@ -235,7 +235,7 @@ export function AppShell({
       : roleLabel;
 
   const sessionLabel = userName || workspaceLabel;
-  const oversightMatch = pathname.match(/^\\/platform\\/oversight\\/([^/]+)$/);
+  const oversightMatch = pathname.match(/^\/platform\/oversight\/([^/]+)$/);
   const activeOversightOrganizationId = oversightMatch ? decodeURIComponent(oversightMatch[1]) : "";
 
   return (
