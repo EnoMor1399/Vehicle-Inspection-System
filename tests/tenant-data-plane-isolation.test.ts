@@ -41,7 +41,7 @@ test("core Vehicle Inspection reads are organization scoped", () => {
   for (const path of files) {
     assert.match(
       source(path),
-      /organizationId, user\.organizationId|organizationId: user\.organizationId|organizationId, currentUser\.organizationId/,
+      /organizationId, user\.organizationId|organizationId: user\.organizationId|organizationId, currentUser\.organizationId|organizationId=\{user\.organizationId\}/,
       `${path} must reference the authenticated organization boundary`,
     );
   }
@@ -149,12 +149,14 @@ test("public verification paths resolve globally unique verification tokens inst
 
 
 test("maintenance risk dashboard and API enforce the same authenticated tenant boundary", () => {
-  const page = source("src/app/predictive/page.tsx");
+  const route = source("src/app/predictive/page.tsx");
+  const page = source("src/components/PredictiveMaintenanceView.tsx");
   const api = source("src/app/api/v1/predictive-maintenance/route.ts");
 
-  assert.match(page, /const user = await requirePermission\("reports"\)/);
-  assert.match(page, /eq\(vehicles\.organizationId, user\.organizationId\)/);
-  assert.match(page, /eq\(inspections\.organizationId, user\.organizationId\)/);
+  assert.match(route, /const user = await requirePermission\("reports"\)/);
+  assert.match(route, /organizationId=\{user\.organizationId\}/);
+  assert.match(page, /eq\(vehicles\.organizationId, organizationId\)/);
+  assert.match(page, /eq\(inspections\.organizationId, organizationId\)/);
   assert.match(page, /eq\(inspections\.vehicleId, v\.id\)/);
   assert.doesNotMatch(page, /\.from\(vehicles\)\.limit\(/);
   assert.match(api, /eq\(vehicles\.organizationId, auth\.user\.organizationId\)/);
