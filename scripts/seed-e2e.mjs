@@ -9,6 +9,7 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 const expectedDatabase = process.env.EXPECTED_DATABASE_NAME || "Vehicle-Inspection-Enterprise";
 const email = (process.env.E2E_USER_EMAIL || "e2e.inspector@vims.local").toLowerCase();
 const trainingEmail = (process.env.E2E_TRAINING_USER_EMAIL || "e2e.training.admin@vims.local").toLowerCase();
+const superAdminEmail = (process.env.E2E_SUPER_ADMIN_EMAIL || "e2e.platform.admin@vims.local").toLowerCase();
 const tenantInspectionEmail = (process.env.E2E_TENANT_USER_EMAIL || "e2e.tenant.inspector@vims.local").toLowerCase();
 const tenantTrainingEmail = (process.env.E2E_TENANT_TRAINING_USER_EMAIL || "e2e.tenant.training.admin@vims.local").toLowerCase();
 const password = process.env.E2E_USER_PASSWORD || "E2eOnly!Passw0rd2026";
@@ -29,6 +30,7 @@ try {
   const organizationId = "00000000-0000-4000-8000-000000000101";
   const userId = "e2e0000-0000-4000-8000-000000000001";
   const trainingUserId = "e2e0000-0000-4000-8000-000000000008";
+  const superAdminUserId = "e2e90000-0000-4000-8000-000000000001";
   const locationId = "e2e0000-0000-4000-8000-000000000002";
   const transporterId = "e2e0000-0000-4000-8000-000000000003";
   const vehicleId = "e2e0000-0000-4000-8000-000000000004";
@@ -124,6 +126,27 @@ try {
        status = excluded.status`,
     [transporterId, organizationId],
   );
+  // E2E-only identity used to exercise the SAME protected Super Admin sidebar
+  // and read-only organization URLs that users open in production. This seed
+  // runs exclusively against the isolated CI PostgreSQL service.
+  await client.query(
+    `insert into users
+      (id, organization_id, name, email, role, password_hash, permissions, is_active, failed_login_attempts, two_factor_enabled)
+     values ($1, $2, 'E2E Platform Administrator', $3, 'super_admin', $4, '{}'::jsonb, true, 0, false)
+     on conflict (email) do update set
+       organization_id = excluded.organization_id,
+       name = excluded.name,
+       role = excluded.role,
+       password_hash = excluded.password_hash,
+       permissions = excluded.permissions,
+       is_active = true,
+       failed_login_attempts = 0,
+       locked_until = null,
+       two_factor_enabled = false,
+       two_factor_secret = null`,
+    [superAdminUserId, organizationId, superAdminEmail, passwordHash],
+  );
+
   await client.query(
     `insert into users
       (id, organization_id, name, email, role, password_hash, permissions, is_active, location_id, failed_login_attempts, two_factor_enabled)
