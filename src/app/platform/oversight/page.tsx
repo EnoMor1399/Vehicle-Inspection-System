@@ -14,8 +14,8 @@ export default async function PlatformOversightPage() {
     <main className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-10">
       <PageHeader
         eyebrow="Super Administrator · Platform Administration"
-        title="Platform Oversight Centre"
-        description="Review company accounts, operational resources, security posture and activity without crossing subscriber data boundaries or taking over users' sessions."
+        title="Platform Overview"
+        description="Review subscriber statistics and platform health. Choose the organization in the top-left sidebar, then use the sidebar Dashboard and module buttons to view that company."
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {([
@@ -38,7 +38,7 @@ export default async function PlatformOversightPage() {
           <div>
             <h2 className="text-lg font-semibold">Subscriber oversight</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Select a company to inspect its own accounts, resources, audit history and security events.
+              Use the organization selector in the sidebar to inspect a company’s accounts, resources, audit history and security events.
             </p>
           </div>
           <Link href="/platform/organizations" className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
@@ -58,7 +58,6 @@ export default async function PlatformOversightPage() {
                   <th scope="col" className="p-3 text-right">Training</th>
                   <th scope="col" className="p-3 text-right">30-day activity</th>
                   <th scope="col" className="p-3 text-right">Security</th>
-                  <th scope="col" className="p-3">View</th>
                 </tr>
               </thead>
               <tbody>
@@ -80,11 +79,6 @@ export default async function PlatformOversightPage() {
                     <td className="p-3 text-right">{org.last30DayActions}</td>
                     <td className="p-3 text-right">{org.unresolvedSecurityEvents > 0
                       ? <strong className="text-red-700">{org.unresolvedSecurityEvents} open</strong> : "Clear"}</td>
-                    <td className="p-3">
-                      <Link href={`/platform/oversight/${org.id}`} className="inline-flex rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                        Open oversight <ArrowUpRight className="ml-1 h-3 w-3" />
-                      </Link>
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, Building2, FileText, ShieldAlert, UsersRound } from "lucide-react";
+import { Building2, FileText, ShieldAlert, UsersRound } from "lucide-react";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { getPlatformOrganizationOversight, listPlatformOrganizationChoices } from "@/lib/platform-oversight";
-import { OrganizationSwitcher } from "../OrganizationSwitcher";
+import { getPlatformOrganizationOversight } from "@/lib/platform-oversight";
 import { AssetInventory } from "./AssetInventory";
 import { getPlatformOrganizationAssetInventory } from "@/lib/platform-asset-inventory";
 import { formatDateTime } from "@/lib/utils";
@@ -20,9 +18,8 @@ export default async function OrganizationOversightDetail({
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const first = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
-  const [result, organizations, inventory] = await Promise.all([
+  const [result, inventory] = await Promise.all([
     getPlatformOrganizationOversight(id),
-    listPlatformOrganizationChoices(),
     getPlatformOrganizationAssetInventory(id, {
       kind: first(query.assetType),
       page: first(query.assetPage),
@@ -41,13 +38,9 @@ export default async function OrganizationOversightDetail({
   ] as const;
   return (
     <main className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-10">
-      <Link href="/platform/oversight" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
-        <ArrowLeft className="h-4 w-4" /> All organisations
-      </Link>
-      <OrganizationSwitcher organizations={organizations} activeOrganizationId={org.id} />
-      <PageHeader eyebrow="Platform Oversight · Subscriber"
+      <PageHeader eyebrow="Super Administrator · Organization dashboard"
         title={org.name}
-        description="Super Administrator-only view of this organisation. All operational records below are filtered to this company."
+        description="Selected organization dashboard. Use the sidebar to switch companies or open organization-specific modules."
       />
       <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -64,16 +57,6 @@ export default async function OrganizationOversightDetail({
               {org.operationalAccessEnabled && org.dataIsolationVerifiedAt ? "Operational" : "Provisioning"}
             </Badge>
           </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold">
-          <Link href={`/platform/organizations/${org.id}`} className="rounded-lg bg-slate-950 px-3 py-2 text-white">
-            Manage subscription & workspace <ArrowUpRight className="ml-1 inline h-4 w-4" />
-          </Link>
-          <Link href={`/platform/account-support?organizationId=${org.id}`}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800">
-            Account recovery & audited support
-          </Link>
-          <Link href="/platform/notices" className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800">System notices</Link>
         </div>
       </Card>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
