@@ -33,7 +33,10 @@ export default async function ScopedOrganizationModulePage({
   searchParams: Promise<{ page?: string | string[]; assetPage?: string | string[]; assetSearch?: string | string[] }>;
 }) {
   const [{ id, section }, query] = await Promise.all([params, searchParams]);
-  if (!isScopedSection(section)) notFound();
+  if (!isScopedSection(section)) {
+    console.warn("[scoped-nav] invalid module section", JSON.stringify({ section, pathOrgIdPresent: Boolean(id) }));
+    notFound();
+  }
   const config = SCOPED_SECTION_DETAILS[section];
   const one = (v?: string | string[]) => Array.isArray(v) ? v[0] : v;
   const parsed = Number(one(query.page));
@@ -47,7 +50,17 @@ export default async function ScopedOrganizationModulePage({
     }) : Promise.resolve(null),
     listPlatformScopedModuleRecords(id, section, requestedPage),
   ]);
-  if (!overview || !log || (config.inventoryKind && !inventory)) notFound();
+  if (!overview || !log || (config.inventoryKind && !inventory)) {
+    console.warn("[scoped-nav] module data missing", JSON.stringify({
+      section,
+      pathOrgIdPresent: Boolean(id),
+      hasOverview: Boolean(overview),
+      hasLog: Boolean(log),
+      hasInventory: Boolean(inventory),
+      requiresInventory: Boolean(config.inventoryKind),
+    }));
+    notFound();
+  }
 
   const { organization: org, counts } = overview;
   const metricItems = [
