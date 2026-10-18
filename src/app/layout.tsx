@@ -17,6 +17,7 @@ import { getUserThemePreference, type ThemeMode } from "@/lib/theme-preferences"
 import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/organization-access";
 import { getActiveSupportContext, SUPPORT_COOKIE_NAME } from "@/lib/support-session";
 import { listVisibleChangeNotices } from "@/lib/platform-change-notices";
+import { listPlatformOrganizationChoices } from "@/lib/platform-oversight";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   let accountTheme: ThemeMode | null = null;
   let changeNoticeBanner: { title: string; severity: "important" | "critical"; effectiveAt: string } | null = null;
   let notificationUnreadCount = 0;
+  let organizationChoices: { id: string; name: string; slug: string; status: string }[] = [];
   let supportContext: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null = null;
 
   try {
@@ -105,6 +107,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       expiresAt: activeSupport.support.expiresAt.toISOString(),
     };
     accountTheme = await getUserThemePreference(user.id);
+    if (user.role === "super_admin") {
+      organizationChoices = await listPlatformOrganizationChoices();
+    }
     try {
       const [notices, unreadReminders] = await Promise.all([
         listVisibleChangeNotices({ id: user.id, organizationId: user.organizationId }),
@@ -198,6 +203,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             supportContext={supportContext}
             changeNoticeBanner={changeNoticeBanner}
             notificationUnreadCount={notificationUnreadCount}
+            organizationChoices={organizationChoices}
           >
             {children}
           </AppShell>
