@@ -108,7 +108,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     };
     accountTheme = await getUserThemePreference(user.id);
     if (user.role === "super_admin") {
-      organizationChoices = await listPlatformOrganizationChoices();
+      try {
+        organizationChoices = await listPlatformOrganizationChoices();
+      } catch (error) {
+        console.warn("[organization-switcher] organization choices unavailable", error instanceof Error ? error.message : "unknown");
+      }
     }
     try {
       const [notices, unreadReminders] = await Promise.all([
