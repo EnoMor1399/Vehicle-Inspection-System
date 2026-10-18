@@ -293,17 +293,26 @@ export function AppShell({
                   onClick={() => setOrganizationMenuOpen((value) => !value)}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
                 >
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-emerald-300">
-                    <Building2 className="h-5 w-5" aria-hidden="true" />
-                  </span>
+                  {activeOversightOrganization || !branding.logoUrl ? (
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-emerald-300">
+                      <Building2 className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={branding.logoUrl}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-1.5 shadow-sm"
+                    />
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold tracking-tight text-white">
-                      {activeOversightOrganization?.name ?? "VIMS Enterprise"}
+                      {activeOversightOrganization?.name ?? branding.companyName}
                     </span>
                     <span className="mt-0.5 block truncate text-[11px] text-slate-400">
                       {activeOversightOrganization
                         ? "Read-only oversight · " + activeOversightOrganization.status
-                        : "Select an organisation"}
+                        : "Switch organisation · oversight only"}
                     </span>
                   </span>
                   <ChevronDown
