@@ -4,7 +4,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Button } from "@/components/ui";
 import { Plus } from "lucide-react";
-import { TransportersList } from "./TransportersList";
+import { TransportersList } from "@/app/transporters/TransportersList";
 
 export async function TransportersWorkspaceView({ organizationId, editable, readOnly = false }: { organizationId: string; editable: boolean; readOnly?: boolean }) {
 
