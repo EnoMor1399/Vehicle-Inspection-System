@@ -48,6 +48,7 @@ type TrendPoint = {
 interface TransportersListProps {
   rows: TransporterRow[];
   trend?: TrendPoint[];
+  readOnly?: boolean;
 }
 
 type SortMode = "score" | "performance" | "clearance" | "fleet" | "activity" | "name";
@@ -94,7 +95,7 @@ function scoreTone(score: number): "emerald" | "blue" | "amber" | "red" {
   return "red";
 }
 
-export function TransportersList({ rows, trend = [] }: TransportersListProps) {
+export function TransportersList({ rows, trend = [], readOnly = false }: TransportersListProps) {
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("score");
 
@@ -483,9 +484,7 @@ export function TransportersList({ rows, trend = [] }: TransportersListProps) {
                 return (
                   <div key={row.id}>
                     <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                      <Link href={`/transporters/${row.id}`} className="min-w-0 truncate font-medium text-slate-800 hover:text-slate-950 hover:underline">
-                        {index + 1}. {row.companyName}
-                      </Link>
+                      {readOnly ? <span className="min-w-0 truncate font-medium text-slate-800">{index + 1}. {row.companyName}</span> : <Link href={`/transporters/${row.id}`} className="min-w-0 truncate font-medium text-slate-800 hover:text-slate-950 hover:underline">{index + 1}. {row.companyName}</Link>}
                       <span className="shrink-0 font-semibold text-slate-900">{score}%</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -520,9 +519,7 @@ export function TransportersList({ rows, trend = [] }: TransportersListProps) {
               return (
                 <div key={row.id}>
                   <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                    <Link href={`/transporters/${row.id}`} className="min-w-0 truncate font-medium text-slate-800 hover:text-slate-950 hover:underline">
-                      {row.companyName}
-                    </Link>
+                    {readOnly ? <span className="min-w-0 truncate font-medium text-slate-800">{row.companyName}</span> : <Link href={`/transporters/${row.id}`} className="min-w-0 truncate font-medium text-slate-800 hover:text-slate-950 hover:underline">{row.companyName}</Link>}
                     <span className="shrink-0 text-xs font-semibold text-slate-700">{fleet} vehicles · {active} active</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -565,7 +562,7 @@ export function TransportersList({ rows, trend = [] }: TransportersListProps) {
                 <option value="activity">Sort: Total activity</option>
                 <option value="name">Sort: Name</option>
               </select>
-              <ExportMenu data={exportData} filename="transporters" title="Transporter Performance" label="Export" />
+              {!readOnly && <ExportMenu data={exportData} filename="transporters" title="Transporter Performance" label="Export" />}
             </div>
           </div>
         </div>
@@ -582,9 +579,8 @@ export function TransportersList({ rows, trend = [] }: TransportersListProps) {
               const active = Number(row.activeVehicles || 0);
               const activeRate = percent(active, fleet);
               return (
-                <Link
+                <div
                   key={row.id}
-                  href={`/transporters/${row.id}`}
                   className="grid gap-4 px-4 py-4 transition hover:bg-slate-50 sm:px-5 xl:grid-cols-[minmax(230px,1.45fr)_110px_145px_145px_145px] xl:items-center"
                 >
                   <div className="min-w-0">
@@ -628,7 +624,7 @@ export function TransportersList({ rows, trend = [] }: TransportersListProps) {
                     <p className="mt-1 text-sm font-semibold text-slate-900">{scoreLabel(score)}</p>
                     <p className="mt-1 text-[11px] text-slate-500">Composite score</p>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
