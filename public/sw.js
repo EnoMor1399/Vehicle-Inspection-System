@@ -1,10 +1,10 @@
-const CACHE_NAME = "rsl-vims-v4-static";
+const CACHE_NAME = "vims-v5-static";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = [
   OFFLINE_URL,
-  "/manifest.json?v=4",
-  "/pwa/icon/192",
-  "/pwa/icon/512",
+  "/manifest.json?v=5",
+  "/pwa/icon/192?v=5",
+  "/pwa/icon/512?v=5",
 ];
 
 self.addEventListener("install", (event) => {

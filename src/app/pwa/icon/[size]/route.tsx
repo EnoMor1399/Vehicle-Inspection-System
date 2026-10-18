@@ -55,24 +55,24 @@ export async function GET(
             borderRadius: size * 0.14,
             background: "rgba(255,255,255,0.96)",
             color: "#026b02",
-            fontSize: compact ? 42 : 108,
+            fontSize: compact ? 31 : 86,
             fontWeight: 800,
             letterSpacing: "-0.05em",
             boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
           }}
         >
-          RSL
+          VIMS
         </div>
         <div
           style={{
             marginTop: compact ? 12 : 28,
             display: "flex",
-            fontSize: compact ? 19 : 50,
+            fontSize: compact ? 11 : 28,
             fontWeight: 800,
-            letterSpacing: compact ? "0.13em" : "0.16em",
+            letterSpacing: compact ? "0.06em" : "0.12em",
           }}
         >
-          VIMS
+          INSPECTION
         </div>
       </div>
     ),

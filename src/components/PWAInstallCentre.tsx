@@ -37,7 +37,7 @@ function getInstructions(platform: InstallPlatform, browser: InstallBrowser) {
         "Open VIMS in Safari.",
         "Tap the Share button in the Safari toolbar.",
         "Scroll and choose Add to Home Screen.",
-        "Confirm the name “RSL VIMS”, then tap Add.",
+        "Confirm the name “VIMS”, then tap Add.",
         "Launch VIMS from the new Home Screen icon and sign in normally.",
       ],
     };
