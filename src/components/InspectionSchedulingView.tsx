@@ -21,8 +21,8 @@ import {
   type AppointmentStatus,
 } from "@/lib/inspection-scheduling";
 import { formatDateTime } from "@/lib/utils";
-import { AppointmentActions } from "./AppointmentActions";
-import { ScheduleAppointmentForm } from "./ScheduleAppointmentForm";
+import { AppointmentActions } from "@/app/schedule/AppointmentActions";
+import { ScheduleAppointmentForm } from "@/app/schedule/ScheduleAppointmentForm";
 
 const ACTIVE_STATUSES: AppointmentStatus[] = ["scheduled", "confirmed", "checked_in", "in_progress"];
 const ASSIGNABLE_ROLES = ["super_admin", "vehicle_inspection_admin", "admin", "operations_manager", "supervisor", "inspector"] as const;
