@@ -22,21 +22,21 @@ import { listPlatformOrganizationChoices } from "@/lib/platform-oversight";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "RSL — Vehicle Inspection Management System",
-  description: "Road Safety Limited — secure vehicle inspection, compliance, reporting, and fleet operations management.",
-  manifest: "/manifest.json?v=4",
+  title: "Vehicle Inspection Management System",
+  description: "Secure multi-organization vehicle inspection, compliance, reporting, and fleet operations management.",
+  manifest: "/manifest.json?v=5",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "RSL VIMS",
+    title: "VIMS",
   },
   icons: {
     icon: [
-      { url: "/pwa/icon/192", sizes: "192x192", type: "image/png" },
-      { url: "/pwa/icon/512", sizes: "512x512", type: "image/png" },
+      { url: "/pwa/icon/192?v=5", sizes: "192x192", type: "image/png" },
+      { url: "/pwa/icon/512?v=5", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/pwa/icon/192", sizes: "192x192", type: "image/png" },
+      { url: "/pwa/icon/192?v=5", sizes: "192x192", type: "image/png" },
     ],
   },
   other: {
@@ -185,7 +185,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" href={settings.logoDataUrl || "/pwa/icon/192"} />
+        <link rel="apple-touch-icon" href={settings.logoDataUrl || "/pwa/icon/192?v=5"} />
         <meta name="theme-color" content={settings.themeColor} />
         <style nonce={nonce}>{`:root { --brand-color: ${settings.themeColor}; --brand-accent: ${settings.accentColor}; }`}</style>
       </head>
