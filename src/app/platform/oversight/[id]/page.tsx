@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Building2, FileText, ShieldAlert, UsersRound } from "lucide-react";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { getPlatformOrganizationOversight } from "@/lib/platform-oversight";
+import { getPlatformOrganizationOversight, listPlatformOrganizationChoices } from "@/lib/platform-oversight";
+import { OrganizationSwitcher } from "../OrganizationSwitcher";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,10 @@ export default async function OrganizationOversightDetail({
   params,
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const result = await getPlatformOrganizationOversight(id);
+  const [result, organizations] = await Promise.all([
+    getPlatformOrganizationOversight(id),
+    listPlatformOrganizationChoices(),
+  ]);
   if (!result) notFound();
   const { organization: org, accounts, counts, recentVehicles,
     recentInspections, recentAudit, recentSecurity,
@@ -28,6 +32,7 @@ export default async function OrganizationOversightDetail({
       <Link href="/platform/oversight" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
         <ArrowLeft className="h-4 w-4" /> All organisations
       </Link>
+      <OrganizationSwitcher organizations={organizations} activeOrganizationId={org.id} />
       <PageHeader eyebrow="Platform Oversight · Subscriber"
         title={org.name}
         description="Super Administrator-only view of this organisation. All operational records below are filtered to this company."
