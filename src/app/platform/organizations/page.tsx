@@ -31,6 +31,9 @@ export default async function PlatformOrganizationsPage() {
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8 xl:p-10">
+      <Link href="/platform/oversight" className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+        Platform Oversight Centre →
+      </Link>
       <PageHeader
         eyebrow="Platform Administration"
         title="Subscriber Companies"

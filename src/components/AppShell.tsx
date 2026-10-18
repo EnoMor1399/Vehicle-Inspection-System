@@ -112,6 +112,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Platform Administration",
     items: [
+      { href: "/platform/oversight", label: "Platform Oversight Centre", icon: LayoutDashboard, superAdminOnly: true },
       { href: "/platform/organizations", label: "Subscriber Companies", icon: Building2, superAdminOnly: true },
       { href: "/platform/account-support", label: "Account Support", icon: ShieldCheck, superAdminOnly: true },
       { href: "/platform/content", label: "Content Management Centre", icon: BookOpen, superAdminOnly: true },

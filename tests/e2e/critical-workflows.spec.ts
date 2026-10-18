@@ -73,6 +73,11 @@ test("Vehicle Inspection and Driver Training workspaces are isolated by account 
 test("separate subscriber organizations cannot see each other's operational records", async ({ page }) => {
   await signIn(page, inspectionEmail, inspectionPassword, "/");
 
+  // Platform governance must remain inaccessible to subscriber accounts.
+  await page.goto(`${baseURL}/platform/oversight`);
+  await expect(page).toHaveURL(`${baseURL}/`);
+  await expect(page.getByText("Platform Oversight Centre")).toHaveCount(0);
+
   await page.goto(`${baseURL}/vehicles`);
   await expect(page.getByText("E2E-2026")).toBeVisible();
   await expect(page.getByText("TENANT-2026")).toHaveCount(0);
