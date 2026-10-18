@@ -2,21 +2,30 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("organization switcher is privileged, explicit, and does not change tenant sessions", () => {
+test("sidebar is the only organization selector and never impersonates a tenant", () => {
   const helper = readFileSync("src/lib/platform-oversight.ts", "utf8");
-  const switcher = readFileSync("src/app/platform/oversight/OrganizationSwitcher.tsx", "utf8");
+  const shell = readFileSync("src/components/AppShell.tsx", "utf8");
   const detail = readFileSync("src/app/platform/oversight/[id]/page.tsx", "utf8");
+  const platformOverview = readFileSync("src/app/platform/oversight/page.tsx", "utf8");
+  const scopedModule = readFileSync("src/app/platform/oversight/[id]/section/[section]/page.tsx", "utf8");
 
-  assert.match(helper, /export async function listPlatformOrganizationChoices\(\)/);
-  assert.match(helper, /listPlatformOrganizationChoices\(\)[\s\S]*?await requirePlatformSuperAdmin\(\)/);
-  assert.match(switcher, /aria-label="Active organization oversight scope"/);
-  assert.match(switcher, /Active organization · read-only oversight/);
-  assert.match(switcher, /router\.push\(\`\/platform\/oversight\/\$\{encodeURIComponent\(nextId\)\}\`\)/);
-  assert.match(switcher, /organizations\.some\(\(organization\) => organization\.id === nextId\)/);
-  assert.match(switcher, /does not switch user sessions or grant cross-organization operational access/);
-  assert.doesNotMatch(switcher, /document\.cookie|localStorage|sessionStorage|rsl_session_token/);
-  assert.match(detail, /getPlatformOrganizationOversight\(id\)/);
-  assert.match(detail, /OrganizationSwitcher organizations=\{organizations\} activeOrganizationId=\{org\.id\}/);
+  assert.match(helper, /export async function listPlatformOrganizationChoices\\(\\)/);
+  assert.match(helper, /listPlatformOrganizationChoices\\(\\)[\\s\\S]*?await requirePlatformSuperAdmin\\(\\)/);
+  assert.match(shell, /aria-label="Switch organization in the sidebar"/);
+  assert.match(shell, /const canSelectOrganization = isSuperAdmin && !supportContext/);
+  assert.match(shell, /organizationChoices\\.some\\(\\(organization\\) => organization\\.id === organizationId\\)/);
+  assert.match(shell, /router\\.push\\(\\`\\/platform\\/oversight\\/\\$\\{encodeURIComponent\\(organizationId\\)\\}\\`\\)/);
+  assert.doesNotMatch(shell, /label: "Platform Oversight Centre"/);
+  assert.match(shell, /href: "\\/", label: "Dashboard"/);
+  assert.doesNotMatch(shell, /document\\.cookie\\s*=|localStorage\\.setItem/);
+
+  assert.match(detail, /getPlatformOrganizationOversight\\(id\\)/);
+  assert.doesNotMatch(detail, /OrganizationSwitcher|Switch organization|All organisations|Manage subscription & workspace/);
+  assert.match(detail, /<AssetInventory organizationId=\\{org\\.id\\} inventory=\\{inventory\\} \\/>/);
+  assert.doesNotMatch(scopedModule, /Organization overview<\\/|<ArrowLeft/);
+  assert.match(platformOverview, /title="Platform Overview"/);
+  assert.doesNotMatch(platformOverview, /Platform Oversight Centre|Open oversight/);
+  assert.match(platformOverview, /organization selector in the sidebar/);
 });
 
 test("organization oversight resource queries remain explicitly tenant scoped", () => {
