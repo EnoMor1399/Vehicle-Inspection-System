@@ -577,15 +577,17 @@ export function AppShell({
             <div className="flex items-center gap-2 sm:gap-3">
               {userRole && (
                 <Link
-                  href="/notifications"
-                  title="Notifications and system updates"
-                  aria-label={notificationUnreadCount > 0
-                    ? `Open notifications (${notificationUnreadCount} unread)`
-                    : "Open notifications"}
+                  href={scopedNavigationHref("/notifications")}
+                  title={activeOversightOrganizationId ? "Selected organization security alerts" : "Notifications and system updates"}
+                  aria-label={activeOversightOrganizationId
+                    ? "Open selected organization security alerts"
+                    : notificationUnreadCount > 0
+                      ? `Open notifications (${notificationUnreadCount} unread)`
+                      : "Open notifications"}
                   className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
                 >
                   <Bell className="h-5 w-5" aria-hidden="true" />
-                  {notificationUnreadCount > 0 && (
+                  {!activeOversightOrganizationId && notificationUnreadCount > 0 && (
                     <span aria-hidden="true" className="absolute -right-1 -top-1 min-w-[1.2rem] rounded-full bg-red-600 px-1 py-0.5 text-center text-[10px] font-bold leading-none text-white">
                       {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
                     </span>
