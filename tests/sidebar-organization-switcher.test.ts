@@ -14,7 +14,7 @@ test("the Super Admin organization selector lives in the sidebar branding area",
   const topbar = shell.slice(shell.indexOf('<header className='));
 
   assert.match(sidebar, /aria-label="Switch organization in the sidebar"/);
-  assert.match(sidebar, /activeOversightOrganization\?\.name \?\? "VIMS Enterprise"/);
+  assert.match(sidebar, /activeOversightOrganization\?\.name \?\? branding\.companyName/);
   assert.match(sidebar, /organizationChoices\.map\(\(organization\) => \(/);
   assert.match(sidebar, /Read-only oversight/);
   assert.doesNotMatch(topbar, /Select organization for read-only oversight/);
