@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "RSL Vehicle Inspection Management System",
-  "short_name": "RSL VIMS",
-  "description": "Secure vehicle inspection, compliance, reporting and fleet operations for Road Safety Limited.",
+  "name": "Vehicle Inspection Management System",
+  "short_name": "VIMS",
+  "description": "Secure multi-organization vehicle inspection, compliance, reporting and fleet operations.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/",
@@ -15,13 +15,13 @@
   "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
-      "src": "/pwa/icon/192",
+      "src": "/pwa/icon/192?v=5",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/pwa/icon/512",
+      "src": "/pwa/icon/512?v=5",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -33,28 +33,28 @@
       "short_name": "Dashboard",
       "description": "Open the VIMS operations dashboard",
       "url": "/",
-      "icons": [{ "src": "/pwa/icon/192", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/pwa/icon/192?v=5", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "New Inspection",
       "short_name": "Inspect",
       "description": "Start a comprehensive vehicle inspection",
       "url": "/inspections/new",
-      "icons": [{ "src": "/pwa/icon/192", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/pwa/icon/192?v=5", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Inspection Scheduling",
       "short_name": "Schedule",
       "description": "Open inspection scheduling and capacity",
       "url": "/schedule",
-      "icons": [{ "src": "/pwa/icon/192", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/pwa/icon/192?v=5", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Reports & Analytics",
       "short_name": "Reports",
       "description": "Open reporting and analytics",
       "url": "/reports",
-      "icons": [{ "src": "/pwa/icon/192", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/pwa/icon/192?v=5", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "prefer_related_applications": false
