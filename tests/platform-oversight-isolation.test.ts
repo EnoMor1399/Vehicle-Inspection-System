@@ -10,7 +10,8 @@ test("Super Admin platform overview is gated and presents only aggregated data",
   assert.match(source, /getPlatformOversightOverview\(\)\s*\{\s*await requirePlatformSuperAdmin\(\)/);
   assert.match(source, /getPlatformOrganizationOversight\(organizationId: string\)\s*\{\s*await requirePlatformSuperAdmin\(\)/);
   assert.match(page, /getPlatformOversightOverview/);
-  assert.match(page, /Platform Oversight Centre/);
+  assert.match(page, /title="Platform Overview"/);
+  assert.doesNotMatch(page, /Platform Oversight Centre/);
   assert.match(source, /\.groupBy\(table\.organizationId\)/);
   assert.match(source, /eq\(securityEvents\.resolved, false\)/);
   assert.doesNotMatch(source, /\.update\(|\.delete\(|\.insert\(/);
@@ -36,10 +37,17 @@ test("overarching navigation and account support remain Super Admin-only", () =>
   const orgs = read("src/app/platform/organizations/page.tsx");
   const detail = read("src/app/platform/oversight/[id]/page.tsx");
   const support = read("src/app/platform/account-support/page.tsx");
-  assert.match(nav, /href: "\/platform\/oversight".*superAdminOnly: true/);
+  // Dashboard uses the selected organization; platform administration is
+  // reached using the protected Subscriber Companies and support buttons.
+  assert.match(nav, /href: "\/", label: "Dashboard"/);
+  assert.match(nav, /href: "\/platform\/organizations".*superAdminOnly: true/);
+  assert.match(nav, /href: "\/platform\/account-support".*superAdminOnly: true/);
+  assert.match(nav, /canSelectOrganization = isSuperAdmin && !supportContext/);
+  assert.doesNotMatch(nav, /label: "Platform Oversight Centre"/);
   assert.match(orgs, /href="\/platform\/oversight"/);
   assert.match(detail, /getPlatformOrganizationOversight\(id\)/);
-  assert.match(detail, /platform\/account-support\?organizationId=/);
+  assert.match(detail, /getPlatformOrganizationAssetInventory\(id/);
+  assert.doesNotMatch(detail, /OrganizationSwitcher|platform\/account-support\?organizationId=/);
   assert.match(support, /actor\.role !== "super_admin"/);
   assert.match(support, /eq\(users\.organizationId, organizationFilter\)/);
 });
