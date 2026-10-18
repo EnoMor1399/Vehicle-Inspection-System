@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
+import { isValidOrganizationId } from "@/lib/organization-id";
 
 // Existing tenant-owned resources are displayed as a read-only catalogue.
 // An inspection event or a user account is not counted as an asset.
@@ -59,7 +60,7 @@ export async function getPlatformOrganizationAssetInventory(
   filters: { kind?: string; page?: string | number; search?: string } = {},
 ) {
   await requirePlatformSuperAdmin();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+  if (!isValidOrganizationId(organizationId)) {
     return null;
   }
   const [org] = await db.select({ id: organizations.id })
