@@ -9,9 +9,10 @@ import { formatDateTime } from "@/lib/utils";
 interface VehiclesListProps {
   rows: any[];
   editable: boolean;
+  readOnly?: boolean;
 }
 
-export function VehiclesList({ rows, editable }: VehiclesListProps) {
+export function VehiclesList({ rows, editable, readOnly = false }: VehiclesListProps) {
   const exportData = rows.map((v: any) => ({
     registrationNumber: v.registrationNumber,
     make: v.make,
@@ -27,14 +28,14 @@ export function VehiclesList({ rows, editable }: VehiclesListProps) {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
+      {!readOnly && <div className="flex justify-end mb-4">
         <ExportMenu
           data={exportData}
           filename="vehicles"
           title="Vehicle Fleet"
           label="Export"
         />
-      </div>
+      </div>}
 
       {rows.length === 0 ? (
         <Card>
@@ -87,9 +88,9 @@ export function VehiclesList({ rows, editable }: VehiclesListProps) {
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link href={`/vehicles/${v.id}`} className="text-[var(--brand-accent)] hover:opacity-75 font-semibold text-sm">
+                      {!readOnly && <Link href={`/vehicles/${v.id}`} className="text-[var(--brand-accent)] hover:opacity-75 font-semibold text-sm">
                         View →
-                      </Link>
+                      </Link>}
                     </td>
                   </tr>
                 ))}
