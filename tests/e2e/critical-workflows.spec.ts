@@ -35,61 +35,6 @@ async function signOut(page: import("@playwright/test").Page) {
   await page.waitForURL(`${baseURL}/login`);
 }
 
-test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
-  await signIn(page, adminEmail, adminPassword, "/");
-  const chooseOrganization = page.getByRole("button", { name: "Switch organization in the sidebar" });
-  await expect(chooseOrganization).toBeVisible();
-  await chooseOrganization.click();
-  await page.getByRole("button", { name: /E2E Tenant Safety Ltd/ }).click();
-  await expect(page).toHaveURL(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
-  await expect(page.getByRole("heading", { name: "E2E Tenant Safety Ltd" })).toBeVisible();
-
-  const vehiclesLink = page.getByRole("link", { name: "Vehicles", exact: true });
-  await expect(vehiclesLink).toHaveAttribute("href",
-    `/platform/oversight/${tenantOrganizationId}/section/vehicles`);
-  await vehiclesLink.click();
-  await expect(page).toHaveURL(
-    `${baseURL}/platform/oversight/${tenantOrganizationId}/section/vehicles`);
-  await expect(page.locator('main').getByText("Organization asset and resource inventory")).toBeVisible();
-  await expect(page.locator('main').getByText("TENANT-2026")).toBeVisible();
-  await expect(page.locator('main').getByText("E2E-2026")).toHaveCount(0);
-
-  // Verifies valid server-side modules and the explicitly selected org for
-  // every sidebar function, not just a link's href or a build-route manifest.
-  for (const slug of [
-    "transporters", "inspections", "daily-inspections", "scheduling",
-    "stations", "training", "reports", "compliance", "maintenance-risk",
-    "powerbi", "rfid", "users", "documents", "import-export",
-    "settings", "audit", "notifications", "transporter-portal",
-  ]) {
-    const response = await page.goto(
-      `${baseURL}/platform/oversight/${tenantOrganizationId}/section/${slug}`);
-    expect(response?.status(), `Selected organization route ${slug}`).toBe(200);
-    await expect(page.getByText("This page could not be found.")).toHaveCount(0);
-    await expect(page.getByText("E2E Tenant Safety Ltd").first()).toBeVisible();
-  }
-
-  await chooseOrganization.click();
-  await page.getByRole("button", { name: /Road Safety Limited/ }).click();
-  await expect(page).toHaveURL(`${baseURL}/platform/oversight/${rslOrganizationId}`);
-  await page.getByRole("link", { name: "Vehicles", exact: true }).click();
-  await expect(page.locator('main').getByText("E2E-2026")).toBeVisible();
-  await expect(page.locator('main').getByText("TENANT-2026")).toHaveCount(0);
-});
-
-test("operational user cannot open any privileged selected-company page", async ({ page }) => {
-  await signIn(page, inspectionEmail, inspectionPassword, "/");
-  for (const path of [
-    `/platform/oversight/${tenantOrganizationId}`,
-    `/platform/oversight/${tenantOrganizationId}/section/vehicles`,
-    `/platform/oversight/${tenantOrganizationId}/section/inspections`,
-  ]) {
-    await page.goto(`${baseURL}${path}`);
-    await expect(page).toHaveURL(`${baseURL}/`);
-    await expect(page.getByText("TENANT-2026")).toHaveCount(0);
-  }
-});
-
 test("Vehicle Inspection and Driver Training workspaces are isolated by account role", async ({ page }) => {
   await signIn(page, inspectionEmail, inspectionPassword, "/");
   await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
@@ -266,3 +211,65 @@ test("support-mode cookie blocks HTTP mutations even if no support record exists
   expect(response.status()).toBe(403);
   expect((await response.json()).error).toContain("Read-only support mode");
 });
+
+test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
+  await signIn(page, adminEmail, adminPassword, "/");
+  const chooseOrganization = page.getByRole("button", { name: "Switch organization in the sidebar" });
+  await expect(chooseOrganization).toBeVisible();
+  await chooseOrganization.click();
+  await page.getByRole("button", { name: /E2E Tenant Safety Ltd/ }).click();
+  await expect(page).toHaveURL(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
+  await expect(page.getByRole("heading", { name: "E2E Tenant Safety Ltd" })).toBeVisible();
+
+  const vehiclesLink = page.getByRole("link", { name: "Vehicles", exact: true });
+  await expect(vehiclesLink).toHaveAttribute("href",
+    `/platform/oversight/${tenantOrganizationId}/section/vehicles`);
+  await vehiclesLink.click();
+  await expect(page).toHaveURL(
+    `${baseURL}/platform/oversight/${tenantOrganizationId}/section/vehicles`);
+  const vehiclesResponse = await page.goto(
+    `${baseURL}/platform/oversight/${tenantOrganizationId}/section/vehicles`);
+  const pageText = await page.locator("body").innerText();
+  console.log("[scoped-navigation-e2e] Vehicles HTTP status:", vehiclesResponse?.status(),
+    "Not Found:", pageText.includes("This page could not be found."));
+  expect(vehiclesResponse?.status(), "Vehicles should render rather than 404/500").toBe(200);
+  await expect(page.locator('main').getByText("Organization asset and resource inventory")).toBeVisible();
+  await expect(page.locator('main').getByText("TENANT-2026")).toBeVisible();
+  await expect(page.locator('main').getByText("E2E-2026")).toHaveCount(0);
+
+  // Verifies valid server-side modules and the explicitly selected org for
+  // every sidebar function, not just a link's href or a build-route manifest.
+  for (const slug of [
+    "transporters", "inspections", "daily-inspections", "scheduling",
+    "stations", "training", "reports", "compliance", "maintenance-risk",
+    "powerbi", "rfid", "users", "documents", "import-export",
+    "settings", "audit", "notifications", "transporter-portal",
+  ]) {
+    const response = await page.goto(
+      `${baseURL}/platform/oversight/${tenantOrganizationId}/section/${slug}`);
+    expect(response?.status(), `Selected organization route ${slug}`).toBe(200);
+    await expect(page.getByText("This page could not be found.")).toHaveCount(0);
+    await expect(page.getByText("E2E Tenant Safety Ltd").first()).toBeVisible();
+  }
+
+  await chooseOrganization.click();
+  await page.getByRole("button", { name: /Road Safety Limited/ }).click();
+  await expect(page).toHaveURL(`${baseURL}/platform/oversight/${rslOrganizationId}`);
+  await page.getByRole("link", { name: "Vehicles", exact: true }).click();
+  await expect(page.locator('main').getByText("E2E-2026")).toBeVisible();
+  await expect(page.locator('main').getByText("TENANT-2026")).toHaveCount(0);
+});
+
+test("operational user cannot open any privileged selected-company page", async ({ page }) => {
+  await signIn(page, inspectionEmail, inspectionPassword, "/");
+  for (const path of [
+    `/platform/oversight/${tenantOrganizationId}`,
+    `/platform/oversight/${tenantOrganizationId}/section/vehicles`,
+    `/platform/oversight/${tenantOrganizationId}/section/inspections`,
+  ]) {
+    await page.goto(`${baseURL}${path}`);
+    await expect(page).toHaveURL(`${baseURL}/`);
+    await expect(page.getByText("TENANT-2026")).toHaveCount(0);
+  }
+});
+
