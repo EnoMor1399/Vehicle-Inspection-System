@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { ArrowLeftRight, Building2, ChevronDown, ShieldCheck } from "lucide-react";
 
 type OrganizationChoice = {
@@ -20,14 +20,12 @@ export function OrganizationSwitcher({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [selectedId, setSelectedId] = useState(activeOrganizationId);
   const active = organizations.find((organization) => organization.id === activeOrganizationId);
 
   function switchOrganization(nextId: string) {
     // Only navigate to an ID supplied by the server-side Super Admin list.
     // This changes the read-only oversight page, not the authenticated user's tenant.
     if (!organizations.some((organization) => organization.id === nextId)) return;
-    setSelectedId(nextId);
     if (nextId === activeOrganizationId) return;
     startTransition(() => router.push(`/platform/oversight/${encodeURIComponent(nextId)}`));
   }
@@ -57,7 +55,7 @@ export function OrganizationSwitcher({
           <span className="relative">
             <select
               aria-label="Switch organization in oversight view"
-              value={selectedId}
+              value={activeOrganizationId}
               disabled={isPending || organizations.length === 0}
               onChange={(event) => switchOrganization(event.target.value)}
               className="min-h-11 w-full appearance-none rounded-xl border border-indigo-200 bg-white py-2 pl-3 pr-10 text-sm font-medium text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:cursor-wait disabled:opacity-70"
