@@ -35,6 +35,8 @@ test("sidebar retains the organization across scoped routes and does not send Su
   assert.match(shell, /sessionStorage\.setItem\(LAST_OVERSIGHT_ORG_KEY, organizationId\)/);
   assert.match(shell, /organizationChoices\.some\(\(organization\) => organization\.id === id\)/);
   assert.match(shell, /currentPageIsScoped/);
+  assert.match(shell, /href=\{scopedNavigationHref\("\/notifications"\)\}/);
+  assert.match(shell, /!activeOversightOrganizationId && notificationUnreadCount > 0/);
   assert.match(shell, /Organization-scoped read-only view/);
   assert.match(shell, /Organization selection retained · this page is platform-wide/);
 });
