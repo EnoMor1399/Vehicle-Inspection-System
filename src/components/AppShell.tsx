@@ -383,7 +383,7 @@ export function AppShell({
 
             <div className="flex items-center gap-2 sm:gap-3">
               {isSuperAdmin && organizationChoices.length > 0 && (
-                <label className="hidden min-w-0 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-950 sm:flex">
+                <label className="flex min-w-0 max-w-[132px] items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2 py-2 text-xs font-semibold text-indigo-950 sm:max-w-[280px] sm:gap-2 sm:px-3">
                   <Building2 className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden="true" />
                   <span className="sr-only">Select organization for read-only oversight</span>
                   <select
@@ -395,7 +395,7 @@ export function AppShell({
                         router.push(`/platform/oversight/${encodeURIComponent(nextId)}`);
                       }
                     }}
-                    className="max-w-[220px] min-w-[145px] bg-transparent text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    className="min-w-0 max-w-[92px] bg-transparent text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 sm:max-w-[220px] sm:text-xs"
                   >
                     <option value="">Select organisation…</option>
                     {organizationChoices.map((organization) => (
