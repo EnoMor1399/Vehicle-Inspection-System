@@ -26,7 +26,7 @@ test("role-scoped navigation keeps all operational entry points while collapsing
 });
 
 test("advanced visual analytics remain accessible without overwhelming the initial dashboard", () => {
-  const page = read("src/app/page.tsx");
+  const page = read("src/components/ExecutiveDashboardView.tsx");
   assert.match(page, /<details className="group mt-6/);
   assert.match(page, /Detailed performance analytics/);
   assert.match(page, /Show insights/);
