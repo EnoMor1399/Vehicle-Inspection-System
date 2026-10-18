@@ -13,6 +13,8 @@ import { InspectionStationsView } from "@/components/InspectionStationsView";
 import { DriverTrainingWorkspaceView } from "@/components/DriverTrainingWorkspaceView";
 import { ReportsWorkspaceView } from "@/components/ReportsWorkspaceView";
 import { AuditWorkspaceView } from "@/components/AuditWorkspaceView";
+import { ComplianceWorkspaceView } from "@/components/ComplianceWorkspaceView";
+import { PredictiveMaintenanceView } from "@/components/PredictiveMaintenanceView";
 import { ClassicScopedModuleView } from "@/components/ClassicScopedModuleView";
 import { AssetInventory } from "../../AssetInventory";
 import { PageHeader } from "@/components/ui";
@@ -78,6 +80,10 @@ export default async function SelectedOrganizationModule({
       return <DriverTrainingWorkspaceView organizationId={organizationId} canManage={false} readOnly />;
     case "reports":
       return <ReportsWorkspaceView organizationId={organizationId} scopedOrganizationId={organizationId} />;
+    case "compliance":
+      return <ComplianceWorkspaceView organizationId={organizationId} scopedOrganizationId={organizationId} />;
+    case "maintenance-risk":
+      return <PredictiveMaintenanceView organizationId={organizationId} scopedOrganizationId={organizationId} />;
     case "audit":
       return <AuditWorkspaceView organizationId={organizationId} />;
     case "rfid":
