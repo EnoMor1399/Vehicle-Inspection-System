@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { scopedOrganizationHref, SCOPED_NAV_SECTIONS } from "@/lib/platform-oversight-navigation";
 import {
   Activity,
   BarChart3,
@@ -37,6 +38,7 @@ import {
 } from "lucide-react";
 
 const NO_SHELL_PATHS = ["/login", "/subscribe"];
+const LAST_OVERSIGHT_ORG_KEY = "vims-superadmin-oversight-selection";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Administrator",
@@ -192,11 +194,51 @@ export function AppShell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
+  const [rememberedOrganizationId, setRememberedOrganizationId] = useState("");
   const organizationMenuRef = useRef<HTMLDivElement>(null);
   const isTransporter = userRole === "transporter_user";
   const isSuperAdmin = userRole === "super_admin";
+  const canSelectOrganization = isSuperAdmin && !supportContext;
   const roleLabel = ROLE_LABELS[userRole || ""] || "User";
   const allowed = new Set(allowedResources);
+
+  // A selected organization is a navigation preference only, not a
+  // change to the authenticated tenant, session, role, or data permissions.
+  const routeParts = pathname.split("/");
+  const pathOrganizationId =
+    routeParts[1] === "platform" && routeParts[2] === "oversight"
+    && ((routeParts.length === 4 && routeParts[3])
+      || (routeParts.length === 6 && routeParts[4] === "section" && routeParts[5]))
+      ? routeParts[3] : "";
+  const validOrganizationId = (id: string) =>
+    organizationChoices.some((organization) => organization.id === id);
+  const activeOversightOrganizationId = canSelectOrganization
+    ? (validOrganizationId(pathOrganizationId)
+      ? pathOrganizationId
+      : validOrganizationId(rememberedOrganizationId) ? rememberedOrganizationId : "")
+    : "";
+  const activeOversightOrganization = organizationChoices.find(
+    (organization) => organization.id === activeOversightOrganizationId,
+  );
+  const currentPageIsScoped = Boolean(pathOrganizationId && pathOrganizationId === activeOversightOrganizationId);
+
+  function scopedNavigationHref(href: string) {
+    if (!canSelectOrganization) return href;
+    if (activeOversightOrganizationId) return scopedOrganizationHref(activeOversightOrganizationId, href);
+    // A Super Admin with no selection must not accidentally open the
+    // operational pages belonging to their original login organization.
+    if (href === "/" || href in SCOPED_NAV_SECTIONS) return "/platform/oversight";
+    return href;
+  }
+
+  function isActiveNavItem(item: NavItem) {
+    const href = scopedNavigationHref(item.href);
+    if (item.href === "/platform/oversight") return pathname === "/platform/oversight";
+    if (item.href === "/" && canSelectOrganization && activeOversightOrganizationId) {
+      return pathname === href;
+    }
+    return isActivePath(pathname, href);
+  }
 
   const navGroups = isTransporter
     ? TRANSPORTER_NAV_GROUPS
@@ -216,7 +258,7 @@ export function AppShell({
 
   const activeContext = (() => {
     for (const group of navGroups) {
-      const item = group.items.find((candidate) => isActivePath(pathname, candidate.href));
+      const item = group.items.find((candidate) => isActiveNavItem(candidate));
       if (item) return { group: group.label, item };
     }
     return null;
@@ -229,14 +271,26 @@ export function AppShell({
       : roleLabel;
 
   const sessionLabel = userName || workspaceLabel;
-  const oversightMatch = pathname.match(/^\/platform\/oversight\/([^/]+)$/);
-  const activeOversightOrganizationId = oversightMatch ? decodeURIComponent(oversightMatch[1]) : "";
-  // The sidebar selector only switches the read-only oversight page.
-  // It never changes the authenticated tenant, session, or operational permissions.
-  const canSelectOrganization = isSuperAdmin && !supportContext;
-  const activeOversightOrganization = canSelectOrganization
-    ? organizationChoices.find((organization) => organization.id === activeOversightOrganizationId)
-    : undefined;
+
+  useEffect(() => {
+    if (!canSelectOrganization) return;
+    try {
+      const isAllowed = (id: string) => organizationChoices.some((org) => org.id === id);
+      if (isAllowed(pathOrganizationId)) {
+        sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, pathOrganizationId);
+        setRememberedOrganizationId(pathOrganizationId);
+      } else {
+        const saved = sessionStorage.getItem(LAST_OVERSIGHT_ORG_KEY) || "";
+        if (isAllowed(saved)) setRememberedOrganizationId(saved);
+        else {
+          sessionStorage.removeItem(LAST_OVERSIGHT_ORG_KEY);
+          setRememberedOrganizationId("");
+        }
+      }
+    } catch {
+      // Only a UI preference: protected server routes never trust storage.
+    }
+  }, [canSelectOrganization, pathOrganizationId, organizationChoices]);
 
   useEffect(() => {
     if (!organizationMenuOpen) return;
@@ -260,6 +314,8 @@ export function AppShell({
     if (!canSelectOrganization) return;
     if (!organizationChoices.some((organization) => organization.id === organizationId)) return;
     setOrganizationMenuOpen(false);
+    setRememberedOrganizationId(organizationId);
+    try { sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, organizationId); } catch {}
     setOpen(false);
     router.push(`/platform/oversight/${encodeURIComponent(organizationId)}`);
   }
@@ -397,16 +453,16 @@ export function AppShell({
 
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary sections">
           {navGroups.map((group) => {
-            const groupHasCurrentPage = group.items.some((item) => isActivePath(pathname, item.href));
+            const groupHasCurrentPage = group.items.some((item) => isActiveNavItem(item));
             const items = (
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const active = isActivePath(pathname, item.href);
+                  const active = isActiveNavItem(item);
                   const Icon = item.icon;
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={scopedNavigationHref(item.href)}
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -533,6 +589,13 @@ export function AppShell({
           </div>
         </header>
 
+        {activeOversightOrganization && (
+          <div role="status" className="flex flex-wrap items-center gap-2 border-b border-indigo-200 bg-indigo-50 px-4 py-2 text-xs text-indigo-950 sm:px-6 lg:px-8">
+            <Building2 className="h-4 w-4" aria-hidden="true" />
+            <span><strong>{activeOversightOrganization.name}</strong> · {currentPageIsScoped ? "Organization-scoped read-only view" : "Organization selection retained · this page is platform-wide"}</span>
+            <Link href={`/platform/oversight/${encodeURIComponent(activeOversightOrganization.id)}`} className="font-semibold underline">Overview</Link>
+          </div>
+        )}
         <main className="app-shell-content min-h-[calc(100vh-65px)] overflow-x-hidden">{children}</main>
       </div>
     </div>
