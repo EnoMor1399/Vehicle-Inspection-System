@@ -70,7 +70,7 @@ export default async function ScopedOrganizationModulePage({
         <Building2 className="h-4 w-4" />
         <strong>{org.name}</strong>
         <Badge tone="slate">Scoped · read-only</Badge>
-        <span className="text-xs text-indigo-800">All data below is filtered to this organization's ID; platform administration is separate.</span>
+        <span className="text-xs text-indigo-800">All data below is filtered to this organization&apos;s ID; platform administration is separate.</span>
       </div>
 
       <PageHeader
@@ -96,7 +96,7 @@ export default async function ScopedOrganizationModulePage({
             <Link
               href={`/platform/oversight/${encodeURIComponent(org.id)}?assetType=equipment#organization-inventory`}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-600"
-            >View equipment recorded at this organization's stations <ArrowRight className="h-4 w-4" /></Link>
+            >View equipment recorded at this organization&apos;s stations <ArrowRight className="h-4 w-4" /></Link>
           )}
           <AssetInventory
             organizationId={org.id}
@@ -186,8 +186,8 @@ export default async function ScopedOrganizationModulePage({
         </p>
       )}
       <p className="text-xs leading-6 text-slate-600">
-        Navigation here is intentionally read-only. The Super Admin's original authenticated
-        organization is never changed; modifying another company's operational data requires
+        Navigation here is intentionally read-only. The Super Admin&apos;s original authenticated
+        organization is never changed; modifying another company&apos;s operational data requires
         separately authorized and audited controls.
       </p>
     </main>
