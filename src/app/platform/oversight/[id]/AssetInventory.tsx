@@ -38,9 +38,9 @@ export function AssetInventory({
               <Boxes className="h-5 w-5 text-emerald-700" /> Organization asset and resource inventory
             </h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
-              Complete, read-only list of the selected organization's registered vehicles,
+              Complete, read-only list of the selected organization&apos;s registered vehicles,
               inspection stations and their listed equipment, RFID tags, transporters,
-              documents and training sessions. No other organization's records are included.
+              documents and training sessions. No other organization&apos;s records are included.
             </p>
           </div>
           <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800">
