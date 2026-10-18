@@ -7,6 +7,7 @@ import {
   securityEvents, users, vehicles,
 } from "@/db/schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
+import { isValidOrganizationId } from "@/lib/organization-id";
 import type { ScopedSection } from "@/lib/platform-oversight-navigation";
 
 export const SCOPED_MODULE_PAGE_SIZE = 40;
@@ -31,7 +32,7 @@ export async function listPlatformScopedModuleRecords(
   requestedPage: number,
 ): Promise<{ records: ScopedModuleRecord[]; total: number; page: number; totalPages: number } | null> {
   await requirePlatformSuperAdmin();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) return null;
+  if (!isValidOrganizationId(organizationId)) return null;
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
     ? Math.min(requestedPage, 10_000)
     : 1;
