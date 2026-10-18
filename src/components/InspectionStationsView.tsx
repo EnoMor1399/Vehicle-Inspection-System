@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { locations, users, inspections } from "@/db/schema";
 import { and, eq, sql, asc } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
-import { StationEditor } from "./StationEditor";
+import { StationEditor } from "@/app/locations/StationEditor";
 import { MapPin, Users, Wrench, Phone, Mail } from "lucide-react";
 
 export async function InspectionStationsView({ organizationId, canManage = false }: { organizationId: string; canManage?: boolean }) {
