@@ -83,6 +83,19 @@ export async function getPlatformOversightOverview() {
   }));
 }
 
+// Minimal organization choices for the Super Admin oversight switcher.
+// The list is available only to platform Super Administrators and contains no
+// operational records. It never changes the user's authenticated organization.
+export async function listPlatformOrganizationChoices() {
+  await requirePlatformSuperAdmin();
+  return db.select({
+    id: organizations.id,
+    name: organizations.name,
+    slug: organizations.slug,
+    status: organizations.status,
+  }).from(organizations).orderBy(organizations.name);
+}
+
 // All queries use explicit organization_id on the selected tenant, even for
 // a Super Administrator. This prevents accidental cross-tenant joins/exports.
 export async function getPlatformOrganizationOversight(organizationId: string) {

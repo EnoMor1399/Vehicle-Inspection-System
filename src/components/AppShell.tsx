@@ -151,9 +151,9 @@ export interface AppBranding {
 }
 
 const DEFAULT_BRANDING: AppBranding = {
-  companyName: "Road Safety Limited",
-  tagline: "Vehicle Inspection Management System",
-  footerText: "© 2026 Road Safety Limited · VIMS Enterprise",
+  companyName: "VIMS Enterprise",
+  tagline: "Multi-Organization Vehicle Inspection Management",
+  footerText: "© 2026 VIMS Enterprise · Secure Multi-Organization Platform",
   themeColor: "#039703",
   accentColor: "#026b02",
 };
