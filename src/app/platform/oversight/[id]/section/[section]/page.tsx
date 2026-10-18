@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, Building2, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, ShieldCheck } from "lucide-react";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { getPlatformOrganizationOversight } from "@/lib/platform-oversight";
 import { getPlatformOrganizationAssetInventory } from "@/lib/platform-asset-inventory";
@@ -62,10 +62,6 @@ export default async function ScopedOrganizationModulePage({
 
   return (
     <main className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6 lg:p-10">
-      <Link href={`/platform/oversight/${encodeURIComponent(org.id)}`} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-950">
-        <ArrowLeft className="h-4 w-4" /> Organization overview
-      </Link>
-
       <div role="status" className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-950">
         <Building2 className="h-4 w-4" />
         <strong>{org.name}</strong>
