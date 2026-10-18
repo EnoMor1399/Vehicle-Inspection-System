@@ -191,7 +191,7 @@ test("training operations are wired into the enterprise migration and verifier",
 });
 
 test("department UI exposes operational workspaces through the streamlined overview", () => {
-  const dashboard = readFileSync("src/app/driver-training/page.tsx", "utf8");
+  const dashboard = readFileSync("src/components/DriverTrainingWorkspaceView.tsx", "utf8");
   const navigation = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
   const sessions = readFileSync("src/app/driver-training/sessions/page.tsx", "utf8");
   const participants = readFileSync("src/app/driver-training/participants/page.tsx", "utf8");
@@ -210,7 +210,7 @@ test("department UI exposes operational workspaces through the streamlined overv
 });
 
 test("Driver Training route degrades safely when data or rendering fails", () => {
-  const dashboard = readFileSync("src/app/driver-training/page.tsx", "utf8");
+  const dashboard = readFileSync("src/components/DriverTrainingWorkspaceView.tsx", "utf8");
   const loading = readFileSync("src/app/driver-training/loading.tsx", "utf8");
   const error = readFileSync("src/app/driver-training/error.tsx", "utf8");
   const navigation = readFileSync("src/app/driver-training/DriverTrainingNav.tsx", "utf8");
