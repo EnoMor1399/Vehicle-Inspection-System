@@ -274,8 +274,8 @@ test("Super Admin company switch and every operational sidebar destination retur
   await page.getByRole("button", { name: /Road Safety Limited/ }).click();
   await expect(page).toHaveURL(`${baseURL}/platform/oversight/${rslOrganizationId}`);
   await page.getByRole("link", { name: "Vehicles", exact: true }).click();
-  await expect(page.locator('main').getByText("E2E-2026")).toBeVisible();
-  await expect(page.locator('main').getByText("TENANT-2026")).toHaveCount(0);
+  await expect(page.getByLabel("Organization asset inventory").getByText("E2E-2026")).toBeVisible();
+  await expect(page.getByLabel("Organization asset inventory").getByText("TENANT-2026")).toHaveCount(0);
 });
 
 
