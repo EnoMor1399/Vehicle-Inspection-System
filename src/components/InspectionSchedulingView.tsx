@@ -77,9 +77,9 @@ export async function InspectionSchedulingView({ organizationId, canSchedule = f
         inspectorName: users.name,
       })
       .from(inspectionAppointments)
-      .innerJoin(vehicles, eq(vehicles.id, inspectionAppointments.vehicleId))
-      .leftJoin(locations, eq(locations.id, inspectionAppointments.locationId))
-      .leftJoin(users, eq(users.id, inspectionAppointments.assignedInspectorId))
+      .innerJoin(vehicles, and(eq(vehicles.id, inspectionAppointments.vehicleId), eq(vehicles.organizationId, organizationId)))
+      .leftJoin(locations, and(eq(locations.id, inspectionAppointments.locationId), eq(locations.organizationId, organizationId)))
+      .leftJoin(users, and(eq(users.id, inspectionAppointments.assignedInspectorId), eq(users.organizationId, organizationId)))
       .where(and(
         eq(inspectionAppointments.organizationId, organizationId),
         eq(vehicles.organizationId, organizationId),
