@@ -222,15 +222,6 @@ export function AppShell({
     return null;
   })();
 
-  if (
-    NO_SHELL_PATHS.includes(pathname)
-    || pathname.startsWith("/invite/")
-    || pathname.startsWith("/verify")
-    || pathname.startsWith("/certificate")
-  ) {
-    return <>{children}{appearanceControl}</>;
-  }
-
   const workspaceLabel = isTransporter
     ? "Transporter Portal"
     : isSuperAdmin
@@ -271,6 +262,15 @@ export function AppShell({
     setOrganizationMenuOpen(false);
     setOpen(false);
     router.push(`/platform/oversight/${encodeURIComponent(organizationId)}`);
+  }
+
+  if (
+    NO_SHELL_PATHS.includes(pathname)
+    || pathname.startsWith("/invite/")
+    || pathname.startsWith("/verify")
+    || pathname.startsWith("/certificate")
+  ) {
+    return <>{children}{appearanceControl}</>;
   }
 
   return (
