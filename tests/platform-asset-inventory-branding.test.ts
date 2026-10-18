@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const inventory = readFileSync("src/lib/platform-asset-inventory.ts", "utf8");
 const view = readFileSync("src/app/platform/oversight/[id]/AssetInventory.tsx", "utf8");
-const detail = readFileSync("src/app/platform/oversight/[id]/page.tsx", "utf8");
+const detail = readFileSync("src/app/platform/oversight/[id]/section/[section]/page.tsx", "utf8");
 
 test("asset inventory is Super Admin only, fail-closed and tenant-scoped in every branch", () => {
   assert.match(inventory, /await requirePlatformSuperAdmin\(\)/);
@@ -36,8 +36,8 @@ test("complete asset inventory exposes precise metadata with stable pagination",
   assert.match(view, /asset\.status/);
   assert.match(view, /asset\.assetType/);
   assert.match(view, /Page \{inventory\.page\} of \{inventory\.totalPages\}/);
-  assert.match(detail, /getPlatformOrganizationAssetInventory\(id/);
-  assert.match(detail, /<AssetInventory organizationId=\{org\.id\} inventory=\{inventory\}/);
+  assert.match(detail, /getPlatformOrganizationAssetInventory\(organizationId/);
+  assert.match(detail, /<AssetInventory organizationId=\{organizationId\} inventory=\{inventory\}/);
 });
 
 test("install metadata and icons use tenant-neutral VIMS application identity", () => {
