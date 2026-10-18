@@ -4,12 +4,37 @@ import { readFileSync } from "node:fs";
 import {
   scopedOrganizationHref, SCOPED_NAV_SECTIONS, SCOPED_SECTION_DETAILS,
 } from "../src/lib/platform-oversight-navigation";
+import { isValidOrganizationId, ORGANIZATION_ID_PATTERN } from "../src/lib/organization-id";
 
 const shell = readFileSync("src/components/AppShell.tsx", "utf8");
 const scopedPage = readFileSync("src/app/platform/oversight/[id]/section/[section]/page.tsx", "utf8");
 const server = readFileSync("src/lib/platform-scoped-module-records.ts", "utf8");
 
 const id = "49ed5e8b-c357-4da0-b099-a83c4f911111";
+
+test("shared organization UUID validator admits every selected subscriber and blocks malformed IDs", () => {
+  const realRslId = "00000000-0000-4000-8000-000000000101";
+  const otherTenantId = "e2e10000-0000-4000-8000-000000000001";
+  for (const value of [realRslId, otherTenantId, id]) {
+    assert.equal(isValidOrganizationId(value), true, `Valid organization ${value} should not produce 404`);
+    assert.equal(ORGANIZATION_ID_PATTERN.test(value), true);
+  }
+  for (const value of [
+    "rsl", "e2e10000-0000-4000-000000000001", "", "not-an-id",
+    "00000000-0000-4000-8000-000000000101/section/vehicles", null, undefined,
+  ]) assert.equal(isValidOrganizationId(value), false);
+
+  // All protected loaders must validate the same full 8-4-4-4-12 ID.
+  for (const loader of [
+    "src/lib/platform-oversight.ts",
+    "src/lib/platform-asset-inventory.ts",
+    "src/lib/platform-scoped-module-records.ts",
+  ]) {
+    const source = readFileSync(loader, "utf8");
+    assert.match(source, /import \{ isValidOrganizationId \} from "@\/lib\/organization-id"/);
+    assert.match(source, /if \(!isValidOrganizationId\(organizationId\)\)/);
+  }
+});
 
 test("every operational navigation button maps to a protected organization-specific destination", () => {
   for (const [href, section] of Object.entries(SCOPED_NAV_SECTIONS)) {
@@ -42,7 +67,7 @@ test("sidebar retains the organization across scoped routes and does not send Su
 });
 
 test("scoped module pages require privileged, validated, organization-specific reads", () => {
-  assert.match(scopedPage, /if \(!isScopedSection\(section\)\) notFound\(\)/);
+  assert.match(scopedPage, /if \(!isScopedSection\(section\)\)[\s\S]*?notFound\(\)/);
   assert.match(scopedPage, /getPlatformOrganizationOversight\(id\)/);
   assert.match(scopedPage, /listPlatformScopedModuleRecords\(id, section, requestedPage\)/);
   assert.match(scopedPage, /getPlatformOrganizationAssetInventory\(id/);
