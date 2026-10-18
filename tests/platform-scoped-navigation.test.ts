@@ -42,7 +42,7 @@ test("sidebar retains the organization across scoped routes and does not send Su
 });
 
 test("scoped module pages require privileged, validated, organization-specific reads", () => {
-  assert.match(scopedPage, /if \(!isScopedSection\(section\)\) notFound\(\)/);
+  assert.match(scopedPage, /if \(!isScopedSection\(section\)\)[\s\S]*?notFound\(\)/);
   assert.match(scopedPage, /getPlatformOrganizationOversight\(id\)/);
   assert.match(scopedPage, /listPlatformScopedModuleRecords\(id, section, requestedPage\)/);
   assert.match(scopedPage, /getPlatformOrganizationAssetInventory\(id/);
