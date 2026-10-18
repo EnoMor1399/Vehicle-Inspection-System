@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -13,6 +13,7 @@ import {
   CalendarCheck,
   CalendarClock,
   Car,
+  Check,
   ChevronRight,
   ChevronDown,
   CreditCard,
@@ -190,6 +191,8 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
+  const organizationMenuRef = useRef<HTMLDivElement>(null);
   const isTransporter = userRole === "transporter_user";
   const isSuperAdmin = userRole === "super_admin";
   const roleLabel = ROLE_LABELS[userRole || ""] || "User";
@@ -219,15 +222,6 @@ export function AppShell({
     return null;
   })();
 
-  if (
-    NO_SHELL_PATHS.includes(pathname)
-    || pathname.startsWith("/invite/")
-    || pathname.startsWith("/verify")
-    || pathname.startsWith("/certificate")
-  ) {
-    return <>{children}{appearanceControl}</>;
-  }
-
   const workspaceLabel = isTransporter
     ? "Transporter Portal"
     : isSuperAdmin
@@ -237,6 +231,47 @@ export function AppShell({
   const sessionLabel = userName || workspaceLabel;
   const oversightMatch = pathname.match(/^\/platform\/oversight\/([^/]+)$/);
   const activeOversightOrganizationId = oversightMatch ? decodeURIComponent(oversightMatch[1]) : "";
+  // The sidebar selector only switches the read-only oversight page.
+  // It never changes the authenticated tenant, session, or operational permissions.
+  const canSelectOrganization = isSuperAdmin && !supportContext;
+  const activeOversightOrganization = canSelectOrganization
+    ? organizationChoices.find((organization) => organization.id === activeOversightOrganizationId)
+    : undefined;
+
+  useEffect(() => {
+    if (!organizationMenuOpen) return;
+    function onPointerDown(event: MouseEvent) {
+      if (!organizationMenuRef.current?.contains(event.target as Node)) {
+        setOrganizationMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOrganizationMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [organizationMenuOpen]);
+
+  function selectOversightOrganization(organizationId: string) {
+    if (!canSelectOrganization) return;
+    if (!organizationChoices.some((organization) => organization.id === organizationId)) return;
+    setOrganizationMenuOpen(false);
+    setOpen(false);
+    router.push(`/platform/oversight/${encodeURIComponent(organizationId)}`);
+  }
+
+  if (
+    NO_SHELL_PATHS.includes(pathname)
+    || pathname.startsWith("/invite/")
+    || pathname.startsWith("/verify")
+    || pathname.startsWith("/certificate")
+  ) {
+    return <>{children}{appearanceControl}</>;
+  }
 
   return (
     <div data-app-shell className="app-shell min-h-screen lg:flex">
@@ -246,27 +281,109 @@ export function AppShell({
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="border-b border-white/10 px-4 py-4">
-          <div className="flex items-center gap-3">
-            {branding.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={branding.logoUrl}
-                alt={branding.companyName}
-                className="h-10 w-10 rounded-xl bg-white object-contain p-1.5 shadow-sm"
-              />
+        <div className="border-b border-white/10 px-3 py-3">
+          <div className="flex items-center gap-2">
+            {canSelectOrganization ? (
+              <div className="relative min-w-0 flex-1" ref={organizationMenuRef}>
+                <button
+                  type="button"
+                  aria-label="Switch organization in the sidebar"
+                  aria-expanded={organizationMenuOpen}
+                  aria-controls="sidebar-organization-options"
+                  onClick={() => setOrganizationMenuOpen((value) => !value)}
+                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                >
+                  {activeOversightOrganization || !branding.logoUrl ? (
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-emerald-300">
+                      <Building2 className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={branding.logoUrl}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-1.5 shadow-sm"
+                    />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold tracking-tight text-white">
+                      {activeOversightOrganization?.name ?? branding.companyName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-slate-400">
+                      {activeOversightOrganization
+                        ? "Read-only oversight · " + activeOversightOrganization.status
+                        : "Switch organisation · oversight only"}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${organizationMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {organizationMenuOpen && (
+                  <div
+                    id="sidebar-organization-options"
+                    role="group"
+                    aria-label="Organisations available for read-only oversight"
+                    className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-700 bg-[#14243a] p-1.5 shadow-2xl"
+                  >
+                    <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Switch organisation · oversight only
+                    </p>
+                    <div className="max-h-64 overflow-y-auto">
+                      {organizationChoices.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-slate-300">No organisations available.</p>
+                      ) : (
+                        organizationChoices.map((organization) => (
+                          <button
+                            key={organization.id}
+                            type="button"
+                            onClick={() => selectOversightOrganization(organization.id)}
+                            aria-current={activeOversightOrganizationId === organization.id ? "true" : undefined}
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 ${
+                              activeOversightOrganizationId === organization.id ? "bg-white/10 text-emerald-200" : "text-slate-100"
+                            }`}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-semibold">{organization.name}</span>
+                              <span className="block truncate text-[11px] text-slate-400">{organization.status}</span>
+                            </span>
+                            {activeOversightOrganizationId === organization.id && (
+                              <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-300" />
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    <p className="border-t border-white/10 px-3 py-2 text-[10px] leading-4 text-slate-400">
+                      Selecting a company opens its scoped oversight page, not an operational session.
+                    </p>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-lg"
-                style={{ background: `linear-gradient(135deg, ${branding.themeColor}, ${branding.accentColor || "#026b02"})` }}
-              >
-                <ShieldCheck className="h-5 w-5 text-white" />
+              <div className="flex min-w-0 flex-1 items-center gap-3 px-1">
+                {branding.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={branding.logoUrl}
+                    alt={branding.companyName}
+                    className="h-10 w-10 rounded-xl bg-white object-contain p-1.5 shadow-sm"
+                  />
+                ) : (
+                  <div
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-lg"
+                    style={{ background: `linear-gradient(135deg, ${branding.themeColor}, ${branding.accentColor || "#026b02"})` }}
+                  >
+                    <ShieldCheck className="h-5 w-5 text-white" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-400">{branding.tagline}</p>
+                </div>
               </div>
             )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold tracking-tight text-white">{branding.companyName}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-400">{branding.tagline}</p>
-            </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -382,30 +499,6 @@ export function AppShell({
 
 
             <div className="flex items-center gap-2 sm:gap-3">
-              {isSuperAdmin && organizationChoices.length > 0 && (
-                <label className="flex min-w-0 max-w-[132px] items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2 py-2 text-xs font-semibold text-indigo-950 sm:max-w-[280px] sm:gap-2 sm:px-3">
-                  <Building2 className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden="true" />
-                  <span className="sr-only">Select organization for read-only oversight</span>
-                  <select
-                    aria-label="Select organization for read-only oversight"
-                    value={organizationChoices.some((organization) => organization.id === activeOversightOrganizationId) ? activeOversightOrganizationId : ""}
-                    onChange={(event) => {
-                      const nextId = event.target.value;
-                      if (organizationChoices.some((organization) => organization.id === nextId)) {
-                        router.push(`/platform/oversight/${encodeURIComponent(nextId)}`);
-                      }
-                    }}
-                    className="min-w-0 max-w-[92px] bg-transparent text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 sm:max-w-[220px] sm:text-xs"
-                  >
-                    <option value="">Select organisation…</option>
-                    {organizationChoices.map((organization) => (
-                      <option key={organization.id} value={organization.id}>
-                        {organization.name} · {organization.status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
               {userRole && (
                 <Link
                   href="/notifications"
