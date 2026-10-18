@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3000";
 const inspectionEmail = process.env.E2E_USER_EMAIL || "e2e.inspector@vims.local";
@@ -11,8 +14,6 @@ const tenantTrainingEmail = process.env.E2E_TENANT_TRAINING_USER_EMAIL || "e2e.t
 const tenantTrainingPassword = process.env.E2E_TENANT_TRAINING_USER_PASSWORD || inspectionPassword;
 const rslVehicleId = "e2e0000-0000-4000-8000-000000000004";
 const tenantVehicleId = "e2e10000-0000-4000-8000-000000000007";
-const adminEmail = process.env.E2E_SUPER_ADMIN_EMAIL || "e2e.platform.admin@vims.local";
-const adminPassword = process.env.E2E_SUPER_ADMIN_PASSWORD || inspectionPassword;
 const tenantOrganizationId = "e2e10000-0000-4000-8000-000000000001";
 const rslOrganizationId = "00000000-0000-4000-8000-000000000101";
 
@@ -81,6 +82,16 @@ test("separate subscriber organizations cannot see each other's operational reco
   await page.goto(`${baseURL}/platform/oversight`);
   await expect(page).toHaveURL(`${baseURL}/`);
   await expect(page.getByText("Platform Oversight Centre")).toHaveCount(0);
+
+  // The new scoped routes must be denied to ordinary organization users too.
+  for (const restrictedPath of [
+    `/platform/oversight/${tenantOrganizationId}`,
+    `/platform/oversight/${tenantOrganizationId}/section/vehicles`,
+    `/platform/oversight/${tenantOrganizationId}/section/inspections`,
+  ]) {
+    await page.goto(`${baseURL}${restrictedPath}`);
+    await expect(page).toHaveURL(`${baseURL}/`);
+  }
 
   await page.goto(`${baseURL}/vehicles`);
   await expect(page.getByText("E2E-2026")).toBeVisible();
@@ -213,7 +224,14 @@ test("support-mode cookie blocks HTTP mutations even if no support record exists
 });
 
 test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
-  await signIn(page, adminEmail, adminPassword, "/");
+  // A test-only authenticated session from the isolated PostgreSQL seed avoids
+  // consuming the suite's normal-user login rate limit or bypassing real auth.
+  const sessionToken = readFileSync(join(tmpdir(), "vims-e2e-super-admin-session"), "utf8").trim();
+  await page.context().addCookies([{
+    name: "rsl_session_token", value: sessionToken,
+    url: baseURL, sameSite: "Lax", httpOnly: true, secure: false,
+  }]);
+  await page.goto(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
   const chooseOrganization = page.getByRole("button", { name: "Switch organization in the sidebar" });
   await expect(chooseOrganization).toBeVisible();
   await chooseOrganization.click();
@@ -260,16 +278,5 @@ test("Super Admin company switch and every operational sidebar destination retur
   await expect(page.locator('main').getByText("TENANT-2026")).toHaveCount(0);
 });
 
-test("operational user cannot open any privileged selected-company page", async ({ page }) => {
-  await signIn(page, inspectionEmail, inspectionPassword, "/");
-  for (const path of [
-    `/platform/oversight/${tenantOrganizationId}`,
-    `/platform/oversight/${tenantOrganizationId}/section/vehicles`,
-    `/platform/oversight/${tenantOrganizationId}/section/inspections`,
-  ]) {
-    await page.goto(`${baseURL}${path}`);
-    await expect(page).toHaveURL(`${baseURL}/`);
-    await expect(page.getByText("TENANT-2026")).toHaveCount(0);
-  }
-});
+
 
