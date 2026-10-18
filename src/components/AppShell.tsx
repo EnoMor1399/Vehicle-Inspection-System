@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { scopedOrganizationHref, SCOPED_NAV_SECTIONS } from "@/lib/platform-oversight-navigation";
 import {
   Activity,
   BarChart3,
@@ -37,6 +38,24 @@ import {
 } from "lucide-react";
 
 const NO_SHELL_PATHS = ["/login", "/subscribe"];
+const LAST_OVERSIGHT_ORG_KEY = "vims-superadmin-oversight-selection";
+const OVERSIGHT_ORG_CHANGED_EVENT = "vims:oversight-organization-changed";
+
+function subscribeToSelectedOrganization(notify: () => void) {
+  window.addEventListener(OVERSIGHT_ORG_CHANGED_EVENT, notify);
+  window.addEventListener("storage", notify);
+  return () => {
+    window.removeEventListener(OVERSIGHT_ORG_CHANGED_EVENT, notify);
+    window.removeEventListener("storage", notify);
+  };
+}
+
+function getSelectedOrganizationSnapshot() {
+  try { return sessionStorage.getItem(LAST_OVERSIGHT_ORG_KEY) || ""; }
+  catch { return ""; }
+}
+function getSelectedOrganizationServerSnapshot() { return ""; }
+
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Administrator",
@@ -192,11 +211,55 @@ export function AppShell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
+  const rememberedOrganizationId = useSyncExternalStore(
+    subscribeToSelectedOrganization,
+    getSelectedOrganizationSnapshot,
+    getSelectedOrganizationServerSnapshot,
+  );
   const organizationMenuRef = useRef<HTMLDivElement>(null);
   const isTransporter = userRole === "transporter_user";
   const isSuperAdmin = userRole === "super_admin";
+  const canSelectOrganization = isSuperAdmin && !supportContext;
   const roleLabel = ROLE_LABELS[userRole || ""] || "User";
   const allowed = new Set(allowedResources);
+
+  // A selected organization is a navigation preference only, not a
+  // change to the authenticated tenant, session, role, or data permissions.
+  const routeParts = pathname.split("/");
+  const pathOrganizationId =
+    routeParts[1] === "platform" && routeParts[2] === "oversight"
+    && ((routeParts.length === 4 && routeParts[3])
+      || (routeParts.length === 6 && routeParts[4] === "section" && routeParts[5]))
+      ? routeParts[3] : "";
+  const validOrganizationId = (id: string) =>
+    organizationChoices.some((organization) => organization.id === id);
+  const activeOversightOrganizationId = canSelectOrganization
+    ? (validOrganizationId(pathOrganizationId)
+      ? pathOrganizationId
+      : validOrganizationId(rememberedOrganizationId) ? rememberedOrganizationId : "")
+    : "";
+  const activeOversightOrganization = organizationChoices.find(
+    (organization) => organization.id === activeOversightOrganizationId,
+  );
+  const currentPageIsScoped = Boolean(pathOrganizationId && pathOrganizationId === activeOversightOrganizationId);
+
+  function scopedNavigationHref(href: string) {
+    if (!canSelectOrganization) return href;
+    if (activeOversightOrganizationId) return scopedOrganizationHref(activeOversightOrganizationId, href);
+    // A Super Admin with no selection must not accidentally open the
+    // operational pages belonging to their original login organization.
+    if (href === "/" || href in SCOPED_NAV_SECTIONS) return "/platform/oversight";
+    return href;
+  }
+
+  function isActiveNavItem(item: NavItem) {
+    const href = scopedNavigationHref(item.href);
+    if (item.href === "/platform/oversight") return pathname === "/platform/oversight";
+    if (item.href === "/" && canSelectOrganization && activeOversightOrganizationId) {
+      return pathname === href;
+    }
+    return isActivePath(pathname, href);
+  }
 
   const navGroups = isTransporter
     ? TRANSPORTER_NAV_GROUPS
@@ -216,7 +279,7 @@ export function AppShell({
 
   const activeContext = (() => {
     for (const group of navGroups) {
-      const item = group.items.find((candidate) => isActivePath(pathname, candidate.href));
+      const item = group.items.find((candidate) => isActiveNavItem(candidate));
       if (item) return { group: group.label, item };
     }
     return null;
@@ -229,14 +292,23 @@ export function AppShell({
       : roleLabel;
 
   const sessionLabel = userName || workspaceLabel;
-  const oversightMatch = pathname.match(/^\/platform\/oversight\/([^/]+)$/);
-  const activeOversightOrganizationId = oversightMatch ? decodeURIComponent(oversightMatch[1]) : "";
-  // The sidebar selector only switches the read-only oversight page.
-  // It never changes the authenticated tenant, session, or operational permissions.
-  const canSelectOrganization = isSuperAdmin && !supportContext;
-  const activeOversightOrganization = canSelectOrganization
-    ? organizationChoices.find((organization) => organization.id === activeOversightOrganizationId)
-    : undefined;
+
+  useEffect(() => {
+    if (!canSelectOrganization) return;
+    try {
+      const isAllowed = (id: string) => organizationChoices.some((org) => org.id === id);
+      const current = getSelectedOrganizationSnapshot();
+      if (isAllowed(pathOrganizationId) && current !== pathOrganizationId) {
+        sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, pathOrganizationId);
+        window.dispatchEvent(new Event(OVERSIGHT_ORG_CHANGED_EVENT));
+      } else if (current && !isAllowed(current)) {
+        sessionStorage.removeItem(LAST_OVERSIGHT_ORG_KEY);
+        window.dispatchEvent(new Event(OVERSIGHT_ORG_CHANGED_EVENT));
+      }
+    } catch {
+      // Storage is an optional navigation hint, never permission to access data.
+    }
+  }, [canSelectOrganization, pathOrganizationId, organizationChoices]);
 
   useEffect(() => {
     if (!organizationMenuOpen) return;
@@ -260,6 +332,10 @@ export function AppShell({
     if (!canSelectOrganization) return;
     if (!organizationChoices.some((organization) => organization.id === organizationId)) return;
     setOrganizationMenuOpen(false);
+    try {
+      sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, organizationId);
+      window.dispatchEvent(new Event(OVERSIGHT_ORG_CHANGED_EVENT));
+    } catch {}
     setOpen(false);
     router.push(`/platform/oversight/${encodeURIComponent(organizationId)}`);
   }
@@ -397,16 +473,16 @@ export function AppShell({
 
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary sections">
           {navGroups.map((group) => {
-            const groupHasCurrentPage = group.items.some((item) => isActivePath(pathname, item.href));
+            const groupHasCurrentPage = group.items.some((item) => isActiveNavItem(item));
             const items = (
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const active = isActivePath(pathname, item.href);
+                  const active = isActiveNavItem(item);
                   const Icon = item.icon;
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={scopedNavigationHref(item.href)}
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -501,15 +577,17 @@ export function AppShell({
             <div className="flex items-center gap-2 sm:gap-3">
               {userRole && (
                 <Link
-                  href="/notifications"
-                  title="Notifications and system updates"
-                  aria-label={notificationUnreadCount > 0
-                    ? `Open notifications (${notificationUnreadCount} unread)`
-                    : "Open notifications"}
+                  href={scopedNavigationHref("/notifications")}
+                  title={activeOversightOrganizationId ? "Selected organization security alerts" : "Notifications and system updates"}
+                  aria-label={activeOversightOrganizationId
+                    ? "Open selected organization security alerts"
+                    : notificationUnreadCount > 0
+                      ? `Open notifications (${notificationUnreadCount} unread)`
+                      : "Open notifications"}
                   className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
                 >
                   <Bell className="h-5 w-5" aria-hidden="true" />
-                  {notificationUnreadCount > 0 && (
+                  {!activeOversightOrganizationId && notificationUnreadCount > 0 && (
                     <span aria-hidden="true" className="absolute -right-1 -top-1 min-w-[1.2rem] rounded-full bg-red-600 px-1 py-0.5 text-center text-[10px] font-bold leading-none text-white">
                       {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
                     </span>
@@ -533,6 +611,13 @@ export function AppShell({
           </div>
         </header>
 
+        {activeOversightOrganization && (
+          <div role="status" className="flex flex-wrap items-center gap-2 border-b border-indigo-200 bg-indigo-50 px-4 py-2 text-xs text-indigo-950 sm:px-6 lg:px-8">
+            <Building2 className="h-4 w-4" aria-hidden="true" />
+            <span><strong>{activeOversightOrganization.name}</strong> · {currentPageIsScoped ? "Organization-scoped read-only view" : "Organization selection retained · this page is platform-wide"}</span>
+            <Link href={`/platform/oversight/${encodeURIComponent(activeOversightOrganization.id)}`} className="font-semibold underline">Overview</Link>
+          </div>
+        )}
         <main className="app-shell-content min-h-[calc(100vh-65px)] overflow-x-hidden">{children}</main>
       </div>
     </div>

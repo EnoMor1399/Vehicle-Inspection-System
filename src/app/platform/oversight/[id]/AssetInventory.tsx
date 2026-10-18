@@ -11,21 +11,27 @@ type Inventory = NonNullable<Awaited<ReturnType<typeof getPlatformOrganizationAs
 function buildInventoryUrl(
   organizationId: string,
   filters: { kind: AssetKind; page?: number; search: string },
+  basePath = `/platform/oversight/${encodeURIComponent(organizationId)}`,
+  fixedKind?: AssetKind,
 ) {
   const params = new URLSearchParams();
-  if (filters.kind !== "all") params.set("assetType", filters.kind);
+  if (!fixedKind && filters.kind !== "all") params.set("assetType", filters.kind);
   if (filters.search) params.set("assetSearch", filters.search);
   if (filters.page && filters.page > 1) params.set("assetPage", String(filters.page));
   const query = params.toString();
-  return `/platform/oversight/${encodeURIComponent(organizationId)}${query ? `?${query}` : ""}#organization-inventory`;
+  return `${basePath}${query ? `?${query}` : ""}#organization-inventory`;
 }
 
 export function AssetInventory({
   organizationId,
   inventory,
+  basePath,
+  fixedKind,
 }: {
   organizationId: string;
   inventory: Inventory;
+  basePath?: string;
+  fixedKind?: AssetKind;
 }) {
   const start = inventory.total === 0 ? 0 : (inventory.page - 1) * inventory.pageSize + 1;
   const end = Math.min(inventory.total, inventory.page * inventory.pageSize);
@@ -47,14 +53,14 @@ export function AssetInventory({
             {inventory.grandTotal.toLocaleString()} registered entries
           </span>
         </div>
-        <div className="mb-5 flex flex-wrap gap-2" aria-label="Filter by resource type">
+        {!fixedKind && <div className="mb-5 flex flex-wrap gap-2" aria-label="Filter by resource type">
           {ASSET_KINDS.map((kind) => {
             const selected = kind === inventory.kind;
             const number = kind === "all" ? inventory.grandTotal : inventory.counts[kind];
             return (
               <Link
                 key={kind}
-                href={buildInventoryUrl(organizationId, { kind, search: inventory.search })}
+                href={buildInventoryUrl(organizationId, { kind, search: inventory.search }, basePath, fixedKind)}
                 aria-current={selected ? "page" : undefined}
                 className={`rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
                   selected
@@ -66,14 +72,14 @@ export function AssetInventory({
               </Link>
             );
           })}
-        </div>
+        </div>}
 
         <form
           method="GET"
-          action={`/platform/oversight/${encodeURIComponent(organizationId)}`}
+          action={basePath || `/platform/oversight/${encodeURIComponent(organizationId)}`}
           className="mb-4 flex flex-wrap items-end gap-2"
         >
-          {inventory.kind !== "all" && <input type="hidden" name="assetType" value={inventory.kind} />}
+          {!fixedKind && inventory.kind !== "all" && <input type="hidden" name="assetType" value={inventory.kind} />}
           <label className="min-w-[220px] flex-1 text-xs font-semibold text-slate-700">
             Search names, types or identification numbers
             <input
@@ -89,7 +95,7 @@ export function AssetInventory({
             <Search className="h-4 w-4" /> Search
           </button>
           {inventory.search && (
-            <Link href={buildInventoryUrl(organizationId, { kind: inventory.kind, search: "" })} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">
+            <Link href={buildInventoryUrl(organizationId, { kind: inventory.kind, search: "" }, basePath, fixedKind)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">
               Clear
             </Link>
           )}
@@ -141,14 +147,14 @@ export function AssetInventory({
         <div className="mt-4 flex items-center justify-between gap-3 text-sm">
           {inventory.page > 1 ? (
             <Link
-              href={buildInventoryUrl(organizationId, { kind: inventory.kind, search: inventory.search, page: inventory.page - 1 })}
+              href={buildInventoryUrl(organizationId, { kind: inventory.kind, search: inventory.search, page: inventory.page - 1 }, basePath, fixedKind)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 font-semibold text-slate-800"
             ><ArrowLeft className="h-4 w-4" /> Previous</Link>
           ) : <span />}
           <span className="text-xs font-semibold text-slate-600">Page {inventory.page} of {inventory.totalPages}</span>
           {inventory.page < inventory.totalPages ? (
             <Link
-              href={buildInventoryUrl(organizationId, { kind: inventory.kind, search: inventory.search, page: inventory.page + 1 })}
+              href={buildInventoryUrl(organizationId, { kind: inventory.kind, search: inventory.search, page: inventory.page + 1 }, basePath, fixedKind)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 font-semibold text-slate-800"
             >Next <ArrowRight className="h-4 w-4" /></Link>
           ) : <span />}

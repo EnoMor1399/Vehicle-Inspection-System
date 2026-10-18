@@ -26,7 +26,13 @@ test("switching a company navigates only to guarded organization oversight", () 
   assert.match(shell, /if \(!canSelectOrganization\) return/);
   assert.match(shell, /organizationChoices\.some\(\(organization\) => organization\.id === organizationId\)/);
   assert.match(shell, /router\.push\(\`\/platform\/oversight\/\$\{encodeURIComponent\(organizationId\)\}\`\)/);
-  assert.doesNotMatch(shell, /document\.cookie\s*=|localStorage\.setItem|sessionStorage\.setItem/);
+  assert.doesNotMatch(shell, /document\.cookie\s*=|localStorage\.setItem/);
+  // Scope selection may persist as a browser-only navigation preference.
+  // Server resource reads never derive authorization from that preference.
+  assert.match(shell, /sessionStorage\.setItem\(LAST_OVERSIGHT_ORG_KEY/);
+  assert.match(shell, /organizationChoices\.some/);
+  const scopedReads = readFileSync("src/lib/platform-scoped-module-records.ts", "utf8");
+  assert.doesNotMatch(scopedReads, /sessionStorage|localStorage|document\.cookie/);
   assert.match(layout, /if \(user\.role === "super_admin"\)/);
   assert.match(layout, /organizationChoices = await listPlatformOrganizationChoices\(\)/);
   assert.match(oversight, /listPlatformOrganizationChoices\(\)[\s\S]*?await requirePlatformSuperAdmin\(\)/);
