@@ -5,7 +5,7 @@ import { eq, asc, and } from "drizzle-orm";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui";
 import { Car, GraduationCap, Users, Shield, Mail, LockKeyhole } from "lucide-react";
 import { ROLE_LABEL } from "@/lib/auth";
-import { canAccessVehicleInspection } from "@/lib/system-access";
+import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { formatDateTime } from "@/lib/utils";
 import { UserAccessEditor } from "@/app/users/UserAccessEditor";
 
