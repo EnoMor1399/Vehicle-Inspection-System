@@ -37,3 +37,12 @@ This manifest does not indicate production release until a verified deployment a
 - Confirm Vercel deployment's target is `production` and its built SHA equals the final `main` merge SHA; verify aliases and public sign-in/readiness checks before reporting a successful deployment.
 - Do not enable live Paystack charges. Confirm production recovery branch `br-steep-rice-af6pjjt4` remains intact.
 - For future releases, account for the ignored-build-step policy before choosing a GitHub merge strategy. Do not bypass or disable build protection globally.
+
+
+## Platform Oversight deployment follow-up — 2026-10-18
+
+- Feature PR #98 (`23b7c715b2bc0e54eaf356a6e6557754b37312de`) adds the Super Administrator Platform Oversight Centre. Its TypeScript/lint/tests, secret and dependency scans, production build, Docker liveness and PostgreSQL browser E2E all passed before merge.
+- Vercel canceled the first production deployment because PR #98 was squash-merged, creating a single-parent commit that the intentional `ignoreCommand` rejects. This is a release-strategy mismatch, not an application build failure.
+- Preserve the existing ignore rule. Merge this release-trigger PR with GitHub's normal **merge** method so the resulting two-parent commit satisfies the documented release gate; do not use squash or rebase for this trigger.
+- Verify the resulting production deployment reaches `READY`, its built Git SHA equals the final `main` merge SHA, and the production aliases point to it. Then smoke-test sign-in, `/platform/oversight`, organization detail drilldown, and denial for non-Super-Admin accounts.
+- No database migration, customer data mutation, privilege expansion or payment configuration change is part of this trigger. Do not report the oversight centre as live until the production deployment and alias checks pass.
