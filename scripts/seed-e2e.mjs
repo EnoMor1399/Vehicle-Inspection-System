@@ -110,23 +110,6 @@ try {
     [tenantSubscriptionId, tenantOrganizationId],
   );
 
-  // Secure, short-lived browser fixture only. Never use this identity or
-  // cookie outside the throwaway PostgreSQL CI service.
-  const adminCookieToken = crypto.randomBytes(64).toString("hex");
-  const adminCookieHash = crypto.createHash("sha256").update(adminCookieToken).digest("hex");
-  await client.query(
-    `insert into sessions
-      (id, user_id, token, ip_address, is_active, expires_at, last_activity_at)
-     values ('e2e90000-0000-4000-8000-000000000002', $1, $2, '127.0.0.1', true,
-             now() + interval '30 minutes', now())
-     on conflict (id) do update set
-       user_id = excluded.user_id, token = excluded.token, is_active = true,
-       expires_at = excluded.expires_at, last_activity_at = excluded.last_activity_at`,
-    [superAdminUserId, adminCookieHash],
-  );
-  const adminCookieFile = join(tmpdir(), "vims-e2e-super-admin-session");
-  writeFileSync(adminCookieFile, adminCookieToken, { mode: 0o600 });
-
   await client.query(
     `insert into locations (id, organization_id, name, code, region, status)
      values ($1, $2, 'E2E Test Station', 'E2E', 'Test Region', 'active')
@@ -166,6 +149,23 @@ try {
        two_factor_secret = null`,
     [superAdminUserId, organizationId, superAdminEmail, passwordHash],
   );
+
+  // Secure, short-lived browser fixture only. Never use this identity or
+  // cookie outside the throwaway PostgreSQL CI service.
+  const adminCookieToken = crypto.randomBytes(64).toString("hex");
+  const adminCookieHash = crypto.createHash("sha256").update(adminCookieToken).digest("hex");
+  await client.query(
+    `insert into sessions
+      (id, user_id, token, ip_address, is_active, expires_at, last_activity_at)
+     values ('e2e90000-0000-4000-8000-000000000002', $1, $2, '127.0.0.1', true,
+             now() + interval '30 minutes', now())
+     on conflict (id) do update set
+       user_id = excluded.user_id, token = excluded.token, is_active = true,
+       expires_at = excluded.expires_at, last_activity_at = excluded.last_activity_at`,
+    [superAdminUserId, adminCookieHash],
+  );
+  const adminCookieFile = join(tmpdir(), "vims-e2e-super-admin-session");
+  writeFileSync(adminCookieFile, adminCookieToken, { mode: 0o600 });
 
   await client.query(
     `insert into users
