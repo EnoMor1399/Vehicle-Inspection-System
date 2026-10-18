@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowUpRight, Building2, FileText, ShieldAlert, UsersRound }
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { getPlatformOrganizationOversight, listPlatformOrganizationChoices } from "@/lib/platform-oversight";
 import { OrganizationSwitcher } from "../OrganizationSwitcher";
+import { AssetInventory } from "./AssetInventory";
+import { getPlatformOrganizationAssetInventory } from "@/lib/platform-asset-inventory";
 import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -11,13 +13,23 @@ export const revalidate = 0;
 
 export default async function OrganizationOversightDetail({
   params,
-}: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const [result, organizations] = await Promise.all([
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ assetType?: string | string[]; assetPage?: string | string[]; assetSearch?: string | string[] }>;
+}) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const first = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
+  const [result, organizations, inventory] = await Promise.all([
     getPlatformOrganizationOversight(id),
     listPlatformOrganizationChoices(),
+    getPlatformOrganizationAssetInventory(id, {
+      kind: first(query.assetType),
+      page: first(query.assetPage),
+      search: first(query.assetSearch),
+    }),
   ]);
-  if (!result) notFound();
+  if (!result || !inventory) notFound();
   const { organization: org, accounts, counts, recentVehicles,
     recentInspections, recentAudit, recentSecurity,
     recentStations, recentTransporters, recentDocuments, recentTrainingSessions } = result;
@@ -72,6 +84,7 @@ export default async function OrganizationOversightDetail({
           </Card>
         ))}
       </div>
+      <AssetInventory organizationId={org.id} inventory={inventory} />
       <Card className="p-5">
         <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold"><UsersRound className="h-5 w-5" /> Organisation user accounts</h2>
         <p className="mb-4 text-xs text-slate-600">Up to 200 accounts shown. MFA, account recovery and support access require the existing protected controls.</p>
