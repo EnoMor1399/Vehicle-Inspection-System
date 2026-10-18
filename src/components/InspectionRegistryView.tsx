@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { inspections, vehicles } from "@/db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { PageHeader } from "@/components/ui";
-import { InspectionsList } from "./InspectionsList";
+import { InspectionsList } from "@/app/inspections/InspectionsList";
 
 export async function InspectionRegistryView({ organizationId, editable, readOnly = false }: { organizationId: string; editable: boolean; readOnly?: boolean }) {
 
