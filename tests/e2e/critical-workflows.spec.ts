@@ -224,6 +224,7 @@ test("support-mode cookie blocks HTTP mutations even if no support record exists
 });
 
 test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
+  test.setTimeout(180_000); // Native VIMS pages render charts, analytics, and guarded records.
   // A test-only authenticated session from the isolated PostgreSQL seed avoids
   // consuming the suite's normal-user login rate limit or bypassing real auth.
   const sessionToken = readFileSync(join(tmpdir(), "vims-e2e-super-admin-session"), "utf8").trim();
