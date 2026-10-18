@@ -4,7 +4,7 @@ import { and, eq, desc, sql } from "drizzle-orm";
 import Link from "next/link";
 import { PageHeader, Button } from "@/components/ui";
 import { Plus } from "lucide-react";
-import { VehiclesList } from "./VehiclesList";
+import { VehiclesList } from "@/app/vehicles/VehiclesList";
 
 export async function VehicleRegistryView({ organizationId, editable, readOnly = false }: { organizationId: string; editable: boolean; readOnly?: boolean }) {
 
