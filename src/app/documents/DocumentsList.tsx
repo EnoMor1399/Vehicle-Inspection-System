@@ -7,9 +7,10 @@ import { formatDate } from "@/lib/utils";
 
 interface DocumentsListProps {
   rows: any[];
+  readOnly?: boolean;
 }
 
-export function DocumentsList({ rows }: DocumentsListProps) {
+export function DocumentsList({ rows, readOnly = false }: DocumentsListProps) {
   const now = new Date();
   const in30 = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
@@ -77,7 +78,7 @@ export function DocumentsList({ rows }: DocumentsListProps) {
                   </td>
                   <td className="py-3 px-4 text-slate-600">{d.uploadedBy || "—"}</td>
                   <td className="py-3 px-4 text-right">
-                    <DocumentActions url={d.url} name={d.name} />
+                    {!readOnly && <DocumentActions url={d.url} name={d.name} />}
                   </td>
                 </tr>
               );
