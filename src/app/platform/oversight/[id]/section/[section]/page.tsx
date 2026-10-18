@@ -15,6 +15,8 @@ import { ReportsWorkspaceView } from "@/components/ReportsWorkspaceView";
 import { AuditWorkspaceView } from "@/components/AuditWorkspaceView";
 import { ComplianceWorkspaceView } from "@/components/ComplianceWorkspaceView";
 import { PredictiveMaintenanceView } from "@/components/PredictiveMaintenanceView";
+import { DocumentsWorkspaceView } from "@/components/DocumentsWorkspaceView";
+import { UsersWorkspaceView } from "@/components/UsersWorkspaceView";
 import { ClassicScopedModuleView } from "@/components/ClassicScopedModuleView";
 import { AssetInventory } from "../../AssetInventory";
 import { PageHeader } from "@/components/ui";
@@ -84,11 +86,14 @@ export default async function SelectedOrganizationModule({
       return <ComplianceWorkspaceView organizationId={organizationId} scopedOrganizationId={organizationId} />;
     case "maintenance-risk":
       return <PredictiveMaintenanceView organizationId={organizationId} scopedOrganizationId={organizationId} />;
+    case "users":
+      return <UsersWorkspaceView organizationId={organizationId} canManage={false} canOpenTrainingUsers={false} />;
+    case "documents":
+      return <DocumentsWorkspaceView organizationId={organizationId} readOnly />;
     case "audit":
       return <AuditWorkspaceView organizationId={organizationId} />;
-    case "rfid":
-    case "documents": {
-      const kind = section === "rfid" ? "rfid" : "document";
+    case "rfid": {
+      const kind = "rfid";
       const inventory = await getPlatformOrganizationAssetInventory(organizationId, {
         kind,
         page: Array.isArray(query.assetPage) ? query.assetPage[0] : query.assetPage,
