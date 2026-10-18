@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { scopedOrganizationHref, SCOPED_NAV_SECTIONS } from "@/lib/platform-oversight-navigation";
 import {
   Activity,
@@ -39,6 +39,23 @@ import {
 
 const NO_SHELL_PATHS = ["/login", "/subscribe"];
 const LAST_OVERSIGHT_ORG_KEY = "vims-superadmin-oversight-selection";
+const OVERSIGHT_ORG_CHANGED_EVENT = "vims:oversight-organization-changed";
+
+function subscribeToSelectedOrganization(notify: () => void) {
+  window.addEventListener(OVERSIGHT_ORG_CHANGED_EVENT, notify);
+  window.addEventListener("storage", notify);
+  return () => {
+    window.removeEventListener(OVERSIGHT_ORG_CHANGED_EVENT, notify);
+    window.removeEventListener("storage", notify);
+  };
+}
+
+function getSelectedOrganizationSnapshot() {
+  try { return sessionStorage.getItem(LAST_OVERSIGHT_ORG_KEY) || ""; }
+  catch { return ""; }
+}
+function getSelectedOrganizationServerSnapshot() { return ""; }
+
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Administrator",
@@ -194,7 +211,11 @@ export function AppShell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [organizationMenuOpen, setOrganizationMenuOpen] = useState(false);
-  const [rememberedOrganizationId, setRememberedOrganizationId] = useState("");
+  const rememberedOrganizationId = useSyncExternalStore(
+    subscribeToSelectedOrganization,
+    getSelectedOrganizationSnapshot,
+    getSelectedOrganizationServerSnapshot,
+  );
   const organizationMenuRef = useRef<HTMLDivElement>(null);
   const isTransporter = userRole === "transporter_user";
   const isSuperAdmin = userRole === "super_admin";
@@ -276,19 +297,16 @@ export function AppShell({
     if (!canSelectOrganization) return;
     try {
       const isAllowed = (id: string) => organizationChoices.some((org) => org.id === id);
-      if (isAllowed(pathOrganizationId)) {
+      const current = getSelectedOrganizationSnapshot();
+      if (isAllowed(pathOrganizationId) && current !== pathOrganizationId) {
         sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, pathOrganizationId);
-        setRememberedOrganizationId(pathOrganizationId);
-      } else {
-        const saved = sessionStorage.getItem(LAST_OVERSIGHT_ORG_KEY) || "";
-        if (isAllowed(saved)) setRememberedOrganizationId(saved);
-        else {
-          sessionStorage.removeItem(LAST_OVERSIGHT_ORG_KEY);
-          setRememberedOrganizationId("");
-        }
+        window.dispatchEvent(new Event(OVERSIGHT_ORG_CHANGED_EVENT));
+      } else if (current && !isAllowed(current)) {
+        sessionStorage.removeItem(LAST_OVERSIGHT_ORG_KEY);
+        window.dispatchEvent(new Event(OVERSIGHT_ORG_CHANGED_EVENT));
       }
     } catch {
-      // Only a UI preference: protected server routes never trust storage.
+      // Storage is an optional navigation hint, never permission to access data.
     }
   }, [canSelectOrganization, pathOrganizationId, organizationChoices]);
 
@@ -314,8 +332,10 @@ export function AppShell({
     if (!canSelectOrganization) return;
     if (!organizationChoices.some((organization) => organization.id === organizationId)) return;
     setOrganizationMenuOpen(false);
-    setRememberedOrganizationId(organizationId);
-    try { sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, organizationId); } catch {}
+    try {
+      sessionStorage.setItem(LAST_OVERSIGHT_ORG_KEY, organizationId);
+      window.dispatchEvent(new Event(OVERSIGHT_ORG_CHANGED_EVENT));
+    } catch {}
     setOpen(false);
     router.push(`/platform/oversight/${encodeURIComponent(organizationId)}`);
   }
