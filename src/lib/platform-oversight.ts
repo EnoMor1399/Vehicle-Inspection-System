@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { trainingSessions } from "@/db/training-schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
+import { isValidOrganizationId } from "@/lib/organization-id";
 
 // This is a strictly privileged control-plane read model. Operational pages
 // continue enforcing their own per-user tenant and module boundaries; no
@@ -100,7 +101,7 @@ export async function listPlatformOrganizationChoices() {
 // a Super Administrator. This prevents accidental cross-tenant joins/exports.
 export async function getPlatformOrganizationOversight(organizationId: string) {
   await requirePlatformSuperAdmin();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+  if (!isValidOrganizationId(organizationId)) {
     return null;
   }
   const [org] = await db.select({
