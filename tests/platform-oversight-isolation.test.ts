@@ -46,17 +46,28 @@ test("overarching navigation and account support remain Super Admin-only", () =>
   assert.doesNotMatch(nav, /label: "Platform Oversight Centre"/);
   assert.match(orgs, /href="\/platform\/oversight"/);
   assert.match(detail, /getPlatformOrganizationOversight\(id\)/);
-  assert.match(detail, /getPlatformOrganizationAssetInventory\(id/);
+  assert.match(detail, /<ExecutiveDashboardView/);
+  assert.match(read("src/app/platform/oversight/[id]/section/[section]/page.tsx"), /getPlatformOrganizationAssetInventory\(organizationId/);
   assert.doesNotMatch(detail, /OrganizationSwitcher|platform\/account-support\?organizationId=/);
   assert.match(support, /actor\.role !== "super_admin"/);
   assert.match(support, /eq\(users\.organizationId, organizationFilter\)/);
 });
 
 
-test("resource previews include tenant-scoped training, stations, transporter and document metadata", () => {
-  const view = read("src/app/platform/oversight/[id]/page.tsx");
-  for (const section of ["Stations", "Transporter companies", "Driver training sessions", "Document inventory"]) {
-    assert.ok(view.includes(section), `Missing resource section: ${section}`);
-  }
-  assert.match(view, /file contents are not exposed/);
+test("selected organizations use original Dashboard and native module UI rather than generic oversight preview", () => {
+  const detail = read("src/app/platform/oversight/[id]/page.tsx");
+  const scoped = read("src/app/platform/oversight/[id]/section/[section]/page.tsx");
+  const dashboard = read("src/components/ExecutiveDashboardView.tsx");
+  assert.match(detail, /<ExecutiveDashboardView/);
+  assert.match(dashboard, /title="Executive Dashboard"/);
+  assert.match(dashboard, /Core operating metrics/);
+  assert.match(dashboard, /Inspection outcome trend/);
+  assert.match(dashboard, /Operational attention/);
+  for (const component of [
+    "VehicleRegistryView", "TransportersWorkspaceView", "InspectionRegistryView",
+    "DailyInspectionWorkspaceView", "InspectionSchedulingView", "InspectionStationsView",
+    "DriverTrainingWorkspaceView", "ReportsWorkspaceView", "AuditWorkspaceView",
+  ]) assert.ok(scoped.includes(`<${component}`));
+  assert.doesNotMatch(detail, /Platform Oversight Centre|OrganizationSwitcher/);
+  assert.doesNotMatch(scoped, /Scoped · read-only/);
 });

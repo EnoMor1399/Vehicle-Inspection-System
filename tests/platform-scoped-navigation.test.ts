@@ -69,8 +69,8 @@ test("sidebar retains the organization across scoped routes and does not send Su
 test("scoped module pages require privileged, validated, organization-specific reads", () => {
   assert.match(scopedPage, /if \(!isScopedSection\(section\)\)[\s\S]*?notFound\(\)/);
   assert.match(scopedPage, /getPlatformOrganizationOversight\(id\)/);
-  assert.match(scopedPage, /listPlatformScopedModuleRecords\(id, section, requestedPage\)/);
-  assert.match(scopedPage, /getPlatformOrganizationAssetInventory\(id/);
+  assert.match(scopedPage, /listPlatformScopedModuleRecords\(organizationId, section, currentPage\)/);
+  assert.match(scopedPage, /getPlatformOrganizationAssetInventory\(organizationId/);
   assert.match(server, /await requirePlatformSuperAdmin\(\)/);
   for (const name of [
     "inspections", "dailyInspections", "inspectionAppointments", "vehicles",
@@ -78,7 +78,11 @@ test("scoped module pages require privileged, validated, organization-specific r
   ]) assert.match(server, new RegExp(`eq\\(${name}\\.organizationId, organizationId\\)`));
   assert.doesNotMatch(server, /db\.insert\(|db\.update\(|db\.delete\(/);
   assert.match(server, /SCOPED_MODULE_PAGE_SIZE = 40/);
-  assert.match(scopedPage, /Scoped · read-only/);
+  assert.match(scopedPage, /<VehicleRegistryView/);
+  assert.match(scopedPage, /<TransportersWorkspaceView/);
+  assert.match(scopedPage, /<InspectionRegistryView/);
+  assert.match(scopedPage, /<ReportsWorkspaceView/);
+  assert.match(scopedPage, /<ClassicScopedModuleView/);
 });
 
 test("sidebar preserves existing non-Super Admin links and never authorizes use of browser storage as tenant authority", () => {

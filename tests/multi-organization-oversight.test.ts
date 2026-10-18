@@ -25,7 +25,9 @@ test("sidebar is the only organization selector and never impersonates a tenant"
     "OrganizationSwitcher", "Switch organization", "All organisations",
     "Manage subscription & workspace",
   ]) assert.ok(!detail.includes(legacy), `Unexpected duplicate navigation: ${legacy}`);
-  assert.ok(detail.includes("<AssetInventory organizationId={org.id} inventory={inventory} />"));
+  assert.ok(detail.includes("<ExecutiveDashboardView"));
+  assert.ok(scopedModule.includes("<VehicleRegistryView"));
+  assert.ok(scopedModule.includes("<AssetInventory"));
   assert.ok(!scopedModule.includes("Organization overview"));
   assert.ok(platformOverview.includes('title="Platform Overview"'));
   assert.ok(!platformOverview.includes("Platform Oversight Centre"));

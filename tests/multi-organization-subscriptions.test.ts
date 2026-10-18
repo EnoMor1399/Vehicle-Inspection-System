@@ -30,12 +30,13 @@ test("subscriber invitation tokens are hashed before persistence", () => {
 });
 
 test("subscriber user directories and mutations enforce organization boundaries", () => {
-  const inspectionUsers = readFileSync("src/app/users/page.tsx", "utf8");
+  const inspectionUsers = readFileSync("src/components/UsersWorkspaceView.tsx", "utf8");
   const inspectionActions = readFileSync("src/app/users/actions.ts", "utf8");
   const trainingUsers = readFileSync("src/app/driver-training/users/page.tsx", "utf8");
   const trainingActions = readFileSync("src/app/driver-training/users/actions.ts", "utf8");
 
-  assert.match(inspectionUsers, /eq\(users\.organizationId, user\.organizationId\)/);
+  assert.match(inspectionUsers, /eq\(users\.organizationId, organizationId\)/);
+  assert.match(readFileSync("src/app/users/page.tsx", "utf8"), /organizationId=\{user\.organizationId\}/);
   assert.match(trainingUsers, /eq\(users\.organizationId, user\.organizationId\)/);
   assert.match(inspectionActions, /target\.organizationId !== actor\.organizationId/);
   assert.match(trainingActions, /organizationId: actor\.organizationId/);

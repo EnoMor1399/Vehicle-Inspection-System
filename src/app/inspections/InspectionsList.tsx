@@ -16,9 +16,10 @@ import { formatDateTime } from "@/lib/utils";
 interface InspectionsListProps {
   rows: any[];
   canCreate?: boolean;
+  readOnly?: boolean;
 }
 
-export function InspectionsList({ rows, canCreate = false }: InspectionsListProps) {
+export function InspectionsList({ rows, canCreate = false, readOnly = false }: InspectionsListProps) {
   const exportData = rows.map((r: any) => ({
     inspectionNumber: r.inspectionNumber,
     date: formatDateTime(r.inspectionDate),
@@ -41,7 +42,7 @@ export function InspectionsList({ rows, canCreate = false }: InspectionsListProp
   return (
     <>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-        {canCreate && (
+        {canCreate && !readOnly && (
           <Link
             href="/inspections/new"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[var(--brand-color)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 active:translate-y-px"
@@ -51,12 +52,12 @@ export function InspectionsList({ rows, canCreate = false }: InspectionsListProp
           </Link>
         )}
 
-        <ExportMenu
+        {!readOnly && <ExportMenu
           data={exportData}
           filename="inspections"
           title="Vehicle Inspections"
           label="Export"
-        />
+        />}
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -142,14 +143,14 @@ export function InspectionsList({ rows, canCreate = false }: InspectionsListProp
                       <ResultBadge result={r.overallResult} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
+                      {!readOnly && <Link
                         href={`/inspections/${r.id}`}
                         aria-label={`View inspection ${r.inspectionNumber}`}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2"
                       >
                         View
                         <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
+                      </Link>}
                     </td>
                   </tr>
                 ))}

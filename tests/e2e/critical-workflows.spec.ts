@@ -224,6 +224,7 @@ test("support-mode cookie blocks HTTP mutations even if no support record exists
 });
 
 test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
+  test.setTimeout(180_000); // Native VIMS pages render charts, analytics, and guarded records.
   // A test-only authenticated session from the isolated PostgreSQL seed avoids
   // consuming the suite's normal-user login rate limit or bypassing real auth.
   const sessionToken = readFileSync(join(tmpdir(), "vims-e2e-super-admin-session"), "utf8").trim();
@@ -237,7 +238,9 @@ test("Super Admin company switch and every operational sidebar destination retur
   await chooseOrganization.click();
   await page.getByRole("button", { name: /E2E Tenant Safety Ltd/ }).click();
   await expect(page).toHaveURL(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
-  await expect(page.getByRole("heading", { name: "E2E Tenant Safety Ltd" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
+  await expect(page.getByText("Core operating metrics")).toBeVisible();
+  await expect(page.getByText("Inspection outcome trend")).toBeVisible();
 
   const vehiclesLink = page.getByRole("link", { name: "Vehicles", exact: true });
   await expect(vehiclesLink).toHaveAttribute("href",
@@ -251,9 +254,10 @@ test("Super Admin company switch and every operational sidebar destination retur
   console.log("[scoped-navigation-e2e] Vehicles HTTP status:", vehiclesResponse?.status(),
     "Not Found:", pageText.includes("This page could not be found."));
   expect(vehiclesResponse?.status(), "Vehicles should render rather than 404/500").toBe(200);
-  await expect(page.locator('main').getByText("Organization asset and resource inventory")).toBeVisible();
-  await expect(page.locator('main').getByText("TENANT-2026")).toBeVisible();
-  await expect(page.locator('main').getByText("E2E-2026")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Vehicles", exact: true })).toBeVisible();
+  await expect(page.getByText("Full organization asset inventory")).toBeVisible();
+  await expect(page.getByRole("table").first().getByText("TENANT-2026")).toBeVisible();
+  await expect(page.getByRole("table").first().getByText("E2E-2026")).toHaveCount(0);
 
   // Verifies valid server-side modules and the explicitly selected org for
   // every sidebar function, not just a link's href or a build-route manifest.
@@ -274,8 +278,8 @@ test("Super Admin company switch and every operational sidebar destination retur
   await page.getByRole("button", { name: /Road Safety Limited/ }).click();
   await expect(page).toHaveURL(`${baseURL}/platform/oversight/${rslOrganizationId}`);
   await page.getByRole("link", { name: "Vehicles", exact: true }).click();
-  await expect(page.getByLabel("Organization asset inventory").getByText("E2E-2026")).toBeVisible();
-  await expect(page.getByLabel("Organization asset inventory").getByText("TENANT-2026")).toHaveCount(0);
+  await expect(page.getByRole("table").first().getByText("E2E-2026")).toBeVisible();
+  await expect(page.getByRole("table").first().getByText("TENANT-2026")).toHaveCount(0);
 });
 
 

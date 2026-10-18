@@ -43,7 +43,7 @@ test("department outcomes cover safety, professionalism, compliance and operatio
 
 test("Driver Training routes are restricted to the Driver Training domain", () => {
   const layout = readFileSync("src/app/driver-training/layout.tsx", "utf8");
-  const source = readFileSync("src/app/driver-training/page.tsx", "utf8");
+  const source = readFileSync("src/components/DriverTrainingWorkspaceView.tsx", "utf8");
   assert.match(layout, /requireDriverTrainingUser\(\)/);
   assert.match(source, /DRIVER_TRAINING_SERVICES/);
 });
