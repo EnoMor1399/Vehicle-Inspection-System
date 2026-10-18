@@ -32,7 +32,7 @@ test("organization oversight resource queries remain explicitly tenant scoped", 
   ]) {
     assert.match(
       detailHelper,
-      new RegExp(`from\\(\\${table}\\)[\\s\\S]{0,180}?where\\(eq\\(\\${table}\\.organizationId, org.id\\)\\)`),
+      new RegExp("from\\\\(" + table + "\\\\)[\\\\s\\\\S]{0,180}?where\\\\(eq\\\\(" + table + "\\\\.organizationId, org.id\\\\)\\\\)"),
       `Expected ${table} query to filter by the selected organization`,
     );
   }
