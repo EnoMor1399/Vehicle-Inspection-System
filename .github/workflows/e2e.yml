@@ -47,6 +47,7 @@ jobs:
       REQUIRE_DISTRIBUTED_RATE_LIMIT: "false"
       ALLOW_PUBLIC_SIGNUP: "false"
       E2E_BASE_URL: http://127.0.0.1:3000
+      E2E_PLATFORM_TOTP_SEED: JBSWY3DPEHPK3PXP # throwaway CI-only fixture, never a production secret
       E2E_USER_EMAIL: e2e.inspector@vims.local
       E2E_USER_PASSWORD: E2eOnly!Passw0rd2026
       E2E_TRAINING_USER_EMAIL: e2e.training.admin@vims.local

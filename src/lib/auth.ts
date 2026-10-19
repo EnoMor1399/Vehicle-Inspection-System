@@ -69,6 +69,26 @@ export async function getCurrentUser(options: CurrentUserOptions = {}) {
     throw new Error("Two-factor enrollment required");
   }
 
+  const scopeCookie = jar.get("vims_superadmin_operations")?.value;
+  if (scopeCookie) {
+    const { operationalUserForRequest } = await import("@/lib/super-admin-operations");
+    try {
+      return await operationalUserForRequest(
+        session, sessionToken, scopeCookie,
+        jar.get("vims_superadmin_stepup")?.value,
+        jar.get("vims_support_token")?.value,
+      );
+    } catch (error) {
+      const { headers } = await import("next/headers");
+      const { redirect } = await import("next/navigation");
+      const request = await headers();
+      if (request.get("x-vims-request-method") === "GET"
+        && request.get("x-vims-request-path") !== "/platform/operations-expired") {
+        redirect("/platform/operations-expired");
+      }
+      throw error;
+    }
+  }
   return effective.user;
 }
 
@@ -263,6 +283,8 @@ export async function logout(sessionId?: string): Promise<void> {
 
   jar.delete("rsl_session_token");
   jar.delete("rsl_user_id");
+  jar.delete("vims_superadmin_operations");
+  jar.delete("vims_superadmin_stepup");
 }
 
 const VEHICLE_ADMIN_PERMISSIONS = {

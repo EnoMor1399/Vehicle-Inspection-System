@@ -108,6 +108,7 @@ export async function updateTransporter(id: string, data: TransporterFormData) {
     .select({ id: transporters.id })
     .from(transporters)
     .where(and(
+      eq(transporters.organizationId, user.organizationId),
       eq(transporters.companyName, parsed.companyName),
       ne(transporters.id, id),
       isNull(transporters.deletedAt)
@@ -142,14 +143,16 @@ export async function deleteTransporter(id: string) {
   const [transporter] = await db
     .select()
     .from(transporters)
-    .where(and(eq(transporters.id, id), isNull(transporters.deletedAt)))
+    .where(and(eq(transporters.organizationId, user.organizationId), eq(transporters.id, id), isNull(transporters.deletedAt)))
     .limit(1);
   if (!transporter) return { deleted: false, notFound: true };
 
-  await db
+  const [deleted] = await db
     .update(transporters)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(transporters.organizationId, user.organizationId), eq(transporters.id, id)));
+    .where(and(eq(transporters.organizationId, user.organizationId), eq(transporters.id, id), isNull(transporters.deletedAt)))
+    .returning({ id: transporters.id });
+  if (!deleted) return { deleted: false, notFound: true };
   await logAudit({
     organizationId: user.organizationId,
     userId: user.id,

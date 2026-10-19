@@ -6,6 +6,7 @@ import { inspectionAppointments, inspections, vehicles, signatures } from "@/db/
 import { eq, and } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { tenantLocalActorUserId } from "@/lib/tenant-local-actor";
 import { getCurrentUser, canManageInspections, canAccessTransporterScope, canApprove } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import {
@@ -116,6 +117,7 @@ function validateSections(sectionData: InspectionSectionData[]) {
 
 export async function createInspection(data: InspectionFormData) {
   const user = await requireEditor();
+  const localActorId = await tenantLocalActorUserId(user);
   const settings = await getSettings(user.organizationId);
 
   if (!data.vehicleId) throw new Error("Vehicle is required");
@@ -190,7 +192,7 @@ export async function createInspection(data: InspectionFormData) {
     inspectionNumber: number,
     vehicleId: data.vehicleId,
     inspectionDate: inspectedAt,
-    inspectorId: user.id,
+    inspectorId: localActorId,
     inspectorName: data.inspectorName.trim() || user.name,
     supervisorId: null,
     supervisorName: null,
@@ -226,7 +228,7 @@ export async function createInspection(data: InspectionFormData) {
         inspectionId: id,
         type: "inspector",
         signerName: data.inspectorName.trim() || user.name,
-        signerId: user.id,
+        signerId: localActorId,
         dataUrl: data.inspectorSignature,
       });
     }
@@ -299,6 +301,7 @@ export async function createInspection(data: InspectionFormData) {
 
 export async function approveInspection(id: string, input: { remarks?: string; signature?: string }) {
   const user = await getCurrentUser();
+  const localActorId = await tenantLocalActorUserId(user);
   if (!canApprove(user)) throw new Error("You do not have permission to approve inspections");
   if (!id || id.length > 64) throw new Error("Inspection reference is invalid");
   if (input.signature) validateSignatureDataUrl(input.signature, "Supervisor signature");
@@ -324,7 +327,7 @@ export async function approveInspection(id: string, input: { remarks?: string; s
   await db.transaction(async (tx) => {
     await tx.update(inspections).set({
       workflowStatus: "approved",
-      supervisorId: user.id,
+      supervisorId: localActorId,
       supervisorName: user.name,
       supervisorRemarks: input.remarks?.trim() || null,
       supervisorSignature: input.signature || null,
@@ -343,7 +346,7 @@ export async function approveInspection(id: string, input: { remarks?: string; s
         inspectionId: id,
         type: "supervisor",
         signerName: user.name,
-        signerId: user.id,
+        signerId: localActorId,
         dataUrl: input.signature,
       });
     }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildContentSecurityPolicy } from "@/lib/csp";
+import { trustedOperationsOrigin } from "@/lib/operations-csrf";
 import { clientIpFromHeaders, normalizeRequestId } from "@/lib/request-context";
 import {
   API_AI_JSON_BODY_LIMIT,
@@ -89,6 +90,23 @@ export async function proxy(request: NextRequest) {
       && !(request.method === "POST" && pathname === "/api/support-session/end")) {
     return NextResponse.json({ error: "Read-only support mode: exit before making changes" },
       { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+  // Browser-bound Super Admin operations intentionally use the existing
+  // tenant-aware Server Actions. Legacy token/API routes often resolve their
+  // own tenant and must never silently target a different company.
+  if (request.cookies.has("vims_superadmin_operations")) {
+    if (pathname.startsWith("/api/")
+      && !pathname.startsWith("/api/platform/operations/")
+      && pathname !== "/api/auth/logout") {
+      return NextResponse.json({ error: "API requests are disabled during scoped Super Admin operations. Exit this mode for API integrations." },
+        { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    if (!["GET", "HEAD"].includes(request.method)
+      && !pathname.startsWith("/api/platform/operations/")) {
+      if (!trustedOperationsOrigin(request)) {
+        return rejected("Scoped operations require a same-origin browser request", 403, crypto.randomUUID());
+      }
+    }
   }
   const ip = clientIpFromHeaders(request.headers);
   const requestId = normalizeRequestId(request.headers.get("x-request-id"), crypto.randomUUID());
