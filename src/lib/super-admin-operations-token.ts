@@ -100,8 +100,8 @@ export type ScopedWriteRisk = "routine" | "high";
 // removal, and unknown operations require fresh MFA step-up.
 export function classifyScopedWrite(pathname: string): ScopedWriteRisk {
   if (/^\/(?:vehicles|transporters)\/new\/?$/.test(pathname)) return "routine";
-  if (/^\/(?:inspections|daily-inspections)\/new\/?$/.test(pathname)) return "routine";
-  if (/^\/schedule\/?$/.test(pathname)) return "routine";
+  // Inspection decisions, certifications, signed pre-trip checks and schedule
+  // reassignment can carry compliance consequences, so they require step-up.
   // Edit forms may also expose deletion/decommission actions, so their
   // entire POST is high risk instead of relying on UI button labels.
   return "high";
