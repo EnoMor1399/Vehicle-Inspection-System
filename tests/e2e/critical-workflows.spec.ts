@@ -223,6 +223,32 @@ test("support-mode cookie blocks HTTP mutations even if no support record exists
   expect((await response.json()).error).toContain("Read-only support mode");
 });
 
+test("Super Admin can activate selected company operations and create only company-owned records", async ({ page }) => {
+  test.setTimeout(180_000);
+  const { generate } = await import("otplib");
+  const token = readFileSync(join(tmpdir(), "vims-e2e-super-admin-session"), "utf8").trim();
+  await page.context().addCookies([{
+    name: "rsl_session_token", value: token, url: baseURL,
+    sameSite: "Lax", httpOnly: true, secure: false,
+  }]);
+  await page.goto(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
+  await page.getByRole("button", { name: "Enable organization operations" }).click();
+  const modal = page.getByRole("dialog", { name: "Enable Super Admin organization operations" });
+  await modal.locator("textarea").fill("Validate scoped tenant transporter creation in isolated browser tests");
+  await modal.locator("input").nth(0).fill("OPERATE E2E Tenant Safety Ltd");
+  await modal.locator("input").nth(1).fill(await generate({ secret: process.env.E2E_PLATFORM_TOTP_SEED || "" }));
+  await modal.getByRole("button", { name: "Start secured organization operations" }).click();
+  await expect(page.getByText("Super Admin operating in E2E Tenant Safety Ltd")).toBeVisible();
+  await page.goto(`${baseURL}/transporters/new`);
+  await page.locator('input[name="companyName"]').fill("E2E Scoped Operations Transporter");
+  await page.getByRole("button", { name: "Create Transporter" }).click();
+  await expect(page).toHaveURL(/\/transporters\/[^/]+$/);
+  await page.getByRole("button", { name: "Exit company operations" }).click();
+  await expect(page).toHaveURL(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
+  await page.goto(`${baseURL}/platform/oversight/${rslOrganizationId}/section/transporters`);
+  await expect(page.getByText("E2E Scoped Operations Transporter")).toHaveCount(0);
+});
+
 test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
   test.setTimeout(180_000); // Native VIMS pages render charts, analytics, and guarded records.
   // A test-only authenticated session from the isolated PostgreSQL seed avoids
