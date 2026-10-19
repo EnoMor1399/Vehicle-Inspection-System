@@ -106,6 +106,14 @@ export function isAuthorizedOperationPage(pathname: string): boolean {
     && !pathname.startsWith("/platform/")
     && !pathname.startsWith("/security/")
     && !pathname.startsWith("/auth/")
+    && !pathname.startsWith("/organization/")
+    && !pathname.startsWith("/profile")
+    && !pathname.startsWith("/account")
+    && !pathname.startsWith("/subscriptions")
+    && !pathname.startsWith("/payments")
+    && !pathname.startsWith("/workspace-setup")
+    && !pathname.startsWith("/subscription-access")
+    && !pathname.startsWith("/invite")
     && !pathname.startsWith("/login")
     && !pathname.startsWith("/logout");
 }
