@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { validateSession } from "@/lib/security";
 import { hasPermission } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
@@ -60,11 +60,20 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
   const scopeCookie = jar.get("vims_superadmin_operations")?.value;
   if (scopeCookie) {
     const { operationalUserForRequest } = await import("@/lib/super-admin-operations");
-    return operationalUserForRequest(
-      session, sessionToken, scopeCookie,
-      jar.get("vims_superadmin_stepup")?.value,
-      jar.get("vims_support_token")?.value,
-    );
+    try {
+      return await operationalUserForRequest(
+        session, sessionToken, scopeCookie,
+        jar.get("vims_superadmin_stepup")?.value,
+        jar.get("vims_support_token")?.value,
+      );
+    } catch (error) {
+      const requestHeaders = await headers();
+      if (requestHeaders.get("x-vims-request-method") === "GET"
+        && requestHeaders.get("x-vims-request-path") !== "/platform/operations-expired") {
+        redirect("/platform/operations-expired");
+      }
+      throw error;
+    }
   }
   return user;
 }
