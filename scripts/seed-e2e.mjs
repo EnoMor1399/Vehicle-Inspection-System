@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import bcrypt from "bcryptjs";
 import pg from "pg";
+import { generateSecret } from "otplib";
 
 const databaseUrl = process.env.DATABASE_URL || "";
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -129,6 +130,8 @@ try {
        status = excluded.status`,
     [transporterId, organizationId],
   );
+  const testAuthenticatorSeed = generateSecret();
+  writeFileSync(join(tmpdir(), "vims-e2e-authenticator-seed"), testAuthenticatorSeed, { mode: 0o600 });
   // E2E-only identity used to exercise the SAME protected Super Admin sidebar
   // and read-only organization URLs that users open in production. This seed
   // runs exclusively against the isolated CI PostgreSQL service.
@@ -147,7 +150,7 @@ try {
        locked_until = null,
        two_factor_enabled = true,
        two_factor_secret = excluded.two_factor_secret`,
-    [superAdminUserId, organizationId, superAdminEmail, passwordHash, process.env.E2E_PLATFORM_TOTP_SEED || "JBSWY3DPEHPK3PXP"],
+    [superAdminUserId, organizationId, superAdminEmail, passwordHash, testAuthenticatorSeed],
   );
 
   // Secure, short-lived browser fixture only. Never use this identity or
