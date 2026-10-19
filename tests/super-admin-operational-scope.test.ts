@@ -56,10 +56,10 @@ test("high-risk step-up expires quickly and is never usable as an operations gra
 
 test("routine writes are restricted to known forms and everything else requires extra MFA", () => {
   for (const pathname of [
-    "/vehicles/new", "/transporters/new", "/inspections/new",
-    "/daily-inspections/new", "/schedule",
+    "/vehicles/new", "/transporters/new",
   ]) assert.equal(classifyScopedWrite(pathname), "routine");
   for (const pathname of [
+    "/inspections/new", "/daily-inspections/new", "/schedule",
     "/vehicles/e2e/edit", "/transporters/e2e/edit", "/users",
     "/settings", "/import", "/inspections/e2e", "/daily-inspections/e2e",
     "/locations", "/driver-training", "/notifications", "/organization/account",
