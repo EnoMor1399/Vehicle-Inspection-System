@@ -135,7 +135,7 @@ try {
   await client.query(
     `insert into users
       (id, organization_id, name, email, role, password_hash, permissions, is_active, failed_login_attempts, two_factor_enabled, two_factor_secret)
-     values ($1, $2, 'E2E Platform Administrator', $3, 'super_admin', $4, '{}'::jsonb, true, 0, true, 'JBSWY3DPEHPK3PXP')
+     values ($1, $2, 'E2E Platform Administrator', $3, 'super_admin', $4, '{}'::jsonb, true, 0, true, $5)
      on conflict (email) do update set
        organization_id = excluded.organization_id,
        name = excluded.name,
@@ -147,7 +147,7 @@ try {
        locked_until = null,
        two_factor_enabled = true,
        two_factor_secret = excluded.two_factor_secret`,
-    [superAdminUserId, organizationId, superAdminEmail, passwordHash],
+    [superAdminUserId, organizationId, superAdminEmail, passwordHash, process.env.E2E_PLATFORM_TOTP_SEED || "JBSWY3DPEHPK3PXP"],
   );
 
   // Secure, short-lived browser fixture only. Never use this identity or
