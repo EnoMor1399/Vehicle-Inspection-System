@@ -6,6 +6,7 @@ import { dailyInspections, vehicles } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { tenantLocalActorUserId } from "@/lib/tenant-local-actor";
 import { getCurrentUser, canApprove, canManageInspections, canAccessTransporterScope } from "@/lib/auth";
 import type { DailyChecklistCategory } from "@/db/schema";
 import { summarizeDailyChecklist } from "@/lib/daily-checklist";
@@ -77,6 +78,7 @@ function validateInspectionDate(value: string) {
 
 export async function submitDailyInspection(input: DailyInspectionInput) {
   const user = await getCurrentUser();
+  const localActorId = await tenantLocalActorUserId(user);
   if (!canManageInspections(user)) throw new Error("You do not have permission to submit daily inspections");
   if (!input.vehicleId || input.vehicleId.length > 64) throw new Error("Vehicle is required");
   if (!input.inspectionDate) throw new Error("Inspection date is required");
@@ -137,7 +139,7 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
     id,
     organizationId: user.organizationId,
     vehicleId: input.vehicleId,
-    driverId: user.id,
+    driverId: localActorId,
     driverName,
     inspectionDate: input.inspectionDate,
     startTime: new Date(),
@@ -228,6 +230,7 @@ export async function getTodaysInspection(vehicleId: string, date: string) {
 
 export async function approveDailyInspection(id: string, supervisorNotes?: string) {
   const user = await getCurrentUser();
+  const localActorId = await tenantLocalActorUserId(user);
   if (!canApprove(user)) {
     throw new Error("You do not have permission to approve daily inspections");
   }
@@ -246,7 +249,7 @@ export async function approveDailyInspection(id: string, supervisorNotes?: strin
 
   await db.update(dailyInspections).set({
     supervisorReview: true,
-    supervisorId: user.id,
+    supervisorId: localActorId,
     supervisorNotes: supervisorNotes?.trim() || null,
     updatedAt: new Date(),
   }).where(and(
