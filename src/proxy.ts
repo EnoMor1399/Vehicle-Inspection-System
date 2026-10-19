@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildContentSecurityPolicy } from "@/lib/csp";
+import { trustedOperationsOrigin } from "@/lib/operations-csrf";
 import { clientIpFromHeaders, normalizeRequestId } from "@/lib/request-context";
 import {
   API_AI_JSON_BODY_LIMIT,
@@ -102,10 +103,7 @@ export async function proxy(request: NextRequest) {
     }
     if (!["GET", "HEAD"].includes(request.method)
       && !pathname.startsWith("/api/platform/operations/")) {
-      const origin = normalizeOrigin(request.headers.get("origin"));
-      const site = request.headers.get("sec-fetch-site");
-      if (site && site !== "same-origin"
-        || !origin || !allowedOrigins(request).has(origin)) {
+      if (!trustedOperationsOrigin(request)) {
         return rejected("Scoped operations require a same-origin browser request", 403, crypto.randomUUID());
       }
     }
