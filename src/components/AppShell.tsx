@@ -243,9 +243,14 @@ export function AppShell({
         ? pathOrganizationId
         : validOrganizationId(rememberedOrganizationId) ? rememberedOrganizationId : ""))
     : "";
-  const activeOversightOrganization = organizationChoices.find(
-    (organization) => organization.id === activeOversightOrganizationId,
-  );
+  // The platform-control-plane organization list is intentionally unavailable
+  // during elevated company operations. Use the validated server-side operation
+  // identity for the visible organization label instead of falling back to the
+  // original login organization's branding.
+  const activeOversightOrganization = operationContext
+    ? { id: operationContext.organizationId, name: operationContext.organizationName,
+        slug: "", status: "active" }
+    : organizationChoices.find((organization) => organization.id === activeOversightOrganizationId);
   const currentPageIsScoped = Boolean(pathOrganizationId && pathOrganizationId === activeOversightOrganizationId);
 
   function scopedNavigationHref(href: string) {
