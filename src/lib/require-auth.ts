@@ -79,6 +79,12 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
 }
 
 export async function requirePlatformSuperAdmin() {
+  // The control plane must never borrow an operational tenant grant. Even a
+  // valid 15-minute organization capability cannot authorize platform-wide
+  // changes, regardless of which page a Server Action POST originated from.
+  if ((await cookies()).has("vims_superadmin_operations")) {
+    throw new Error("Exit scoped company operations before platform administration");
+  }
   const user = await requireAuth();
   if (user.role !== "super_admin") redirect("/");
   return user;
