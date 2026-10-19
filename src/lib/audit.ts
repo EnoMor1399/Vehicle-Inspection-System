@@ -18,6 +18,8 @@ export type AuditInput = {
   before?: unknown;
   after?: unknown;
   ipAddress?: string | null;
+  /** Refuse the operation if the privileged intent cannot be persisted. */
+  required?: boolean;
 };
 
 export async function logAudit(input: AuditInput) {
@@ -85,5 +87,6 @@ export async function logAudit(input: AuditInput) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown error";
     console.warn(`[audit] persistence failed: ${message}`);
+    if (input.required) throw new Error("Privileged operation blocked because the audit trail is unavailable");
   }
 }
