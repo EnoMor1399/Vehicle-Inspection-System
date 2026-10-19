@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { scopedOrganizationHref, SCOPED_NAV_SECTIONS } from "@/lib/platform-oversight-navigation";
+import { SuperAdminOperationControls } from "@/components/SuperAdminOperationControls";
 import {
   Activity,
   BarChart3,
@@ -194,6 +195,8 @@ export function AppShell({
   changeNoticeBanner,
   notificationUnreadCount = 0,
   organizationChoices = [],
+  operationContext,
+  operationExpired = false,
 }: {
   children: ReactNode;
   branding?: AppBranding;
@@ -205,6 +208,8 @@ export function AppShell({
   changeNoticeBanner?: { title: string; severity: "critical" | "important"; effectiveAt: string } | null;
   notificationUnreadCount?: number;
   organizationChoices?: OrganizationChoice[];
+  operationContext?: { organizationId: string; organizationName: string; expiresAt: string; stepUpExpiresAt: string | null } | null;
+  operationExpired?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -233,9 +238,10 @@ export function AppShell({
   const validOrganizationId = (id: string) =>
     organizationChoices.some((organization) => organization.id === id);
   const activeOversightOrganizationId = canSelectOrganization
-    ? (validOrganizationId(pathOrganizationId)
-      ? pathOrganizationId
-      : validOrganizationId(rememberedOrganizationId) ? rememberedOrganizationId : "")
+    ? (operationContext?.organizationId
+      || (validOrganizationId(pathOrganizationId)
+        ? pathOrganizationId
+        : validOrganizationId(rememberedOrganizationId) ? rememberedOrganizationId : ""))
     : "";
   const activeOversightOrganization = organizationChoices.find(
     (organization) => organization.id === activeOversightOrganizationId,
@@ -244,6 +250,7 @@ export function AppShell({
 
   function scopedNavigationHref(href: string) {
     if (!canSelectOrganization) return href;
+    if (operationContext) return href;
     if (activeOversightOrganizationId) return scopedOrganizationHref(activeOversightOrganizationId, href);
     // A Super Admin with no selection must not accidentally open the
     // operational pages belonging to their original login organization.
@@ -266,7 +273,7 @@ export function AppShell({
           ...group,
           items: group.items.filter((item) => {
             if (!userRole) return false;
-            if (isSuperAdmin) return true;
+            if (isSuperAdmin) return !operationContext || !item.superAdminOnly;
             if (item.superAdminOnly) return false;
             if (item.organizationOwnerOnly && userRole !== "organization_owner") return false;
             if (!item.resource) return true;
@@ -327,7 +334,7 @@ export function AppShell({
   }, [organizationMenuOpen]);
 
   function selectOversightOrganization(organizationId: string) {
-    if (!canSelectOrganization) return;
+    if (!canSelectOrganization || operationContext) return;
     if (!organizationChoices.some((organization) => organization.id === organizationId)) return;
     setOrganizationMenuOpen(false);
     try {
@@ -364,7 +371,7 @@ export function AppShell({
                   aria-label="Switch organization in the sidebar"
                   aria-expanded={organizationMenuOpen}
                   aria-controls="sidebar-organization-options"
-                  onClick={() => setOrganizationMenuOpen((value) => !value)}
+                  onClick={() => { if (!operationContext) setOrganizationMenuOpen((value) => !value); }}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
                 >
                   {activeOversightOrganization || !branding.logoUrl ? (
@@ -384,9 +391,10 @@ export function AppShell({
                       {activeOversightOrganization?.name ?? branding.companyName}
                     </span>
                     <span className="mt-0.5 block truncate text-[11px] text-slate-400">
-                      {activeOversightOrganization
-                        ? "Read-only oversight · " + activeOversightOrganization.status
-                        : "Switch organisation · oversight only"}
+                      {operationContext ? "Authorized operations · " + activeOversightOrganization?.status
+                        : activeOversightOrganization
+                          ? "Company oversight · " + activeOversightOrganization.status
+                          : "Select organization to manage"}
                     </span>
                   </span>
                   <ChevronDown
@@ -592,7 +600,7 @@ export function AppShell({
                   )}
                 </Link>
               )}
-              {isSuperAdmin && (
+              {isSuperAdmin && !operationContext && (
                 <Link href="/platform/notices" className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 xl:inline-flex">
                   Manage notices
                 </Link>
@@ -609,12 +617,22 @@ export function AppShell({
           </div>
         </header>
 
-        {activeOversightOrganization && (
+        {!operationContext && activeOversightOrganization && (
           <div role="status" className="flex flex-wrap items-center gap-2 border-b border-indigo-200 bg-indigo-50 px-4 py-2 text-xs text-indigo-950 sm:px-6 lg:px-8">
             <Building2 className="h-4 w-4" aria-hidden="true" />
-            <span><strong>{activeOversightOrganization.name}</strong> · {currentPageIsScoped ? "Organization-scoped read-only view" : "Organization selection retained · this page is platform-wide"}</span>
+            <span><strong>{activeOversightOrganization.name}</strong> · {currentPageIsScoped ? "Organization-scoped view" : "Organization selection retained · this page is platform-wide"}</span>
             <Link href={`/platform/oversight/${encodeURIComponent(activeOversightOrganization.id)}`} className="font-semibold underline">Overview</Link>
           </div>
+        )}
+        {isSuperAdmin && (
+          <SuperAdminOperationControls
+            selectedOrganization={activeOversightOrganization}
+            operations={operationContext}
+            expired={operationExpired}
+          />
+        )}
+        {!isSuperAdmin && operationExpired && (
+          <SuperAdminOperationControls expired />
         )}
         <main className="app-shell-content min-h-[calc(100vh-65px)] overflow-x-hidden">{children}</main>
       </div>
