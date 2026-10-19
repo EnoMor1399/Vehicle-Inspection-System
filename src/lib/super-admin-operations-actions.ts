@@ -101,7 +101,7 @@ export async function beginSuperAdminOperations(input: {
     secure: process.env.NODE_ENV === "production",
     // Keep the signed marker after its embedded 15-min expiration so stale
     // workspaces FAIL CLOSED rather than silently writing into the login tenant.
-    maxAge: 8 * 60 * 60,
+    maxAge: 31 * 24 * 60 * 60,
   });
   actor.jar.set(STEP_UP_COOKIE_NAME, "", {
     path: "/", maxAge: 0, httpOnly: true, sameSite: "strict",
