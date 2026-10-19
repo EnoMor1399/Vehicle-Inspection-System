@@ -69,6 +69,15 @@ export async function getCurrentUser(options: CurrentUserOptions = {}) {
     throw new Error("Two-factor enrollment required");
   }
 
+  const scopeCookie = jar.get("vims_superadmin_operations")?.value;
+  if (scopeCookie) {
+    const { operationalUserForRequest } = await import("@/lib/super-admin-operations");
+    return operationalUserForRequest(
+      session, sessionToken, scopeCookie,
+      jar.get("vims_superadmin_stepup")?.value,
+      jar.get("vims_support_token")?.value,
+    );
+  }
   return effective.user;
 }
 
