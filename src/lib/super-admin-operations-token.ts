@@ -107,19 +107,14 @@ export function classifyScopedWrite(pathname: string): ScopedWriteRisk {
   return "high";
 }
 
+const REVIEWED_OPERATION_PATHS = ["/vehicles", "/transporters", "/inspections",
+  "/daily-inspections", "/schedule", "/locations", "/driver-training",
+  "/reports", "/compliance", "/predictive", "/powerbi", "/rfid",
+  "/users", "/documents", "/import", "/settings", "/audit",
+  "/notifications", "/portal", "/apps", "/api-docs", "/guide"] as const;
+
 export function isAuthorizedOperationPage(pathname: string): boolean {
-  return !pathname.startsWith("/api/")
-    && !pathname.startsWith("/platform/")
-    && !pathname.startsWith("/security/")
-    && !pathname.startsWith("/auth/")
-    && !pathname.startsWith("/organization/")
-    && !pathname.startsWith("/profile")
-    && !pathname.startsWith("/account")
-    && !pathname.startsWith("/subscriptions")
-    && !pathname.startsWith("/payments")
-    && !pathname.startsWith("/workspace-setup")
-    && !pathname.startsWith("/subscription-access")
-    && !pathname.startsWith("/invite")
-    && !pathname.startsWith("/login")
-    && !pathname.startsWith("/logout");
+  if (pathname === "/") return true;
+  return REVIEWED_OPERATION_PATHS.some((prefix) =>
+    pathname === prefix || pathname.startsWith(prefix + "/"));
 }
