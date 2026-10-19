@@ -21,11 +21,17 @@ const HEX_SESSION_ID = /^[A-Za-z0-9-]{16,64}$/;
 const SAFE_ACTOR_ID = /^[A-Za-z0-9-]{16,64}$/;
 
 function capabilityKey(sessionToken: string): Buffer {
-  // The real login session token has 512 bits of entropy and is HttpOnly.
-  // The token is bound to the *same* revocable login session in the database.
-  // Revoking or rotating that session also revokes every operations capability.
+  // Defense in depth: a compromised login token must not permit minting
+  // arbitrary MFA-elevated scopes. Authentication is bound to the revocable
+  // login session AND an independent server-only signing secret.
+  // Never derive signing authority solely from a browser-held cookie.
   if (!/^[0-9a-f]{128}$/i.test(sessionToken)) throw new Error("Invalid login session");
-  return createHmac("sha256", sessionToken).update("vims-superadmin-operations-v1").digest();
+  const signingSecret = process.env.SUPERADMIN_OPERATIONS_SIGNING_SECRET || process.env.SESSION_SECRET;
+  if (!signingSecret || signingSecret.length < 32) throw new Error("Operations signing secret is not configured");
+  return createHmac("sha256", signingSecret)
+    .update("vims-superadmin-operations-v1")
+    .update(sessionToken)
+    .digest();
 }
 
 export function mintOperationsCapability(input: {
