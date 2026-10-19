@@ -90,6 +90,26 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ error: "Read-only support mode: exit before making changes" },
       { status: 403, headers: { "Cache-Control": "no-store" } });
   }
+  // Browser-bound Super Admin operations intentionally use the existing
+  // tenant-aware Server Actions. Legacy token/API routes often resolve their
+  // own tenant and must never silently target a different company.
+  if (request.cookies.has("vims_superadmin_operations")) {
+    if (pathname.startsWith("/api/")
+      && !pathname.startsWith("/api/platform/operations/")
+      && pathname !== "/api/auth/logout") {
+      return NextResponse.json({ error: "API requests are disabled during scoped Super Admin operations. Exit this mode for API integrations." },
+        { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    if (!["GET", "HEAD"].includes(request.method)
+      && !pathname.startsWith("/api/platform/operations/")) {
+      const origin = normalizeOrigin(request.headers.get("origin"));
+      const site = request.headers.get("sec-fetch-site");
+      if (site && site !== "same-origin"
+        || !origin || !allowedOrigins(request).has(origin)) {
+        return rejected("Scoped operations require a same-origin browser request", 403, crypto.randomUUID());
+      }
+    }
+  }
   const ip = clientIpFromHeaders(request.headers);
   const requestId = normalizeRequestId(request.headers.get("x-request-id"), crypto.randomUUID());
   const nonce = crypto.randomUUID().replaceAll("-", "");
