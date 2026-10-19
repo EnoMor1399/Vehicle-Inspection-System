@@ -96,8 +96,9 @@ export async function operationalUserForRequest(
   if (!context) return session.user!;
 
   const requestHeaders = await headers();
-  const method = requestHeaders.get("x-vims-request-method") || "GET";
-  const path = requestHeaders.get("x-vims-request-path") || "";
+  const method = requestHeaders.get("x-vims-request-method");
+  const path = requestHeaders.get("x-vims-request-path");
+  if (!method || !path) throw new Error("Trusted request context required for Super Admin operations");
   if (!isAuthorizedOperationPage(path)) {
     throw new Error("Leave organization operations mode before using this administration route");
   }
