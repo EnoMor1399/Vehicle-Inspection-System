@@ -18,6 +18,7 @@ import { getOrganizationSubscriptionState, hasOrganizationModule } from "@/lib/o
 import { getActiveSupportContext, SUPPORT_COOKIE_NAME } from "@/lib/support-session";
 import { listVisibleChangeNotices } from "@/lib/platform-change-notices";
 import { listPlatformOrganizationChoices } from "@/lib/platform-oversight";
+import { getActiveSuperAdminOperations, type ActiveSuperAdminOperations } from "@/lib/super-admin-operations";
 
 export const dynamic = "force-dynamic";
 
@@ -96,9 +97,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   let notificationUnreadCount = 0;
   let organizationChoices: { id: string; name: string; slug: string; status: string }[] = [];
   let supportContext: { actorName: string; targetName: string; targetEmail: string; expiresAt: string } | null = null;
+  let operationContext: ActiveSuperAdminOperations | null = null;
+  let operationExpired = false;
 
   try {
     const user = await getCurrentUser();
+    if ((await cookies()).has("vims_superadmin_operations")) {
+      operationContext = await getActiveSuperAdminOperations();
+    }
     const activeSupport = await getActiveSupportContext();
     if (activeSupport) supportContext = {
       actorName: activeSupport.actor.name,
@@ -163,6 +169,22 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       allowedResources,
     };
   } catch {
+    if ((await cookies()).has("vims_superadmin_operations")) {
+      operationExpired = true;
+      // Keep the Exit control available even after its signed capability expires.
+      // This is UI only; no operational permissions are restored.
+      try {
+        const raw = (await cookies()).get("rsl_session_token")?.value;
+        if (raw) {
+          const { validateSession } = await import("@/lib/security");
+          const active = await validateSession(raw);
+          if (active.valid && active.user?.role === "super_admin") {
+            shellUser = { role: active.user.role, name: active.user.name,
+              organizationId: active.user.organizationId, allowedResources: [] };
+          }
+        }
+      } catch {}
+    }
     // Fail closed on stale support credentials, but keep an exit control
     // visible so the original administrator can clear the unusable cookie.
     if ((await cookies()).has(SUPPORT_COOKIE_NAME)) {
@@ -208,6 +230,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             changeNoticeBanner={changeNoticeBanner}
             notificationUnreadCount={notificationUnreadCount}
             organizationChoices={organizationChoices}
+            operationContext={operationContext}
+            operationExpired={operationExpired}
           >
             {children}
           </AppShell>
