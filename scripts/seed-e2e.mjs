@@ -134,8 +134,8 @@ try {
   // runs exclusively against the isolated CI PostgreSQL service.
   await client.query(
     `insert into users
-      (id, organization_id, name, email, role, password_hash, permissions, is_active, failed_login_attempts, two_factor_enabled)
-     values ($1, $2, 'E2E Platform Administrator', $3, 'super_admin', $4, '{}'::jsonb, true, 0, false)
+      (id, organization_id, name, email, role, password_hash, permissions, is_active, failed_login_attempts, two_factor_enabled, two_factor_secret)
+     values ($1, $2, 'E2E Platform Administrator', $3, 'super_admin', $4, '{}'::jsonb, true, 0, true, 'JBSWY3DPEHPK3PXP')
      on conflict (email) do update set
        organization_id = excluded.organization_id,
        name = excluded.name,
@@ -145,8 +145,8 @@ try {
        is_active = true,
        failed_login_attempts = 0,
        locked_until = null,
-       two_factor_enabled = false,
-       two_factor_secret = null`,
+       two_factor_enabled = true,
+       two_factor_secret = excluded.two_factor_secret`,
     [superAdminUserId, organizationId, superAdminEmail, passwordHash],
   );
 
