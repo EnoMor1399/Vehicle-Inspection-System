@@ -16,7 +16,8 @@ test("the Super Admin organization selector lives in the sidebar branding area",
   assert.match(sidebar, /aria-label="Switch organization in the sidebar"/);
   assert.match(sidebar, /activeOversightOrganization\?\.name \?\? branding\.companyName/);
   assert.match(sidebar, /organizationChoices\.map\(\(organization\) => \(/);
-  assert.match(sidebar, /Read-only oversight/);
+  assert.match(sidebar, /Company oversight/);
+  assert.match(sidebar, /Authorized operations/);
   assert.doesNotMatch(topbar, /Select organization for read-only oversight/);
   assert.doesNotMatch(topbar, /organizationChoices\.map/);
 });
