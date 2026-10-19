@@ -101,6 +101,11 @@ test("privileged audit requests fail closed without interfering with ordinary au
   const code = read("src/lib/audit.ts");
   assert.match(code, /required\?: boolean/);
   assert.match(code, /if \(input\.required\) throw new Error/);
+  assert.match(code, /actor\.organizationId !== organizationId/);
+  assert.match(code, /actor\.role !== "super_admin"/);
+  assert.match(code, /tenantLocalAuditUserId = null/);
+  assert.match(code, /platformActorId = sanitizedUserId/);
+  assert.match(code, /platformActorRole: "super_admin"/);
   const resolver = read("src/lib/super-admin-operations.ts");
   assert.match(resolver, /required: true/);
 });
