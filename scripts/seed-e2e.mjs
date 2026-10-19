@@ -132,6 +132,10 @@ try {
   );
   const testAuthenticatorSeed = generateSecret();
   writeFileSync(join(tmpdir(), "vims-e2e-authenticator-seed"), testAuthenticatorSeed, { mode: 0o600 });
+  if (process.env.GITHUB_ENV) {
+    const { appendFileSync } = await import("node:fs");
+    appendFileSync(process.env.GITHUB_ENV, `E2E_PLATFORM_TOTP_SEED=${testAuthenticatorSeed}\n`);
+  }
   // E2E-only identity used to exercise the SAME protected Super Admin sidebar
   // and read-only organization URLs that users open in production. This seed
   // runs exclusively against the isolated CI PostgreSQL service.
