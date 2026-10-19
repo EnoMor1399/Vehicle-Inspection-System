@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { canManageInspections, getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { tenantLocalActorUserId } from "@/lib/tenant-local-actor";
 import {
   canTransitionAppointment,
   type AppointmentStatus,
@@ -60,6 +61,7 @@ function dayRange(value: Date) {
 
 export async function createAppointment(input: AppointmentInput) {
   const user = await requireScheduler();
+  const tenantBookerId = await tenantLocalActorUserId(user);
 
   if (!input.vehicleId) throw new Error("Vehicle is required");
   if (!input.locationId) throw new Error("Inspection station is required");
@@ -169,7 +171,7 @@ export async function createAppointment(input: AppointmentInput) {
       status: "scheduled",
       assignedInspectorId: assignedInspector?.id || null,
       notes,
-      bookedBy: user.id,
+      bookedBy: tenantBookerId,
     });
 
     if (assignedInspector) {
