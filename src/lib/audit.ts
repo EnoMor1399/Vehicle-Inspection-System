@@ -43,6 +43,28 @@ export async function logAudit(input: AuditInput) {
         throw new Error("Organization context is required for tenant audit records");
       }
 
+      // audit_logs.user_id is an organization-local FK, guarded by PostgreSQL.
+      // When a *verified platform Super Admin* acts for another company, keep
+      // that database invariant. Place the true actor in the hash-chained
+      // event payload instead of inserting a foreign-tenant user reference.
+      let tenantLocalAuditUserId = sanitizedUserId;
+      let platformActorId: string | null = null;
+      if (sanitizedUserId) {
+        const [actor] = await tx
+          .select({ organizationId: users.organizationId, role: users.role })
+          .from(users)
+          .where(eq(users.id, sanitizedUserId))
+          .limit(1);
+        if (!actor) throw new Error("Audit actor no longer exists");
+        if (actor.organizationId !== organizationId) {
+          if (actor.role !== "super_admin") {
+            throw new Error("A non-platform actor cannot audit another organization");
+          }
+          tenantLocalAuditUserId = null;
+          platformActorId = sanitizedUserId;
+        }
+      }
+
       // Chain audit events inside each organization independently. This avoids
       // coupling one subscriber's audit throughput or hash history to another.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${organizationId}))`);
@@ -59,7 +81,7 @@ export async function logAudit(input: AuditInput) {
       const sanitized = {
         id,
         organizationId,
-        userId: sanitizedUserId,
+        userId: tenantLocalAuditUserId,
         userName: sanitizeAuditText(input.userName, 200),
         action: input.action,
         entityType: sanitizeAuditText(input.entityType, 100) || "unknown",
@@ -67,7 +89,14 @@ export async function logAudit(input: AuditInput) {
         entityLabel: sanitizeAuditText(input.entityLabel, 300),
         summary: sanitizeAuditText(input.summary, 2_000),
         before: sanitizeAuditPayload(input.before),
-        after: sanitizeAuditPayload(input.after),
+        after: platformActorId
+          ? {
+              payload: sanitizeAuditPayload(input.after),
+              platformActorId,
+              platformActorRole: "super_admin",
+              organizationId,
+            }
+          : sanitizeAuditPayload(input.after),
         ipAddress: input.ipAddress ? normalizeClientIp(input.ipAddress) : null,
         createdAt,
       };
