@@ -8,6 +8,8 @@ import {
   OPERATION_TTL_SECONDS, STEP_UP_TTL_SECONDS,
 } from "../src/lib/super-admin-operations-token";
 
+// Unit-only signing secret; no production key is written to source control.
+process.env.SESSION_SECRET ||= "vims-ci-only-operations-test-secret-not-for-deployment";
 const actorId = "e2e90000-0000-4000-8000-000000000001";
 const sessionId = "e2e90000-0000-4000-8000-000000000002";
 const organizationId = "e2e10000-0000-4000-8000-000000000001";
@@ -31,6 +33,11 @@ test("Super Admin company capabilities are bound to the real actor, login and or
   assert.equal(verifyOperationsCapability({ ...base, sessionId: "00000000-0000-4000-8000-000000000011" }), null);
   assert.equal(verifyOperationsCapability({ ...base, organizationId: otherOrganizationId }), null);
   assert.equal(verifyOperationsCapability({ ...base, sessionToken: randomBytes(64).toString("hex") }), null);
+  const originalSecret = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = "vims-ci-other-independent-signature-key-string";
+  assert.equal(verifyOperationsCapability(base), null,
+    "Changing the independent server-only secret must invalidate a stolen session cookie");
+  process.env.SESSION_SECRET = originalSecret;
   assert.equal(verifyOperationsCapability({ ...base, now: now + OPERATION_TTL_SECONDS * 1000 }), null);
   assert.equal(verifyOperationsCapability({ ...base, token: token.slice(0, -2) + "AA" }), null);
   assert.equal(verifyOperationsCapability({ ...base, token: "invalid.token" }), null);
