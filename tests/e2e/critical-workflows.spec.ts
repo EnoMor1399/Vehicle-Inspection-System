@@ -239,6 +239,12 @@ test("Super Admin company switch and every operational sidebar destination retur
   await page.getByRole("button", { name: /E2E Tenant Safety Ltd/ }).click();
   await expect(page).toHaveURL(`${baseURL}/platform/oversight/${tenantOrganizationId}`);
   await expect(page.getByRole("heading", { name: "Executive Dashboard" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enable organization operations" })).toBeVisible();
+  await page.getByRole("button", { name: "Enable organization operations" }).click();
+  await expect(page.getByRole("dialog", { name: "Enable Super Admin organization operations" })).toBeVisible();
+  await expect(page.getByText("OPERATE E2E Tenant Safety Ltd")).toBeVisible();
+  await page.getByRole("button", { name: "Close authorization" }).click();
+  await expect(page.getByRole("dialog", { name: "Enable Super Admin organization operations" })).toHaveCount(0);
   await expect(page.getByText("Core operating metrics")).toBeVisible();
   await expect(page.getByText("Inspection outcome trend")).toBeVisible();
 
