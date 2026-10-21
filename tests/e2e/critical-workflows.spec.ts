@@ -249,6 +249,13 @@ test("Super Admin can activate selected company operations and create only compa
   await expect(page.getByText("E2E Scoped Operations Transporter")).toHaveCount(0);
 });
 
+test("signed-out Transporter Portal visitors are sent to login without a server error", async ({ page }) => {
+  const response = await page.goto(`${baseURL}/portal`);
+  expect(response?.status()).not.toBe(500);
+  await expect(page).toHaveURL(`${baseURL}/login`);
+  await expect(page.getByLabel("Email Address")).toBeVisible();
+});
+
 test("Vehicle Inspection Admin and Super Admin can use the real tenant-bound Transporter Portal", async ({ page }) => {
   test.setTimeout(180_000);
 

@@ -1,4 +1,5 @@
-import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { hasPermission } from "@/lib/auth";
+import { requireAuth } from "@/lib/require-auth";
 import { isTransporterPortalAdministratorRole } from "@/lib/transporter-portal-access";
 import { TransporterPortalWorkspace } from "@/components/TransporterPortalWorkspace";
 import { Card, PageHeader } from "@/components/ui";
@@ -13,7 +14,9 @@ export default async function PortalPage({
 }: {
   searchParams?: Promise<{ transporterId?: string }>;
 }) {
-  const user = await getCurrentUser();
+  // Missing or expired sessions must redirect to sign-in instead of throwing
+  // an unhandled Server Component error and producing HTTP 500.
+  const user = await requireAuth();
   const mayManagePortal =
     isTransporterPortalAdministratorRole(user.role)
     && hasPermission(user, "transporters");
