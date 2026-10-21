@@ -249,6 +249,59 @@ test("Super Admin can activate selected company operations and create only compa
   await expect(page.getByText("E2E Scoped Operations Transporter")).toHaveCount(0);
 });
 
+test("Vehicle Inspection Admin and Super Admin can use the real tenant-bound Transporter Portal", async ({ page }) => {
+  test.setTimeout(180_000);
+
+  const adminSession = readFileSync(join(tmpdir(), "vims-e2e-vehicle-admin-session"), "utf8").trim();
+  await page.context().addCookies([{
+    name: "rsl_session_token", value: adminSession,
+    url: baseURL, sameSite: "Lax", httpOnly: true, secure: false,
+  }]);
+  await page.goto(`${baseURL}/`);
+  const portalLink = page.getByRole("link", { name: "Transporter Portal", exact: true });
+  await expect(portalLink).toHaveAttribute("href", "/portal");
+  await portalLink.click();
+  await expect(page.getByRole("heading", { name: "Transporter Portal Directory" })).toBeVisible();
+  await expect(page.getByText("Tenant Transport Ltd").first()).toBeVisible();
+  await expect(page.getByText("E2E Transport Ltd")).toHaveCount(0);
+
+  const rslTransporterId = "e2e0000-0000-4000-8000-000000000003";
+  const tenantTransporterId = "e2e10000-0000-4000-8000-000000000006";
+  // Forging a transporter ID from another subscriber cannot cross the
+  // authenticated Admin's tenant filter.
+  await page.goto(`${baseURL}/portal?transporterId=${rslTransporterId}`);
+  await expect(page.getByText("The selected transporter profile is unavailable.")).toBeVisible();
+  await page.goto(`${baseURL}/portal?transporterId=${tenantTransporterId}`);
+  await expect(page.getByRole("heading", { name: "Tenant Transport Ltd" })).toBeVisible();
+  await expect(page.getByText("TENANT-2026").first()).toBeVisible();
+  await expect(page.getByText("E2E-2026")).toHaveCount(0);
+
+  await page.context().clearCookies();
+  const superSession = readFileSync(join(tmpdir(), "vims-e2e-super-admin-session"), "utf8").trim();
+  await page.context().addCookies([{
+    name: "rsl_session_token", value: superSession,
+    url: baseURL, sameSite: "Lax", httpOnly: true, secure: false,
+  }]);
+
+  const scoped = `${baseURL}/platform/oversight/${tenantOrganizationId}/section/transporter-portal`;
+  await page.goto(scoped);
+  await expect(page.getByRole("heading", { name: "Transporter Portal Directory" })).toBeVisible();
+  await expect(page.getByText("Tenant Transport Ltd").first()).toBeVisible();
+  await expect(page.getByText("E2E Transport Ltd")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Transporter Portal", exact: true }))
+    .toHaveAttribute("href", `/platform/oversight/${tenantOrganizationId}/section/transporter-portal`);
+  await page.goto(`${scoped}?transporterId=${tenantTransporterId}`);
+  await expect(page.getByRole("heading", { name: "Tenant Transport Ltd" })).toBeVisible();
+  await expect(page.getByText("TENANT-2026").first()).toBeVisible();
+  await page.goto(`${scoped}?transporterId=${rslTransporterId}`);
+  await expect(page.getByText("The selected transporter profile is unavailable.")).toBeVisible();
+
+  await page.goto(`${baseURL}/platform/oversight/${rslOrganizationId}/section/transporter-portal`);
+  await expect(page.getByRole("heading", { name: "Transporter Portal Directory" })).toBeVisible();
+  await expect(page.getByText("E2E Transport Ltd").first()).toBeVisible();
+  await expect(page.getByText("Tenant Transport Ltd")).toHaveCount(0);
+});
+
 test("Super Admin company switch and every operational sidebar destination return scoped content, not 404", async ({ page }) => {
   test.setTimeout(180_000); // Native VIMS pages render charts, analytics, and guarded records.
   // A test-only authenticated session from the isolated PostgreSQL seed avoids

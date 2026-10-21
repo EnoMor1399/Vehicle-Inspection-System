@@ -6,6 +6,7 @@ import type { ComponentType, ReactNode } from "react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { scopedOrganizationHref, SCOPED_NAV_SECTIONS } from "@/lib/platform-oversight-navigation";
 import { SuperAdminOperationControls } from "@/components/SuperAdminOperationControls";
+import { canSeeTransporterPortalNavigation } from "@/lib/transporter-portal-access";
 import {
   Activity,
   BarChart3,
@@ -81,6 +82,7 @@ type NavItem = {
   resource?: string;
   superAdminOnly?: boolean;
   organizationOwnerOnly?: boolean;
+  transporterPortalAdminOnly?: boolean;
 };
 
 type NavGroup = {
@@ -96,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/", label: "Dashboard", icon: LayoutDashboard, resource: "vehicle_inspection" },
       { href: "/vehicles", label: "Vehicles", icon: Car, resource: "vehicles" },
       { href: "/transporters", label: "Transporters", icon: Truck, resource: "transporters" },
+      { href: "/portal", label: "Transporter Portal", icon: Truck, transporterPortalAdminOnly: true },
       { href: "/inspections", label: "Inspections", icon: ClipboardCheck, resource: "inspections" },
       { href: "/daily-inspections", label: "Daily Pre-Trip", icon: CalendarCheck, resource: "inspections" },
       { href: "/schedule", label: "Inspection Scheduling", icon: CalendarClock, resource: "inspections" },
@@ -146,7 +149,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/organization/account", label: "Organization Account", icon: Building2, organizationOwnerOnly: true },
       { href: "/notifications", label: "Notifications", icon: Bell },
-      { href: "/portal", label: "Transporter Portal", icon: Truck, superAdminOnly: true },
       { href: "/apps", label: "App Access", icon: Smartphone },
       { href: "/api-docs", label: "API & Integrations", icon: FileBarChart, resource: "api_module" },
       { href: "/guide", label: "User Guide", icon: BookOpen },
@@ -278,6 +280,9 @@ export function AppShell({
           ...group,
           items: group.items.filter((item) => {
             if (!userRole) return false;
+            if (item.transporterPortalAdminOnly) {
+              return canSeeTransporterPortalNavigation(userRole, allowedResources);
+            }
             if (isSuperAdmin) return !operationContext || !item.superAdminOnly;
             if (item.superAdminOnly) return false;
             if (item.organizationOwnerOnly && userRole !== "organization_owner") return false;

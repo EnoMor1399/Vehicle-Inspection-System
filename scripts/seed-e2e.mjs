@@ -35,6 +35,8 @@ try {
   const userId = "e2e0000-0000-4000-8000-000000000001";
   const trainingUserId = "e2e0000-0000-4000-8000-000000000008";
   const superAdminUserId = "e2e90000-0000-4000-8000-000000000001";
+  const vehicleAdminUserId = "e2e20000-0000-4000-8000-000000000001";
+  const vehicleAdminSessionId = "e2e20000-0000-4000-8000-000000000002";
   const locationId = "e2e0000-0000-4000-8000-000000000002";
   const transporterId = "e2e0000-0000-4000-8000-000000000003";
   const vehicleId = "e2e0000-0000-4000-8000-000000000004";
@@ -173,6 +175,40 @@ try {
   );
   const adminCookieFile = join(tmpdir(), "vims-e2e-super-admin-session");
   writeFileSync(adminCookieFile, adminCookieToken, { mode: 0o600 });
+
+  // Dedicated Vehicle Inspection Administrator fixture proves portal access
+  // never depends on being the platform Super Admin. The tenant and credentials
+  // exist ONLY inside the isolated PostgreSQL test service.
+  await client.query(
+    `insert into users
+      (id, organization_id, name, email, role, password_hash, permissions,
+       is_active, failed_login_attempts, two_factor_enabled, two_factor_secret)
+     values ($1, $2, 'Tenant Vehicle Inspection Administrator',
+             'e2e.vehicle.admin@vims.local', 'vehicle_inspection_admin',
+             $3, '{"vehicle_inspection":true,"transporters":true}'::jsonb,
+             true, 0, true, $4)
+     on conflict (email) do update set
+       organization_id = excluded.organization_id,
+       role = excluded.role,
+       permissions = excluded.permissions,
+       is_active = true, failed_login_attempts = 0,
+       locked_until = null, two_factor_enabled = true,
+       two_factor_secret = excluded.two_factor_secret`,
+    [vehicleAdminUserId, tenantOrganizationId, passwordHash, testAuthenticatorSeed],
+  );
+  const vehicleAdminToken = crypto.randomBytes(64).toString("hex");
+  const vehicleAdminHash = crypto.createHash("sha256").update(vehicleAdminToken).digest("hex");
+  await client.query(
+    `insert into sessions
+      (id, user_id, token, ip_address, is_active, expires_at, last_activity_at)
+     values ($1, $2, $3, '127.0.0.1', true, now() + interval '30 minutes', now())
+     on conflict (id) do update set
+       user_id = excluded.user_id, token = excluded.token,
+       is_active = true, expires_at = excluded.expires_at,
+       last_activity_at = excluded.last_activity_at`,
+    [vehicleAdminSessionId, vehicleAdminUserId, vehicleAdminHash],
+  );
+  writeFileSync(join(tmpdir(), "vims-e2e-vehicle-admin-session"), vehicleAdminToken, { mode: 0o600 });
 
   await client.query(
     `insert into users
