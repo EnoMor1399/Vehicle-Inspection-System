@@ -3,7 +3,7 @@
 ## Integration status
 VIMS uses **Paystack hosted checkout** for one-time, GHS-denominated subscription payments. Customers may choose a card or the Ghana Mobile Money channel (subject to merchant account/channel activation). VIMS does not accept or store payment card numbers, CVVs, mobile-money PINs or OTPs.
 
-**Release gate:** No live payments are allowed unless all secrets are configured for the intended deployment and `PAYSTACK_LIVE_PAYMENTS_ENABLED=true`. Use the Paystack **test** environment first. Do not use real customer details in test transactions.
+**Release gate:** No **new live checkouts** are allowed unless all secrets are configured for the intended deployment and `PAYSTACK_LIVE_PAYMENTS_ENABLED=true`. Keep the flag `false` through staging and code review. Previously initiated transactions must remain verifiable when checkout is paused; do not remove the Paystack credential before reconciling them. Use the Paystack **test** environment first. Do not use real customer details in test transactions.
 
 ## Environment settings (server only)
 
@@ -53,3 +53,24 @@ Payments are **one-time** receipts, not recurring mobile-money deductions. Succe
 - Monitor Paystack dashboard reconciliation, unexpected pending transactions, chargebacks and refunds. Refunds/chargebacks are **not automated** in this initial release.
 
 Reference: https://paystack.com/docs/api/transaction/ , https://paystack.com/docs/payments/webhooks/ and https://paystack.com/docs/payments/payment-channels/ .
+
+
+## Emergency pause and pending-payment recovery
+
+- Set `PAYSTACK_LIVE_PAYMENTS_ENABLED=false` to disable new live hosted-checkout initialization. This does **not** cancel provider-side transactions that already started.
+- Leave `PAYSTACK_MODE=live` and the matching protected credential available to the server while reconciling pending live transactions. Never replace a live secret with a test secret while live settlements remain unresolved.
+- Keep the webhook enabled with a valid HMAC-SHA512 signature and independent Paystack verification. Status checks continue to validate tenant, GHS amount, reference, payer email, channel and mode before writing the payment ledger.
+- If you rotate or revoke a credential, coordinate with Paystack and settle/reconcile outstanding transactions first; the previous signature cannot be verified after removing the correct signing key.
+- Do not automatically grant subscription entitlements on receipt. Review refunds, chargebacks, invoice issuance and administrator-approved lifecycle transitions independently.
+
+## Paystack merchant and production readiness
+
+The screenshot of Paystack Live/Approved indicates the merchant account is approved, but it does not prove VIMS has a configured key or a reachable webhook. Confirm live Ghana Mobile Money support for MTN MoMo, ATMoney and Telecel within the merchant account; these channel options may vary.
+
+Use only Paystack's **hosted checkout**. The VIMS website must not collect mobile-money PINs, OTPs, raw card details or passwords. Configure the production webhook as:
+
+```text
+https://YOUR-PRODUCTION-DOMAIN/api/payments/paystack/webhook
+```
+
+Run the automated `tests/paystack-live-checkout-guard.test.ts` and existing `tests/paystack-subscription-payments.test.ts` before go-live. Test invalid key/mode combinations, rejected unsigned events, duplicate callback replay, failed settlement, delayed MoMo approval, an already-paid billing period, and another organization's reference. Do not issue a live charge without an approved small-amount smoke-test plan.
