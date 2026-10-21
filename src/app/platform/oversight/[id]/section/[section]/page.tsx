@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { getPlatformOrganizationOversight } from "@/lib/platform-oversight";
+import { getCurrentUser } from "@/lib/auth";
+import { TransporterPortalWorkspace } from "@/components/TransporterPortalWorkspace";
 import { getPlatformOrganizationAssetInventory } from "@/lib/platform-asset-inventory";
 import { isScopedSection } from "@/lib/platform-oversight-navigation";
 import { listPlatformScopedModuleRecords } from "@/lib/platform-scoped-module-records";
@@ -32,7 +34,7 @@ export default async function SelectedOrganizationModule({
   searchParams,
 }: {
   params: Promise<{ id: string; section: string }>;
-  searchParams: Promise<{ page?: string | string[]; assetPage?: string | string[]; assetSearch?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; assetPage?: string | string[]; assetSearch?: string | string[]; transporterId?: string | string[] }>;
 }) {
   const [{ id, section }, query] = await Promise.all([params, searchParams]);
   if (!isScopedSection(section)) notFound();
@@ -68,8 +70,20 @@ export default async function SelectedOrganizationModule({
       );
     }
     case "transporters":
-    case "transporter-portal":
       return <TransportersWorkspaceView organizationId={organizationId} editable={false} readOnly />;
+    case "transporter-portal": {
+      // getPlatformOrganizationOversight() above checks real Super Admin
+      // authority. All portal queries below use its validated company ID,
+      // never the actor's home organization or an untrusted query parameter.
+      const viewer = await getCurrentUser();
+      return <TransporterPortalWorkspace
+        user={viewer}
+        organizationId={organizationId}
+        requestedTransporterId={Array.isArray(query.transporterId) ? query.transporterId[0] : query.transporterId}
+        directoryHref={`/platform/oversight/${encodeURIComponent(organizationId)}/section/transporter-portal`}
+        readOnlyOversight
+      />;
+    }
     case "inspections":
       return <InspectionRegistryView organizationId={organizationId} editable={false} readOnly />;
     case "daily-inspections":
