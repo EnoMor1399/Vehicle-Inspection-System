@@ -37,7 +37,8 @@ test("sidebar lists transporter portal beside Transporters and preserves transpo
 test("page checks real role plus transporter permission before giving a directory", () => {
   const page = read("src/app/portal/page.tsx");
   const view = read("src/components/TransporterPortalWorkspace.tsx");
-  assert.match(page, /await getCurrentUser\(\)/);
+  assert.match(page, /await requireAuth\(\)/);
+  assert.doesNotMatch(page, /await getCurrentUser\(\)/);
   assert.match(page, /isTransporterPortalAdministratorRole\(user\.role\)/);
   assert.match(page, /hasPermission\(user, "transporters"\)/);
   assert.match(page, /user\.role !== "transporter_user" && !mayManagePortal/);
