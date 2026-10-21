@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import { matchesOriginalInvoice, type VerifiedPaystackTransaction } from "@/lib/paystack-validation";
+import { approvedPaystackCheckout, validatedPaystackCredentials } from "@/lib/paystack-runtime";
 export { toGhsPesewas, verifyPaystackSignature } from "@/lib/paystack-validation";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -11,20 +12,22 @@ const GATEWAY = "https://api.paystack.co";
 export type CheckoutChannel = "card" | "mobile_money";
 
 function paystackSecret() {
-  const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
-  const mode = process.env.PAYSTACK_MODE?.trim();
-  if (!secret || !["test", "live"].includes(mode || "") ||
-      !secret.startsWith(mode === "live" ? "sk_live_" : "sk_test_")) {
-    throw new Error("Paystack is not configured for this environment.");
-  }
-  if (mode === "live" && process.env.PAYSTACK_LIVE_PAYMENTS_ENABLED !== "true") {
-    throw new Error("Live payments require explicit activation.");
-  }
-  return { secret, mode: mode as "test" | "live" };
+  return validatedPaystackCredentials({
+    secretKey: process.env.PAYSTACK_SECRET_KEY,
+    mode: process.env.PAYSTACK_MODE,
+  });
+}
+
+function requireCheckoutApproval() {
+  return approvedPaystackCheckout({
+    secretKey: process.env.PAYSTACK_SECRET_KEY,
+    mode: process.env.PAYSTACK_MODE,
+    livePaymentsEnabled: process.env.PAYSTACK_LIVE_PAYMENTS_ENABLED,
+  });
 }
 
 export function paymentsAvailable() {
-  try { paystackSecret(); return true; } catch { return false; }
+  try { requireCheckoutApproval(); return true; } catch { return false; }
 }
 
 async function paystackRequest<T>(path: string, method: "GET" | "POST", body?: Record<string, unknown>): Promise<T> {
@@ -35,6 +38,7 @@ async function paystackRequest<T>(path: string, method: "GET" | "POST", body?: R
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(12000),
     cache: "no-store",
+    redirect: "error",
   });
   if (!response.ok) throw new Error("The payment provider is temporarily unavailable. Please try again.");
   const result: unknown = await response.json();
@@ -53,6 +57,9 @@ export async function initializePaystack(input: {
   organizationId: string;
   subscriptionId: string;
 }) {
+  // Approval is required only when initiating a new checkout. Never put this
+  // gate inside GET verification or signed webhook processing.
+  requireCheckoutApproval();
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (!configured) throw new Error("The checkout return URL is not configured.");
   const url = new URL(configured);
