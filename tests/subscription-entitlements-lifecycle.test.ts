@@ -88,3 +88,12 @@ test("subscription access page explains unavailable modules without exposing ope
   assert.match(source, /Included modules/);
   assert.doesNotMatch(source, /from\(vehicles\)|from\(inspections\)|from\(trainingSessions\)/);
 });
+
+test("trial and grace subscriptions fail closed without a valid expiry timestamp", () => {
+  const source = readFileSync("src/lib/organization-access.ts", "utf8");
+  assert.match(source, /subscription\.status === "trialing"/);
+  assert.match(source, /Boolean\(subscription\.trialEndsAt\)/);
+  assert.match(source, /subscription\.status === "grace"/);
+  assert.match(source, /Boolean\(subscription\.graceEndsAt\)/);
+  assert.match(source, /Number\.isFinite/);
+});
