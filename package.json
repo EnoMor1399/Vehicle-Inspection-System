@@ -36,7 +36,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.27.0",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "otplib": "^13.4.1",
     "pg": "8.20.0",
     "qrcode": "^1.5.4",
@@ -45,7 +45,7 @@
     "react-dom": "19.2.6",
     "react-hook-form": "^7.83.0",
     "recharts": "^3.10.1",
-    "zod": "^4.4.3",
+    "zod": "^4.6.7",
     "nodemailer": "10.1.2"
   },
   "devDependencies": {
@@ -56,7 +56,7 @@
     "@types/react-dom": "19.2.3",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.3",
     "postcss": "8.5.26",
     "tailwindcss": "4.1.17",
     "tsx": "^4.23.12",
@@ -66,6 +66,7 @@
   "overrides": {
     "esbuild": "0.28.2",
     "sharp": "0.35.5",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "dompurify": "3.4.17"
   }
 }
