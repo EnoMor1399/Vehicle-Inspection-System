@@ -1,15 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyAndRecordPayment, verifyPaystackSignature } from "@/lib/paystack-payments";
+import { validatedPaystackCredentials } from "@/lib/paystack-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
-  const mode = process.env.PAYSTACK_MODE?.trim();
-  if (!secret || !["test", "live"].includes(mode || "") ||
-    !secret.startsWith(mode === "live" ? "sk_live_" : "sk_test_") ||
-    (mode === "live" && process.env.PAYSTACK_LIVE_PAYMENTS_ENABLED !== "true")) {
+  // Accept a correctly authenticated settlement notification even if
+  // new live checkouts are paused. Otherwise legitimate in-flight payments
+  // could remain pending indefinitely after an emergency checkout shutdown.
+  let secret: string;
+  try {
+    secret = validatedPaystackCredentials({
+      secretKey: process.env.PAYSTACK_SECRET_KEY,
+      mode: process.env.PAYSTACK_MODE,
+    }).secret;
+  } catch {
     return NextResponse.json({ error: "Payment processing unavailable" }, { status: 503 });
   }
 
