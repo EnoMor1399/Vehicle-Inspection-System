@@ -258,6 +258,7 @@ export const organizationSubscriptions = pgTable(
     providerSubscriptionId: varchar("provider_subscription_id", { length: 150 }),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
     currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
+    checkoutEnabled: boolean("checkout_enabled").notNull().default(false),
     currentPeriodStart: timestamp("current_period_start").notNull().defaultNow(),
     currentPeriodEnd: timestamp("current_period_end"),
     trialEndsAt: timestamp("trial_ends_at"),
