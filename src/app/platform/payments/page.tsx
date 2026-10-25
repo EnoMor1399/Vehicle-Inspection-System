@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, CreditCard } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { organizations, subscriptionPayments, users } from "@/db/schema";
+import { organizations, subscriptionPayments, subscriptionPlans, users } from "@/db/schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import { VerifyPaymentForm } from "./VerifyPaymentForm";
+import { PlanPricingForm } from "./PlanPricingForm";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export default async function PlatformPaymentMonitorPage() {
     .innerJoin(users, eq(users.id, subscriptionPayments.initiatedBy))
     .orderBy(desc(subscriptionPayments.createdAt))
     .limit(200);
+  const plans = await db.select().from(subscriptionPlans)
+    .orderBy(subscriptionPlans.sortOrder, subscriptionPlans.name);
   const successful = rows.filter(({ payment }) => payment.status === "success");
   const unresolved = rows.filter(({ payment }) => payment.status === "pending" || payment.status === "processing");
   const receivedPesewas = successful.reduce((sum, { payment }) => sum + (payment.currency === "GHS" ? payment.amountSubunits : 0), 0);
@@ -51,6 +54,26 @@ export default async function PlatformPaymentMonitorPage() {
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
         To approve or pause subscription collection and manage pricing, select <strong>Manage subscription</strong> for the organization. Pausing new checkout never cancels or erases pending payment verification.
       </div>
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">Subscription plan catalog</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Set prices, billing cycles and plan availability for future subscriber assignments.
+            Existing organization subscriptions keep their approved invoice amounts until the Super Admin updates them individually.
+          </p>
+        </div>
+        {plans.map(plan => (
+          <PlanPricingForm key={plan.id} plan={{
+            id: plan.id,
+            name: plan.name,
+            currency: plan.currency,
+            price: plan.price,
+            billingCycle: plan.billingCycle,
+            isActive: plan.isActive,
+          }} />
+        ))}
+        {!plans.length && <p className="text-sm text-slate-500">No subscription plans have been configured.</p>}
+      </section>
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead className="border-b text-xs uppercase tracking-wider text-slate-500"><tr>
