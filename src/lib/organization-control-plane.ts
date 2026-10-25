@@ -6,6 +6,7 @@ import {
   organizationOnboardingRequests,
   organizations,
   organizationSubscriptions,
+  subscriptionPayments,
   subscriptionPlans,
   systemSettings,
   inspections,
@@ -1070,9 +1071,27 @@ export async function updateOrganizationSubscriptionLifecycle(input: {
   const now = new Date();
   const planChanged = current.plan.id !== targetPlan.id;
   const statusChanged = current.subscription.status !== input.status;
+  const billingTermsChanged = planChanged
+    || Number(amountValue) !== Number(current.subscription.amount)
+    || currency !== current.subscription.currency;
 
   const [updated] = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`subscription-lifecycle:${input.organizationId}`}))`);
+    // Synchronize billing term changes with the live checkout creation lock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"subscription-payments:" + current.subscription.id}))`);
+    if (billingTermsChanged) {
+      const [unsettled] = await tx.select({ id: subscriptionPayments.id })
+        .from(subscriptionPayments)
+        .where(and(
+          eq(subscriptionPayments.organizationId, input.organizationId),
+          eq(subscriptionPayments.subscriptionId, current.subscription.id),
+          eq(subscriptionPayments.billingPeriodStart, current.subscription.currentPeriodStart),
+          inArray(subscriptionPayments.status, ["pending", "processing"]),
+        )).limit(1);
+      if (unsettled) {
+        throw new Error("An unresolved subscription payment exists. Reverify it before changing the plan, amount or currency.");
+      }
+    }
 
     const [subscription] = await tx
       .update(organizationSubscriptions)

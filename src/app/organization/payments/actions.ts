@@ -39,6 +39,11 @@ export async function startSubscriptionCheckout(
     || ["cancelled", "suspended", "expired"].includes(current.subscription.status)) {
     return { ok: false, message: "This subscriber account is not eligible for online payment. Contact support." };
   }
+  // Only the Super Admin may authorize this organization's online subscription
+  // collection. This policy is independent of the production live-key switch.
+  if (!current.subscription.checkoutEnabled) {
+    return { ok: false, message: "Online subscription collection is paused by VIMS Super Admin. Contact platform billing support." };
+  }
   if (current.subscription.currency !== "GHS") {
     return { ok: false, message: "Paystack Ghana checkout currently supports GHS invoices only." };
   }
@@ -50,6 +55,27 @@ export async function startSubscriptionCheckout(
   try {
     await db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"subscription-payments:" + current.subscription.id}))`);
+      // Re-read under the same lock used by Super Admin pause/resume. A stale
+      // form or concurrent subscription price update cannot initiate charges.
+      const [bill] = await tx.select({
+        checkoutEnabled: organizationSubscriptions.checkoutEnabled,
+        organizationId: organizationSubscriptions.organizationId,
+        amount: organizationSubscriptions.amount,
+        currency: organizationSubscriptions.currency,
+        currentPeriodStart: organizationSubscriptions.currentPeriodStart,
+        status: organizationSubscriptions.status,
+      }).from(organizationSubscriptions)
+        .where(eq(organizationSubscriptions.id, current.subscription.id))
+        .limit(1);
+      if (!bill || bill.organizationId !== user.organizationId || !bill.checkoutEnabled) {
+        throw new Error("Super Admin has paused online subscription collection.");
+      }
+      if (["suspended", "cancelled", "expired"].includes(bill.status)
+        || bill.currency !== "GHS"
+        || toGhsPesewas(String(bill.amount)) !== amountSubunits
+        || bill.currentPeriodStart.getTime() !== current.subscription.currentPeriodStart.getTime()) {
+        throw new Error("Subscription billing terms changed. Refresh your invoice before paying.");
+      }
       // Prevent accidental double taps or simultaneous checkout attempts.
       const [paid] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
         .where(and(
