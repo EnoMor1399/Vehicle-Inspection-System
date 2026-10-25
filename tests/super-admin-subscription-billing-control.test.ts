@@ -72,3 +72,14 @@ test("platform plan catalog pricing can only be changed by the Super Admin", () 
   assert.match(pricing, /updateSubscriptionPlanPricing/);
   assert.match(dashboard, /Subscription plan catalog/);
 });
+
+
+test("Super Admin cannot reprice a subscription while a matching billing period is unresolved", () => {
+  const service = read("src/lib/organization-control-plane.ts");
+  assert.match(service, /const billingTermsChanged = planChanged/);
+  assert.match(service, /subscription-payments:/);
+  assert.match(service, /subscriptionPayments\.organizationId, input\.organizationId/);
+  assert.match(service, /subscriptionPayments\.subscriptionId, current\.subscription\.id/);
+  assert.match(service, /inArray\(subscriptionPayments\.status, \["pending", "processing"\]\)/);
+  assert.match(service, /An unresolved subscription payment exists/);
+});
