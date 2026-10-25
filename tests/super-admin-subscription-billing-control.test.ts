@@ -50,9 +50,25 @@ test("Super Admin re-verification never directly sets paid status or subscriptio
   assert.match(action, /verifyAndRecordPayment\(payment\.reference\)/);
   assert.match(action, /payment\.status !== "pending" && payment\.status !== "processing"/);
   assert.doesNotMatch(action, /status:\s*"success"/);
-  assert.doesNotMatch(action, /\.update\(organizationSubscriptions\).*status/s);
+  assert.doesNotMatch(action, /\.update\(subscriptionPayments\)/);
   assert.match(provider, /matchesOriginalInvoice\(txn/);
   assert.match(provider, /pg_advisory_xact_lock/);
   assert.match(dashboard, /VerifyPaymentForm/);
   assert.match(dashboard, /Manage subscription/);
+});
+
+
+test("platform plan catalog pricing can only be changed by the Super Admin", () => {
+  const actions = read("src/app/platform/payments/actions.ts");
+  const pricing = read("src/app/platform/payments/PlanPricingForm.tsx");
+  const dashboard = read("src/app/platform/payments/page.tsx");
+  assert.match(actions, /export async function updateSubscriptionPlanPricing/);
+  assert.match(actions, /const actor = await requirePlatformSuperAdmin\(\)/);
+  assert.match(actions, /entityType: "platform_subscription_plan_pricing"/);
+  assert.match(actions, /required: true/);
+  assert.match(actions, /plan.currency !== "GHS"/);
+  assert.match(actions, /db.update\(subscriptionPlans\)/);
+  assert.doesNotMatch(actions, /\.update\(subscriptionPayments\)/);
+  assert.match(pricing, /updateSubscriptionPlanPricing/);
+  assert.match(dashboard, /Subscription plan catalog/);
 });
