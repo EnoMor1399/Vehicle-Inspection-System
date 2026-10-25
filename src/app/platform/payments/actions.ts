@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { organizations, organizationSubscriptions, subscriptionPayments } from "@/db/schema";
+import { organizations, organizationSubscriptions, subscriptionPayments, subscriptionPlans } from "@/db/schema";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import { logAudit } from "@/lib/audit";
 import { paymentsAvailable, toGhsPesewas, verifyAndRecordPayment } from "@/lib/paystack-payments";
@@ -137,5 +137,66 @@ export async function verifySubscriptionPayment(
     return { ok: true, message: `Verified provider status: ${status}.` };
   } catch {
     return { ok: false, message: "Payment could not be verified. Review the provider transaction and retry safely." };
+  }
+}
+
+export type PlanPricingState = { ok: boolean; message: string };
+
+export async function updateSubscriptionPlanPricing(
+  _previous: PlanPricingState,
+  formData: FormData,
+): Promise<PlanPricingState> {
+  const actor = await requirePlatformSuperAdmin();
+  const parsed = z.object({
+    planId: z.string().uuid(),
+    price: z.string().trim().regex(/^(?:0|[1-9]\\d{0,7})(?:\\.\\d{1,2})?$/),
+    billingCycle: z.enum(["monthly", "annual", "custom"]),
+    isActive: z.enum(["true", "false"]),
+  }).safeParse({
+    planId: formData.get("planId"),
+    price: formData.get("price"),
+    billingCycle: formData.get("billingCycle"),
+    isActive: formData.get("isActive"),
+  });
+  if (!parsed.success) return { ok: false, message: "Enter a valid GHS price (up to two decimal places), cycle, and availability." };
+
+  const [plan] = await db.select().from(subscriptionPlans)
+    .where(eq(subscriptionPlans.id, parsed.data.planId)).limit(1);
+  if (!plan) return { ok: false, message: "Subscription plan not found." };
+  if (plan.currency !== "GHS") {
+    return { ok: false, message: "Only Ghana cedi pricing can be updated in this Paystack control centre." };
+  }
+  // Super Admin approval is audited. Updating catalog prices does not alter
+  // already assigned invoices or retroactively charge any subscriber.
+  try {
+    await logAudit({
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      userName: actor.name,
+      action: "update",
+      entityType: "platform_subscription_plan_pricing",
+      entityId: plan.id,
+      entityLabel: plan.name,
+      summary: "Super Admin updated VIMS subscription plan pricing and availability",
+      before: { price: plan.price, billingCycle: plan.billingCycle, isActive: plan.isActive },
+      after: {
+        price: parsed.data.price,
+        billingCycle: parsed.data.billingCycle,
+        isActive: parsed.data.isActive === "true",
+        currency: "GHS",
+      },
+      required: true,
+    });
+    await db.update(subscriptionPlans).set({
+      price: Number(parsed.data.price).toFixed(2),
+      billingCycle: parsed.data.billingCycle,
+      isActive: parsed.data.isActive === "true",
+      updatedAt: new Date(),
+    }).where(eq(subscriptionPlans.id, plan.id));
+    revalidatePath("/platform/payments");
+    revalidatePath("/platform/organizations");
+    return { ok: true, message: "Plan catalog updated. Existing organization invoices were not changed." };
+  } catch {
+    return { ok: false, message: "Could not update plan pricing safely. Review the audit service and retry." };
   }
 }
