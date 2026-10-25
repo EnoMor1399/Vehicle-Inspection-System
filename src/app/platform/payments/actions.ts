@@ -149,7 +149,7 @@ export async function updateSubscriptionPlanPricing(
   const actor = await requirePlatformSuperAdmin();
   const parsed = z.object({
     planId: z.string().uuid(),
-    price: z.string().trim().regex(/^(?:0|[1-9]\\d{0,7})(?:\\.\\d{1,2})?$/),
+    price: z.string().trim().regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/),
     billingCycle: z.enum(["monthly", "annual", "custom"]),
     isActive: z.enum(["true", "false"]),
   }).safeParse({
