@@ -35,7 +35,7 @@ export default async function PlatformPaymentMonitorPage() {
         <span className="rounded-xl bg-blue-50 p-3 text-blue-700"><CreditCard className="h-6 w-6" /></span>
         <div><p className="text-xs font-bold uppercase tracking-widest text-blue-700">Super Admin billing oversight</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">Subscription payments</h1>
-          <p className="mt-2 text-sm text-slate-600">Platform subscription billing only. The Super Admin approves each organization's checkout, manages subscription terms and can reverify pending Paystack payments. No one can manually mark a transaction as paid.</p></div>
+          <p className="mt-2 text-sm text-slate-600">Platform subscription billing only. The Super Admin approves each organization&apos;s checkout, manages subscription terms and can reverify pending Paystack payments. No one can manually mark a transaction as paid.</p></div>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
