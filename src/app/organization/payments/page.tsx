@@ -22,7 +22,7 @@ export default async function OrganizationPaymentsPage() {
     row.subscriptionId === subscription.subscription.id &&
     row.billingPeriodStart.getTime() === subscription.subscription.currentPeriodStart.getTime(),
   ));
-  const permitted = Boolean(subscription && subscription.subscription.currency === "GHS" &&
+  const permitted = Boolean(subscription && subscription.subscription.checkoutEnabled && subscription.subscription.currency === "GHS" &&
     Number.isFinite(payAmount) && payAmount > 0 && !alreadyPaid && paymentsAvailable());
 
   return (
@@ -45,7 +45,9 @@ export default async function OrganizationPaymentsPage() {
           ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">This subscription billing period is already paid. Another charge is blocked.</p>
           : subscription && payAmount === 0
             ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">No online payment is due for this subscription amount. Contact the platform administrator if billing is expected.</p>
-            : <PaystackCheckoutForm enabled={permitted} />}
+            : subscription && !subscription.subscription.checkoutEnabled
+              ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">VIMS Super Admin has not approved online payment collection for this subscription. Contact platform billing support. Your subscription amount and payment history are shown below.</p>
+              : <PaystackCheckoutForm enabled={permitted} />}
       </section>
 
       <section aria-label="How to pay" className="rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:p-7">
