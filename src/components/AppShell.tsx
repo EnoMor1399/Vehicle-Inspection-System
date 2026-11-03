@@ -39,7 +39,7 @@ import {
   X,
 } from "lucide-react";
 
-const NO_SHELL_PATHS = ["/login", "/subscribe"];
+const NO_SHELL_PATHS = ["/login", "/subscribe", "/welcome"];
 const LAST_OVERSIGHT_ORG_KEY = "vims-superadmin-oversight-selection";
 const OVERSIGHT_ORG_CHANGED_EVENT = "vims:oversight-organization-changed";
 
@@ -363,6 +363,7 @@ export function AppShell({
 
   if (
     NO_SHELL_PATHS.includes(pathname)
+    || (!userRole && pathname === "/")
     || pathname.startsWith("/invite/")
     || pathname.startsWith("/verify")
     || pathname.startsWith("/certificate")
