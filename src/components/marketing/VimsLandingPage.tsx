@@ -333,7 +333,7 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
           <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 lg:flex-row lg:items-center">
             <div>
               <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-300"><Fingerprint className="h-4 w-4" aria-hidden="true" /> Security by design</span>
-              <h2 className="mt-3 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl">Your operations. Your people. Your organisation's data.</h2>
+              <h2 className="mt-3 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl">Your operations. Your people. Your organisation’s data.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">Role-aware accounts, audit history and controlled organisation activation help protect critical inspection workflows.</p>
             </div>
             <Link href="/subscribe" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-extrabold text-[#0b2834] hover:bg-emerald-50">
