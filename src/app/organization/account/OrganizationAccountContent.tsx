@@ -21,8 +21,27 @@ export async function OrganizationAccountContent({ organizationId, platformAdmin
     listOrganizationInvitations(organizationId),
     getOrganizationCapacitySnapshot(organizationId),
   ]);
-  if (!snapshot.organization || !snapshot.subscription) {
-    return <div className="p-8 text-sm text-red-700">Organization subscription data is unavailable.</div>;
+  if (!snapshot.organization) {
+    return <div className="p-8 text-sm text-red-700">Organization account not found.</div>;
+  }
+  if (!snapshot.subscription) {
+    return (
+      <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
+        <PageHeader eyebrow={platformAdmin ? "Super Administrator · Organization Account" : "Organization Account"}
+          title={snapshot.organization.name}
+          description="Organization identity and branding remain manageable while subscription provisioning is pending." />
+        <Card className="mt-5 p-5 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold">Organization profile & branding</h2>
+          <OrganizationProfileForm organization={snapshot.organization}
+            targetOrganizationId={platformAdmin ? organizationId : undefined} />
+        </Card>
+        <Card className="mt-5 p-5 text-sm text-amber-800">
+          This organization does not yet have an assigned subscription. The Super Admin can assign one from the subscriber management page.
+          {platformAdmin && <Link href={`/platform/organizations/${organizationId}`}
+            className="mt-3 block font-semibold underline">Manage subscription</Link>}
+        </Card>
+      </div>
+    );
   }
 
   const { organization, subscription, pendingInvitationCount } = snapshot;
