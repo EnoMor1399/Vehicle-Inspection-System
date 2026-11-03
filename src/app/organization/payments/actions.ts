@@ -53,10 +53,11 @@ export async function startSubscriptionCheckout(
 
   const reference = newPaymentReference();
   try {
-    await db.transaction(async tx => {
+    // Keep the checkout-policy advisory lock until the gateway has either
+    // responded or timed out. Super Admin pause/approval uses the same lock,
+    // so a pause cannot interleave between authorization and initialization.
+    const result = await db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"subscription-payments:" + current.subscription.id}))`);
-      // Re-read under the same lock used by Super Admin pause/resume. A stale
-      // form or concurrent subscription price update cannot initiate charges.
       const [bill] = await tx.select({
         checkoutEnabled: organizationSubscriptions.checkoutEnabled,
         organizationId: organizationSubscriptions.organizationId,
@@ -76,7 +77,6 @@ export async function startSubscriptionCheckout(
         || bill.currentPeriodStart.getTime() !== current.subscription.currentPeriodStart.getTime()) {
         throw new Error("Subscription billing terms changed. Refresh your invoice before paying.");
       }
-      // Prevent accidental double taps or simultaneous checkout attempts.
       const [paid] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
         .where(and(
           eq(subscriptionPayments.subscriptionId, current.subscription.id),
@@ -108,17 +108,29 @@ export async function startSubscriptionCheckout(
         status: "pending",
         customerEmail: user.email.toLowerCase(),
       });
-    });
-    const checkoutUrl = await initializePaystack({
-      reference,
-      amountSubunits,
-      email: user.email.toLowerCase(),
-      channel: channel as CheckoutChannel,
-      organizationId: user.organizationId,
-      subscriptionId: current.subscription.id,
+      try {
+        const checkoutUrl = await initializePaystack({
+          reference,
+          amountSubunits,
+          email: user.email.toLowerCase(),
+          channel: channel as CheckoutChannel,
+          organizationId: user.organizationId,
+          subscriptionId: current.subscription.id,
+        });
+        return { checkoutUrl, error: null };
+      } catch {
+        // The provider may have accepted the reference even if its response
+        // was lost. Commit the pending record, rather than rolling it back
+        // and allowing a second checkout for the same billing period.
+        return { checkoutUrl: null, error: "Checkout initialization was not confirmed by Paystack." };
+      }
     });
     revalidatePath("/organization/payments");
-    return { ok: true, checkoutUrl, message: "Your secure Paystack checkout is ready." };
+    if (result.error || !result.checkoutUrl) {
+      return { ok: false, message: (result.error || "Checkout unavailable.") +
+        " Check Payment History and have support reconcile the reference before retrying." };
+    }
+    return { ok: true, checkoutUrl: result.checkoutUrl, message: "Your secure Paystack checkout is ready." };
   } catch (error) {
     // A timeout or lost gateway response cannot prove Paystack rejected the
     // transaction. Retain the pending record to prevent an accidental second
