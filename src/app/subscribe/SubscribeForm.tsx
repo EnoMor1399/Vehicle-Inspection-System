@@ -20,7 +20,7 @@ type Plan = {
 
 const initialState: SubscriptionRequestState = { ok: false, message: "" };
 
-export function SubscribeForm({ plans }: { plans: Plan[] }) {
+export function SubscribeForm({ plans, initialPlanCode }: { plans: Plan[]; initialPlanCode?: string }) {
   const [state, action, pending] = useActionState(submitSubscriptionRequest, initialState);
 
   if (state.ok) {
@@ -63,7 +63,7 @@ export function SubscribeForm({ plans }: { plans: Plan[] }) {
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700">Preferred plan</label>
-        <select name="desiredPlanCode" className={inputClass} defaultValue={plans[0]?.code || "starter"}>
+        <select name="desiredPlanCode" className={inputClass} defaultValue={plans.some((plan) => plan.code === initialPlanCode) ? initialPlanCode : (plans[0]?.code || "starter")}>
           {plans.map((plan) => (
             <option key={plan.code} value={plan.code}>
               {plan.name} · up to {plan.maxUsers} users · {plan.maxVehicles.toLocaleString()} vehicles
