@@ -39,6 +39,11 @@ export async function startSubscriptionCheckout(
     || ["cancelled", "suspended", "expired"].includes(current.subscription.status)) {
     return { ok: false, message: "This subscriber account is not eligible for online payment. Contact support." };
   }
+  // Only the Super Admin may authorize this organization's online subscription
+  // collection. This policy is independent of the production live-key switch.
+  if (!current.subscription.checkoutEnabled) {
+    return { ok: false, message: "Online subscription collection is paused by VIMS Super Admin. Contact platform billing support." };
+  }
   if (current.subscription.currency !== "GHS") {
     return { ok: false, message: "Paystack Ghana checkout currently supports GHS invoices only." };
   }
@@ -48,9 +53,30 @@ export async function startSubscriptionCheckout(
 
   const reference = newPaymentReference();
   try {
-    await db.transaction(async tx => {
+    // Keep the checkout-policy advisory lock until the gateway has either
+    // responded or timed out. Super Admin pause/approval uses the same lock,
+    // so a pause cannot interleave between authorization and initialization.
+    const result = await db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"subscription-payments:" + current.subscription.id}))`);
-      // Prevent accidental double taps or simultaneous checkout attempts.
+      const [bill] = await tx.select({
+        checkoutEnabled: organizationSubscriptions.checkoutEnabled,
+        organizationId: organizationSubscriptions.organizationId,
+        amount: organizationSubscriptions.amount,
+        currency: organizationSubscriptions.currency,
+        currentPeriodStart: organizationSubscriptions.currentPeriodStart,
+        status: organizationSubscriptions.status,
+      }).from(organizationSubscriptions)
+        .where(eq(organizationSubscriptions.id, current.subscription.id))
+        .limit(1);
+      if (!bill || bill.organizationId !== user.organizationId || !bill.checkoutEnabled) {
+        throw new Error("Super Admin has paused online subscription collection.");
+      }
+      if (["suspended", "cancelled", "expired"].includes(bill.status)
+        || bill.currency !== "GHS"
+        || toGhsPesewas(String(bill.amount)) !== amountSubunits
+        || bill.currentPeriodStart.getTime() !== current.subscription.currentPeriodStart.getTime()) {
+        throw new Error("Subscription billing terms changed. Refresh your invoice before paying.");
+      }
       const [paid] = await tx.select({ id: subscriptionPayments.id }).from(subscriptionPayments)
         .where(and(
           eq(subscriptionPayments.subscriptionId, current.subscription.id),
@@ -82,17 +108,29 @@ export async function startSubscriptionCheckout(
         status: "pending",
         customerEmail: user.email.toLowerCase(),
       });
-    });
-    const checkoutUrl = await initializePaystack({
-      reference,
-      amountSubunits,
-      email: user.email.toLowerCase(),
-      channel: channel as CheckoutChannel,
-      organizationId: user.organizationId,
-      subscriptionId: current.subscription.id,
+      try {
+        const checkoutUrl = await initializePaystack({
+          reference,
+          amountSubunits,
+          email: user.email.toLowerCase(),
+          channel: channel as CheckoutChannel,
+          organizationId: user.organizationId,
+          subscriptionId: current.subscription.id,
+        });
+        return { checkoutUrl, error: null };
+      } catch {
+        // The provider may have accepted the reference even if its response
+        // was lost. Commit the pending record, rather than rolling it back
+        // and allowing a second checkout for the same billing period.
+        return { checkoutUrl: null, error: "Checkout initialization was not confirmed by Paystack." };
+      }
     });
     revalidatePath("/organization/payments");
-    return { ok: true, checkoutUrl, message: "Your secure Paystack checkout is ready." };
+    if (result.error || !result.checkoutUrl) {
+      return { ok: false, message: (result.error || "Checkout unavailable.") +
+        " Check Payment History and have support reconcile the reference before retrying." };
+    }
+    return { ok: true, checkoutUrl: result.checkoutUrl, message: "Your secure Paystack checkout is ready." };
   } catch (error) {
     // A timeout or lost gateway response cannot prove Paystack rejected the
     // transaction. Retain the pending record to prevent an accidental second

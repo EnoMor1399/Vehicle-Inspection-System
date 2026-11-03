@@ -18,6 +18,7 @@ import {
   listSubscriptionPlans,
 } from "@/lib/organization-control-plane";
 import { changeOrganizationStatus } from "../actions";
+import { setSubscriptionCheckoutAvailability } from "@/app/platform/payments/actions";
 import { ActivationReadinessControls } from "./ActivationReadinessControls";
 import { SubscriptionLifecycleForm } from "./SubscriptionLifecycleForm";
 
@@ -106,6 +107,47 @@ export default async function PlatformOrganizationDetailPage({
         </Card>
 
         <div className="space-y-6">
+          <Card className="p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-slate-950">VIMS subscription payments</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Only the Super Admin can approve Paystack subscription collection. Subscribers cannot change
+              plan pricing, billing terms, or their checkout permission. Payments use GHS card or Ghana Mobile Money.
+            </p>
+            {current ? (
+              <>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">Online subscription collection</p>
+                    <p className={`mt-1 font-bold ${current.subscription.checkoutEnabled ? "text-emerald-800" : "text-amber-800"}`}>
+                      {current.subscription.checkoutEnabled ? "Approved" : "Paused"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {current.subscription.currency} {Number(current.subscription.amount).toFixed(2)}
+                      {" · "}{current.plan.name}
+                    </p>
+                  </div>
+                  <form action={setSubscriptionCheckoutAvailability}>
+                    <input type="hidden" name="organizationId" value={organization.id} />
+                    <input type="hidden" name="enabled" value={current.subscription.checkoutEnabled ? "false" : "true"} />
+                    <button type="submit"
+                      className={`rounded-lg px-4 py-2 text-sm font-semibold ${current.subscription.checkoutEnabled ? "border border-amber-300 bg-white text-amber-900" : "bg-emerald-700 text-white hover:bg-emerald-800"}`}>
+                      {current.subscription.checkoutEnabled ? "Pause new payments" : "Approve online payments"}
+                    </button>
+                  </form>
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Pausing stops new Paystack checkouts for this subscription. Already initiated transactions
+                  can still settle through signed webhooks and independent Paystack verification.
+                  This control does not change operational permissions or manually mark a payment paid.
+                </p>
+                <Link href="/platform/payments" className="mt-3 inline-flex text-sm font-semibold text-blue-700 underline">
+                  View subscription payments and verification
+                </Link>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-amber-700">Assign a subscription before approving payments.</p>
+            )}
+          </Card>
           <Card className="p-5 sm:p-6">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700">
