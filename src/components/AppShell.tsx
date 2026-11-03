@@ -257,6 +257,12 @@ export function AppShell({
 
   function scopedNavigationHref(href: string) {
     if (!canSelectOrganization) return href;
+    if (href === "/organization/account") {
+      if (operationContext) return href;
+      return activeOversightOrganizationId
+        ? `/platform/organizations/${encodeURIComponent(activeOversightOrganizationId)}/account`
+        : "/platform/organizations";
+    }
     if (operationContext) return href;
     if (activeOversightOrganizationId) return scopedOrganizationHref(activeOversightOrganizationId, href);
     // A Super Admin with no selection must not accidentally open the
