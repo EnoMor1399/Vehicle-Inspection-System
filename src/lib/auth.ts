@@ -70,6 +70,16 @@ export async function getCurrentUser(options: CurrentUserOptions = {}) {
   }
 
   const scopeCookie = jar.get("vims_superadmin_operations")?.value;
+  if (scopeCookie && !effective.support && effective.user.role === "super_admin") {
+    const { headers } = await import("next/headers");
+    const { isPlatformControlPlaneRequest } = await import("@/lib/platform-control-plane-request");
+    const request = await headers();
+    if (isPlatformControlPlaneRequest(request.get("x-vims-request-path"), request.get("x-vims-request-method"))) {
+      // Authenticate the real login actor for platform administration.
+      // Never turn the signed tenant operations cookie into a platform grant.
+      return effective.user;
+    }
+  }
   if (scopeCookie) {
     const { operationalUserForRequest } = await import("@/lib/super-admin-operations");
     try {
