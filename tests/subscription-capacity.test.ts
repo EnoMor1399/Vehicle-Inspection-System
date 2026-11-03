@@ -49,8 +49,10 @@ test("database capacity guards protect all billable resources under concurrency"
 });
 
 test("organization account displays real usage against plan limits", () => {
-  const page = source("src/app/organization/account/page.tsx");
-  assert.match(page, /getOrganizationCapacitySnapshot\(user\.organizationId\)/);
+  const page = source("src/app/organization/account/OrganizationAccountContent.tsx");
+  const wrapper = source("src/app/organization/account/page.tsx");
+  assert.match(wrapper, /organizationId=\{user\.organizationId\}/);
+  assert.match(page, /getOrganizationCapacitySnapshot\(organizationId\)/);
   assert.match(page, /capacity\.usage\.users/);
   assert.match(page, /capacity\.usage\.stations/);
   assert.match(page, /capacity\.usage\.vehicles/);
