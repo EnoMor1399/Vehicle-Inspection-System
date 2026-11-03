@@ -79,7 +79,7 @@ export default async function SubscribePage({ searchParams }: {
             </p>
           </div>
 
-          <SubscribeForm initialPlanCode={requestedCode} plans={plans.map((plan) => ({
+          <SubscribeForm plans={plans.map((plan) => ({
             code: plan.code,
             name: plan.name,
             description: plan.description,
@@ -91,7 +91,7 @@ export default async function SubscribePage({ searchParams }: {
             maxStations: plan.maxStations,
             maxVehicles: plan.maxVehicles,
             modules: plan.modules,
-          }))} />
+          }))} initialPlanCode={requestedCode} />
         </div>
       </div>
     </main>
