@@ -83,3 +83,21 @@ test("Super Admin cannot reprice a subscription while a matching billing period 
   assert.match(service, /inArray\(subscriptionPayments\.status, \["pending", "processing"\]\)/);
   assert.match(service, /An unresolved subscription payment exists/);
 });
+
+test("admin checkout pause stays serialized through Paystack initialization and uncertain responses retain pending records", () => {
+  const action = read("src/app/organization/payments/actions.ts");
+  const transactionStart = action.indexOf("const result = await db.transaction(async tx => {");
+  const gatewayStart = action.indexOf("const checkoutUrl = await initializePaystack({", transactionStart);
+  const transactionEnd = action.indexOf("revalidatePath(\"/organization/payments\");", gatewayStart);
+  assert.ok(transactionStart >= 0 && gatewayStart > transactionStart && transactionEnd > gatewayStart);
+  const lockedTransaction = action.slice(transactionStart, transactionEnd);
+  assert.match(lockedTransaction, /pg_advisory_xact_lock/);
+  assert.match(lockedTransaction, /!bill\.checkoutEnabled/);
+  assert.match(lockedTransaction, /await tx\.insert\(subscriptionPayments\)/);
+  assert.match(lockedTransaction, /return \{ checkoutUrl: null, error:/);
+  assert.doesNotMatch(lockedTransaction, /tx\.delete\(subscriptionPayments\)/);
+  assert.match(action, /have support reconcile the reference before retrying/);
+  const admin = read("src/app/platform/payments/actions.ts");
+  assert.match(admin, /pg_advisory_xact_lock/);
+  assert.match(admin, /subscription-payments:/);
+});
