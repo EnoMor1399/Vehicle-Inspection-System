@@ -79,11 +79,11 @@ function ValueCell({ value }: { value: string | boolean }) {
   return <span className="font-medium text-zinc-700">{value}</span>;
 }
 
-function PlanAction({ plan, view, wide = false }: { plan: Plan; view: BillingView; wide?: boolean }) {
+function PlanAction({ plan, view, wide = false, featured = false }: { plan: Plan; view: BillingView; wide?: boolean; featured?: boolean }) {
   const href = "/subscribe?plan=" + encodeURIComponent(plan.code) + (view === "annual" ? "&billing=annual" : "");
   return (
-    <Link href={href} className={"inline-flex items-center justify-center rounded-lg bg-[#141414] px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 " + (wide ? "w-full" : "")}>
-      {view === "annual" ? "Request annual quote" : "Get started"}
+    <Link href={href} className={"group/cta inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 " + (featured ? "bg-emerald-400 text-[#092c25] hover:bg-emerald-300" : "bg-[#141414] text-white hover:bg-[#2b3741]") + (wide ? " w-full" : "")}>
+      {view === "annual" ? "Request annual quote" : "Get started"} <ArrowUpRight size={16} aria-hidden="true" className="transition group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5" />
     </Link>
   );
 }
@@ -198,11 +198,11 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
               <div className="absolute inset-[119px] rounded-full border border-zinc-100" />
             </div>
             <div className="relative">
-              <span className="text-[11px] font-bold uppercase tracking-[.17em] text-emerald-700">Vehicle Inspection Management System</span>
-              <h1 className="mt-3 text-[clamp(2.35rem,5vw,4.05rem)] font-extrabold leading-tight tracking-[-.06em] text-[#161616]">Pricing plans</h1>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-[#747474] sm:text-base">A plan for every inspection operation. Compare real VIMS limits and benefits before you request your company workspace.</p>
+              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[.14em] text-emerald-700"><Sparkles size={13} aria-hidden="true" /> Simple plans. Serious capability.</span>
+              <h1 className="mt-5 text-[clamp(2.5rem,5vw,4.25rem)] font-extrabold leading-[1.08] tracking-[-.06em] text-[#161616]">Pricing plans</h1>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-[#747474] sm:text-base">Choose the right foundation for safer, smarter operations. Every package is tailored to the scale of your organisation, with clear limits and a simple onboarding process.</p>
 
-              <div className="mt-10 inline-flex gap-1 rounded-xl border border-zinc-200 bg-[#f5f5f5] p-1" role="group" aria-label="Billing period">
+              <div className="mt-9 inline-flex gap-1 rounded-xl border border-zinc-200 bg-[#f5f5f5] p-1 shadow-inner" role="group" aria-label="Billing period">
                 <button type="button" aria-pressed={billingView === "annual"} onClick={() => setBillingView("annual")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "annual" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Annual pricing</button>
                 <button type="button" aria-pressed={billingView === "monthly"} onClick={() => setBillingView("monthly")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "monthly" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Monthly pricing</button>
               </div>
@@ -220,21 +220,38 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
                   const price = priceFor(plan, billingView);
                   const isPopular = plan.code === highlighted;
                   return (
-                    <article key={plan.id} className="relative flex min-h-[265px] flex-col rounded-[20px] border border-[#ededed] bg-[#f3f3f3] px-5 pb-5 pt-6 sm:px-6">
-                      {isPopular && <span className="absolute -top-3 left-3 rounded-full bg-[#171717] px-3 py-1 text-[10px] font-bold text-white">Most popular</span>}
-                      <div className="flex items-start justify-between gap-2">
+                    <article key={plan.id} className={"group relative flex min-h-[420px] flex-col overflow-visible rounded-[24px] border px-6 pb-6 pt-8 transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_60px_rgba(6,42,38,.15)] sm:px-7 " + (isPopular
+                      ? "border-[#12483d] bg-[radial-gradient(ellipse_at_95%_2%,rgba(52,211,153,.18),transparent_48%),linear-gradient(155deg,#123b3c,#092b35)] text-white shadow-[0_18px_48px_rgba(8,45,49,.19)]"
+                      : "border-zinc-200 bg-[#f8f9f9] text-zinc-900 shadow-[0_10px_25px_rgba(17,33,44,.045)]")}>
+                      {isPopular && <span className="absolute -top-3 left-5 rounded-full border border-emerald-100/20 bg-emerald-400 px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[.1em] text-[#073427] shadow-md">Featured plan</span>}
+                      <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h2 className="text-lg font-extrabold tracking-tight">{plan.name} plan</h2>
-                          <p className="mt-1 min-h-11 text-xs leading-5 text-zinc-500">{plan.description || "Flexible inspection operations for your organisation."}</p>
+                          <p className={"text-[10px] font-extrabold uppercase tracking-[.18em] " + (isPopular ? "text-emerald-200" : "text-emerald-700")}>VIMS subscription</p>
+                          <h2 className="mt-2 text-[23px] font-extrabold tracking-[-.04em]">{plan.name}</h2>
                         </div>
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-zinc-400 text-zinc-800"><CheckCircle2 size={18} aria-hidden="true" /></span>
+                        <span className={"grid h-11 w-11 shrink-0 place-items-center rounded-2xl border " + (isPopular ? "border-white/15 bg-white/10 text-emerald-200" : "border-emerald-100 bg-white text-emerald-700")}><Layers3 size={22} aria-hidden="true" /></span>
                       </div>
-                      <div className="mt-auto flex min-h-[91px] items-center gap-2 pt-4">
-                        <span className="text-[clamp(1.75rem,2.6vw,2.55rem)] font-extrabold tracking-[-.055em]">{price.amount}</span>
-                        {price.amount !== "Custom quote" && <span className="max-w-[64px] text-[11px] leading-4 text-zinc-500">{price.frequency}</span>}
+                      <p className={"mt-3 min-h-[50px] text-[13px] leading-[1.65] " + (isPopular ? "text-slate-200" : "text-zinc-500")}>{plan.description || "Flexible inspection operations for your organisation."}</p>
+                      <div className={"mt-5 flex min-h-[73px] items-center gap-2 border-b pb-5 " + (isPopular ? "border-white/15" : "border-zinc-200")}>
+                        <span className="text-[clamp(1.75rem,2.5vw,2.5rem)] font-black tracking-[-.06em]">{price.amount}</span>
+                        {price.amount !== "Custom quote" && <span className={"max-w-[70px] text-[11px] leading-4 " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{price.frequency}</span>}
                       </div>
-                      {price.amount === "Custom quote" && <p className="-mt-1 mb-3 text-[11px] text-zinc-500">{price.frequency}</p>}
-                      <div className="mt-2"><PlanAction plan={plan} view={billingView} wide /></div>
+                      <p className={"mt-4 text-[10px] font-extrabold uppercase tracking-[.16em] " + (isPopular ? "text-emerald-200" : "text-zinc-500")}>Included capacity</p>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
+                        {[
+                          { label: "Users", value: plan.maxUsers },
+                          { label: "Stations", value: plan.maxStations },
+                          { label: "Vehicles", value: plan.maxVehicles },
+                          { label: "Inspections / mo.", value: plan.maxInspectionsPerMonth },
+                        ].map((item) => (
+                          <div key={item.label} className={"rounded-xl border px-3 py-2.5 " + (isPopular ? "border-white/10 bg-white/[.07]" : "border-zinc-200/80 bg-white")}>
+                            <div className="text-[17px] font-extrabold tracking-tight">{item.value.toLocaleString("en-GH")}</div>
+                            <div className={"mt-0.5 text-[10px] font-medium " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{item.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-auto pt-6"><PlanAction plan={plan} view={billingView} featured={isPopular} wide /></div>
+                      {plan.trialDays > 0 && <p className={"mt-3 text-center text-[10px] " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{plan.trialDays}-day trial policy · activation subject to approval</p>}
                     </article>
                   );
                 })}
