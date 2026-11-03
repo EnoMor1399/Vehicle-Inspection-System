@@ -20,7 +20,7 @@ type Plan = {
 
 const initialState: SubscriptionRequestState = { ok: false, message: "" };
 
-export function SubscribeForm({ plans, initialPlanCode }: { plans: Plan[]; initialPlanCode?: string }) {
+export function SubscribeForm({ plans, initialPlanCode, initialBillingMode = "monthly" }: { plans: Plan[]; initialPlanCode?: string; initialBillingMode?: "monthly" | "annual" }) {
   const [state, action, pending] = useActionState(submitSubscriptionRequest, initialState);
 
   if (state.ok) {
@@ -86,6 +86,7 @@ export function SubscribeForm({ plans, initialPlanCode }: { plans: Plan[]; initi
         <textarea name="notes" rows={4} maxLength={4000} className={inputClass} placeholder="Sites, departments, workflow, integrations, compliance or rollout requirements…" />
       </Field>
 
+      <input type="hidden" name="requestedBillingCycle" value={initialBillingMode} />
       <input name="website" className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" />
 
 
