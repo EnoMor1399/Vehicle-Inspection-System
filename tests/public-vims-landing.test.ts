@@ -91,3 +91,31 @@ test("annual plan selection flows through the onboarding request without chargin
   assert.match(action, /Annual billing quote requested/);
   assert.match(action, /createOnboardingRequest\(/);
 });
+
+test("premium landing hero uses a genuine VIMS feature preview rather than fake live KPIs", () => {
+  const landing = read("src/components/marketing/VimsLandingPage.tsx");
+  assert.match(landing, /id="overview"/);
+  assert.match(landing, /Every inspection/);
+  assert.match(landing, /Illustrative interface/);
+  assert.match(landing, /Explore pricing/);
+  assert.match(landing, /href="\/subscribe"/);
+  assert.match(landing, /Workflow preview/);
+  assert.match(landing, /Secure by design/);
+  assert.match(landing, /aria-label="Mobile landing page"/);
+});
+
+test("enhanced pricing remains linked to the VIMS catalogue and clearly distinguishes featured tiers", () => {
+  const landing = read("src/components/marketing/VimsLandingPage.tsx");
+  assert.match(landing, /Featured plan/);
+  assert.match(landing, /Included capacity/);
+  assert.match(landing, /plan\.maxUsers/);
+  assert.match(landing, /plan\.maxStations/);
+  assert.match(landing, /plan\.maxVehicles/);
+  assert.match(landing, /plan\.maxInspectionsPerMonth/);
+  assert.match(landing, /plan\.code === highlighted/);
+  assert.match(landing, /rounded-\[24px\]/);
+  assert.match(landing, /aria-label="Subscription feature comparison"/);
+  assert.match(landing, /group\.rows\.map/);
+  assert.match(landing, /Request your workspace/);
+  assert.doesNotMatch(landing, /\b99% uptime\b|\b10,000\+ customers\b|\b100,000\+ inspections\b/);
+});
