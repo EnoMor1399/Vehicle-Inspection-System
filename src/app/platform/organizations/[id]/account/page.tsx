@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import { getOrganizationAccountSnapshot } from "@/lib/organization-control-plane";
 import { isValidOrganizationId } from "@/lib/organization-id";
-import { OrganizationAccountContent } from "@/app/organization/account/page";
+import { OrganizationAccountContent } from "@/app/organization/account/OrganizationAccountContent";
 
 export const dynamic = "force-dynamic";
 
