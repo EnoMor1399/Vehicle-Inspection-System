@@ -34,5 +34,7 @@ test("tenant account updates cannot use untrusted organization hints under owner
   assert.match(actions, /organizationId,\s*\.\.\.parsed\.data/);
   assert.match(actions, /updateSettings\(/);
   assert.match(actions, /logAudit\(/);
+  assert.match(actions, /intent: true/);
+  assert.match(actions, /required: true/);
   assert.match(forms, /name="targetOrganizationId"/);
 });
