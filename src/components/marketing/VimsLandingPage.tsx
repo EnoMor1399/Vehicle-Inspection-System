@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight, ArrowUpRight, BarChart3, CalendarCheck2, Check, CheckCircle2, ChevronDown,
-  ClipboardCheck, FileCheck2, Layers3, LockKeyhole, Minus, ShieldCheck, Sparkles, Truck, UsersRound,
+  ArrowRight, ArrowUpRight, BarChart3, Check, CheckCircle2, ChevronDown,
+  ClipboardCheck, FileCheck2, Layers3, LockKeyhole, Minus, ShieldCheck, Sparkles, Truck,
 } from "lucide-react";
 import type { subscriptionPlans } from "@/db/schema";
 
@@ -296,36 +296,36 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
             </section>
           )}
 
-          <section id="benefits" className="scroll-mt-6 border-t border-zinc-100 px-5 py-14 sm:px-10 lg:px-[7%]">
+          <section id="benefits" className="scroll-mt-6 border-t border-zinc-100 bg-[#f8faf9] px-5 py-20 sm:px-10 lg:px-[7%]">
             <div className="max-w-2xl">
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">Why VIMS</span>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight">All the essentials. One smarter workspace.</h2>
+              <h2 className="mt-3 text-3xl font-extrabold leading-[1.15] tracking-[-.05em] sm:text-4xl">All the essentials. <span className="text-emerald-700">One smarter workspace.</span></h2>
               <p className="mt-3 text-sm leading-6 text-zinc-500">Designed for vehicle inspection centres, fleet teams and transport organisations. Module availability depends on your plan.</p>
             </div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {benefits.map(({ icon: Icon, title, text }) => (
-                <article key={title} className="rounded-2xl border border-zinc-200 bg-[#f8f8f8] p-5">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-white text-emerald-700"><Icon size={20} aria-hidden="true" /></div>
-                  <h3 className="mt-4 text-sm font-bold">{title}</h3>
-                  <p className="mt-2 text-xs leading-6 text-zinc-500">{text}</p>
+                <article key={title} className="group rounded-[22px] border border-zinc-200 bg-white p-6 shadow-[0_10px_30px_rgba(9,38,36,.035)] transition duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_22px_42px_rgba(9,38,36,.09)]">
+                  <div className="grid h-12 w-12 place-items-center rounded-[15px] bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100"><Icon size={20} aria-hidden="true" /></div>
+                  <h3 className="mt-5 text-[15px] font-extrabold tracking-tight">{title}</h3>
+                  <p className="mt-3 text-xs leading-6 text-zinc-500">{text}</p>
                 </article>
               ))}
             </div>
             <p className="mt-5 text-[11px] text-zinc-500">Illustrative interface features; availability and user permissions depend on your subscription and account role.</p>
           </section>
 
-          <section id="workflow" className="scroll-mt-6 border-y border-zinc-100 bg-[#fafafa] px-5 py-12 sm:px-10 lg:px-[7%]">
-            <div className="grid gap-5 md:grid-cols-[1fr_1.5fr] md:items-center">
+          <section id="workflow" className="scroll-mt-6 border-y border-zinc-100 bg-white px-5 py-16 sm:px-10 lg:px-[7%]">
+            <div className="grid gap-8 md:grid-cols-[.85fr_1.15fr] md:items-center">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Getting started</p>
-                <h2 className="mt-2 text-2xl font-extrabold tracking-tight">From plan to workspace</h2>
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Simple onboarding</p>
+                <h2 className="mt-2 text-3xl font-extrabold tracking-[-.04em]">From plan to workspace</h2>
               </div>
               <ol className="grid gap-4 sm:grid-cols-3">
                 {[
                   { step: "01", label: "Choose your plan" },
                   { step: "02", label: "Submit your request" },
                   { step: "03", label: "Approve & activate" },
-                ].map((item) => <li key={item.step} className="flex items-center gap-3 text-xs font-semibold text-zinc-700"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white font-bold text-emerald-700">{item.step}</span>{item.label}</li>)}
+                ].map((item) => <li key={item.step} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-[#f7f9f8] p-3 text-xs font-bold text-zinc-700"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white font-bold text-emerald-700">{item.step}</span>{item.label}</li>)}
               </ol>
             </div>
           </section>
@@ -341,9 +341,20 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
               ))}
             </div>
           </section>
+          <section className="px-4 pb-10 pt-4 sm:px-7 lg:px-10">
+            <div className="relative overflow-hidden rounded-[26px] bg-[#0b2b35] px-7 py-10 text-white sm:px-10 sm:py-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-32 h-96 w-96 rounded-full border border-white/10" />
+              <div className="relative">
+                <p className="text-[11px] font-bold uppercase tracking-[.16em] text-emerald-300">Your next step</p>
+                <h2 className="mt-3 max-w-2xl text-2xl font-extrabold tracking-[-.04em] sm:text-3xl">Ready to modernise your inspection operations?</h2>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300">Select a plan and request your VIMS workspace. Our team will review your organisation’s requirements before activation.</p>
+              </div>
+              <Link href="/subscribe" className="relative mt-7 inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-sm font-extrabold text-[#082b23] transition hover:bg-emerald-300 lg:mt-0">Request your workspace <ArrowUpRight size={17} aria-hidden="true" /></Link>
+            </div>
+          </section>
         </main>
 
-        <footer className="border-t border-zinc-100 px-5 pb-12 pt-14 sm:px-10 lg:px-[7%]">
+        <footer className="border-t border-zinc-100 bg-[#fcfdfd] px-5 pb-12 pt-14 sm:px-10 lg:px-[7%]">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.8fr_repeat(4,minmax(0,1fr))]">
             <div>
               <Link href="/welcome" className="inline-flex items-center gap-2 text-base font-extrabold">
