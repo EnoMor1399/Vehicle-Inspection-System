@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { isPlatformControlPlaneRequest } from "../src/lib/platform-control-plane-request";
+import { isAuthorizedOperationPage } from "../src/lib/super-admin-operations-token";
 
 const read = (file: string) => readFileSync(file, "utf8");
 
@@ -34,7 +35,6 @@ test("platform auth uses the genuine actor and does not treat scope as a permiss
   assert.match(auth, /const user = await requireAuth\(\)/);
   assert.match(auth, /if \(user\.role !== "super_admin"\) redirect\("\/"\)/);
   assert.doesNotMatch(auth, /throw new Error\("Exit scoped company operations before platform administration"\)/);
-  const operations = read("src/lib/super-admin-operations-token.ts");
-  assert.match(operations, /"\/platform\/organizations"/);
-  assert.match(operations, /isAuthorizedOperationPage\(pathname\)/);
+  assert.equal(isAuthorizedOperationPage("/platform/organizations"), false);
+  assert.equal(isAuthorizedOperationPage("/organization/account"), true);
 });
