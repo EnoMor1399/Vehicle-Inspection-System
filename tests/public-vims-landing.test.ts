@@ -30,7 +30,7 @@ test("landing cards use active subscription plan limits, modules, cycle, currenc
   assert.match(view, /plan\.maxStations/);
   assert.match(view, /plan\.maxVehicles/);
   assert.match(view, /plan\.maxInspectionsPerMonth/);
-  assert.match(view, /plan\.modules\.map/);
+  assert.match(view, /plan\.modules\.includes/);
   assert.match(view, /plan\.trialDays/);
   assert.match(view, /Custom quote/);
   assert.doesNotMatch(view, /GH₵50|GH₵120|\$50\.00|\$120\.00/);
@@ -56,8 +56,38 @@ test("landing page is responsive and provides reachable public navigation, benef
     assert.match(landing, new RegExp(`id="${section}"`));
   }
   assert.match(landing, /aria-label="Mobile landing page"/);
-  assert.match(landing, /sm:px-7/);
+  assert.match(landing, /sm:px-10/);
   assert.match(landing, /lg:grid-cols-3/);
   assert.match(landing, /<details/);
   assert.match(landing, /Illustrative interface/);
+});
+
+test("landing follows the supplied pricing-first design and keeps billing quotes honest", () => {
+  const landing = read("src/components/marketing/VimsLandingPage.tsx");
+  assert.match(landing, /bg-\[#141414\]/);
+  assert.match(landing, /Pricing plans/);
+  assert.match(landing, /Annual pricing/);
+  assert.match(landing, /Monthly pricing/);
+  assert.match(landing, /aria-pressed=\{billingView === "annual"\}/);
+  assert.match(landing, /billingView === "monthly"/);
+  assert.match(landing, /comparison\.map/);
+  assert.match(landing, /Subscription feature comparison/);
+  assert.match(landing, /role="region"/);
+  assert.match(landing, /Organisation & security/);
+  assert.match(landing, /Priority support/);
+  assert.match(landing, /if \(plan\.billingCycle === period && value > 0/);
+  assert.match(landing, /Annual terms on request/);
+  assert.match(landing, /&billing=annual/);
+  assert.match(landing, /<FooterColumn/);
+});
+
+test("annual plan selection flows through the onboarding request without charging", () => {
+  const page = read("src/app/subscribe/page.tsx");
+  const form = read("src/app/subscribe/SubscribeForm.tsx");
+  const action = read("src/app/subscribe/actions.ts");
+  assert.match(page, /const annualQuote = params\.billing === "annual"/);
+  assert.match(page, /initialBillingMode=\{annualQuote \? "annual" : "monthly"\}/);
+  assert.match(form, /name="requestedBillingCycle"/);
+  assert.match(action, /Annual billing quote requested/);
+  assert.match(action, /createOnboardingRequest\(/);
 });
