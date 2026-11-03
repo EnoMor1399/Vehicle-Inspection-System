@@ -58,6 +58,15 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
   }
 
   const scopeCookie = jar.get("vims_superadmin_operations")?.value;
+  if (scopeCookie && !effective.support && effective.user.role === "super_admin") {
+    const { isPlatformControlPlaneRequest } = await import("@/lib/platform-control-plane-request");
+    const request = await headers();
+    if (isPlatformControlPlaneRequest(request.get("x-vims-request-path"), request.get("x-vims-request-method"))) {
+      // Platform actions use only the authenticated real Super Admin identity,
+      // not the signed operations tenant or a browser-selected organization.
+      return effective.user;
+    }
+  }
   if (scopeCookie) {
     const { operationalUserForRequest } = await import("@/lib/super-admin-operations");
     try {
@@ -79,12 +88,9 @@ export async function requireAuth(options: RequireAuthOptions = {}) {
 }
 
 export async function requirePlatformSuperAdmin() {
-  // The control plane must never borrow an operational tenant grant. Even a
-  // valid 15-minute organization capability cannot authorize platform-wide
-  // changes, regardless of which page a Server Action POST originated from.
-  if ((await cookies()).has("vims_superadmin_operations")) {
-    throw new Error("Exit scoped company operations before platform administration");
-  }
+  // requireAuth resolves the real Super Admin login for platform paths even
+  // if a separate organization operations cookie is still present.
+  // That cookie grants no additional platform authority.
   const user = await requireAuth();
   if (user.role !== "super_admin") redirect("/");
   return user;
