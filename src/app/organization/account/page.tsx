@@ -15,10 +15,19 @@ export const dynamic = "force-dynamic";
 
 export default async function OrganizationAccountPage() {
   const user = await requireOrganizationAccountManager();
+  return <OrganizationAccountContent organizationId={user.organizationId} />;
+}
+
+// Reused by the Super Admin platform view, which authenticates and authorizes
+// its explicit tenant ID before calling this renderer.
+export async function OrganizationAccountContent({ organizationId, platformAdmin = false }: {
+  organizationId: string;
+  platformAdmin?: boolean;
+}) {
   const [snapshot, invitations, capacity] = await Promise.all([
-    getOrganizationAccountSnapshot(user.organizationId),
-    listOrganizationInvitations(user.organizationId),
-    getOrganizationCapacitySnapshot(user.organizationId),
+    getOrganizationAccountSnapshot(organizationId),
+    listOrganizationInvitations(organizationId),
+    getOrganizationCapacitySnapshot(organizationId),
   ]);
   if (!snapshot.organization || !snapshot.subscription) {
     return <div className="p-8 text-sm text-red-700">Organization subscription data is unavailable.</div>;
@@ -30,8 +39,9 @@ export default async function OrganizationAccountPage() {
 
   return (
     <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 xl:p-10">
+      {platformAdmin && <Link href="/platform/organizations" className="mb-4 inline-flex text-sm font-semibold text-emerald-800">← Subscriber organizations</Link>}
       <PageHeader
-        eyebrow="Organization Account"
+        eyebrow={platformAdmin ? "Super Administrator · Organization Account" : "Organization Account"}
         title={organization.name}
         description="Manage company identity, subscription capacity and administrator invitations without overlapping Vehicle Inspection and Driver Training operational responsibilities."
       />
@@ -47,13 +57,13 @@ export default async function OrganizationAccountPage() {
         <Card className="p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-950">Organization profile & branding</h2>
           <p className="mt-1 mb-5 text-sm text-slate-500">These details identify your subscriber workspace and supply organization-specific branding.</p>
-          <OrganizationProfileForm organization={organization} />
+          <OrganizationProfileForm organization={organization} targetOrganizationId={platformAdmin ? organizationId : undefined} />
         </Card>
 
         <div className="space-y-6">
           <Card className="p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-slate-950">Subscription</h2>
-            <Link href="/organization/payments" className="mt-3 inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white">Pay subscription online</Link>
+            <Link href={platformAdmin ? `/platform/organizations/${organizationId}` : "/organization/payments"} className="mt-3 inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white">{platformAdmin ? "Manage subscription and payments" : "Pay subscription online"}</Link>
             <div className="mt-4 space-y-3 text-sm">
               <Row label="Status"><Badge tone={subscription.subscription.status === "active" || subscription.subscription.status === "trialing" ? "emerald" : "amber"}>{subscription.subscription.status}</Badge></Row>
               <Row label="Billing">{Number(subscription.subscription.amount) > 0 ? `${subscription.subscription.currency} ${Number(subscription.subscription.amount).toLocaleString()}` : "Custom agreement"}</Row>
@@ -88,7 +98,7 @@ export default async function OrganizationAccountPage() {
       <Card className="mt-6 p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-slate-950">Invite operational administrators</h2>
         <p className="mt-1 mb-5 text-sm text-slate-500">Invitations expire after seven days and respect the subscription user limit.</p>
-        <AdministratorInvitationForm trainingEnabled={trainingEnabled} />
+        <AdministratorInvitationForm trainingEnabled={trainingEnabled} targetOrganizationId={platformAdmin ? organizationId : undefined} />
 
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
