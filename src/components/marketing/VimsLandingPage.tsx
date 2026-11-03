@@ -1,424 +1,318 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight, BarChart3, Building2,
-  CalendarCheck2, Check, CheckCircle2, ChevronDown, ClipboardCheck,
-  FileCheck2, Fingerprint, Globe2, GraduationCap, Layers3, LockKeyhole,
-  MapPinned, Shield, ShieldCheck, Sparkles, Truck, Users,
-  Zap,
+  ArrowRight, BarChart3, Building2, Check, CheckCircle2, ChevronDown,
+  ClipboardCheck, FileCheck2, Fingerprint, GraduationCap, LockKeyhole,
+  MapPin, Minus, ShieldCheck, Truck, Users,
 } from "lucide-react";
 import type { subscriptionPlans } from "@/db/schema";
 
 type Plan = typeof subscriptionPlans.$inferSelect;
+type BillingView = "monthly" | "annual";
+type FeatureRow = { label: string; description?: string; value: (plan: Plan) => string | boolean };
+type FeatureGroup = { title: string; rows: FeatureRow[] };
 
-const benefits = [
-  {
-    icon: ClipboardCheck,
-    title: "Complete digital inspections",
-    copy: "Standardise vehicle assessments, record findings, capture evidence and guide inspectors through consistent checklists.",
-  },
-  {
-    icon: Truck,
-    title: "Fleet & transporter records",
-    copy: "Keep vehicles, transporters, inspection histories and compliance documents organised in one workspace.",
-  },
-  {
-    icon: FileCheck2,
-    title: "Certificates & verification",
-    copy: "Support inspection approvals, digital certificates and QR-based verification with traceable records.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Driver training & assessment",
-    copy: "Manage training and assessment workflows when the Driver Training module is included in your plan.",
-  },
-  {
-    icon: BarChart3,
-    title: "Reports that drive decisions",
-    copy: "Review inspection performance, defects and compliance trends with operational reports and analytics.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Secure organisation workspaces",
-    copy: "Separate company data with role-based permissions, audit trails and controlled workspace activation.",
-  },
-] as const;
-
-const moduleNames: Record<string, string> = {
-  vehicle_inspection: "Vehicle inspection operations",
+const modules: Record<string, string> = {
+  vehicle_inspection: "Vehicle inspections",
   driver_training: "Driver training & assessment",
   reports: "Reports & analytics",
   api: "API & integrations",
 };
 
-function readablePrice(plan: Plan): { value: string; period: string } {
-  const price = Number(plan.price);
-  if (!Number.isFinite(price) || price <= 0 || plan.billingCycle === "custom") {
-    return { value: "Custom quote", period: "Tailored to your organisation" };
+const comparison: FeatureGroup[] = [
+  {
+    title: "Inspection operations",
+    rows: [
+      { label: "Digital vehicle inspection", value: (plan) => plan.modules.includes("vehicle_inspection") },
+      { label: "Fleet and transporter records", value: (plan) => plan.modules.includes("vehicle_inspection") },
+      { label: "Inspection reports and certificates", value: (plan) => plan.modules.includes("vehicle_inspection") },
+      { label: "Users", description: "Maximum active user accounts", value: (plan) => plan.maxUsers.toLocaleString("en-GH") },
+      { label: "Stations", description: "Maximum inspection locations", value: (plan) => plan.maxStations.toLocaleString("en-GH") },
+      { label: "Registered vehicles", value: (plan) => plan.maxVehicles.toLocaleString("en-GH") },
+      { label: "Inspections per month", value: (plan) => plan.maxInspectionsPerMonth.toLocaleString("en-GH") },
+    ],
+  },
+  {
+    title: "Modules & reporting",
+    rows: [
+      { label: "Reports & analytics", value: (plan) => plan.modules.includes("reports") },
+      { label: "Driver training & assessment", value: (plan) => plan.modules.includes("driver_training") },
+      { label: "API & integrations", description: "Requires the API module in your plan", value: (plan) => plan.modules.includes("api") },
+    ],
+  },
+  {
+    title: "Organisation & security",
+    rows: [
+      { label: "Dedicated organisation workspace", value: () => true },
+      { label: "Role-based employee access", value: () => true },
+      { label: "Activity and audit history", value: () => true },
+      { label: "Organisation branding", value: (plan) => Boolean(plan.features?.custom_branding) },
+      { label: "Priority support", value: (plan) => Boolean(plan.features?.priority_support) },
+      { label: "Trial policy", value: (plan) => plan.trialDays > 0 ? plan.trialDays + " days" : "On request" },
+    ],
+  },
+];
+
+const benefits = [
+  { icon: ClipboardCheck, title: "Structured inspections", text: "Digital assessment workflows, traceable findings and approvals." },
+  { icon: Truck, title: "Connected fleet records", text: "Vehicles, transporters, compliance history and certificates in one place." },
+  { icon: BarChart3, title: "Operational visibility", text: "Actionable reporting for inspection and fleet management teams." },
+  { icon: LockKeyhole, title: "Protected company data", text: "Role-aware access and separate organisation workspaces." },
+];
+
+const faq = [
+  { q: "Can we add staff to our organisation?", a: "Yes. Organisation administrators can create employee accounts inside their own organisation, within the subscribed user capacity." },
+  { q: "Is driver training included with every package?", a: "No. Included modules differ by package. Consult the comparison table to confirm whether Driver Training & Assessment is included." },
+  { q: "Can we request annual billing?", a: "Yes. Select Annual pricing to request a quote. The current catalogue may not publish an annual rate, so the final price must be confirmed during review." },
+  { q: "Will our data be separate from other subscribers?", a: "Each company is assigned its own organisation-scoped workspace. Activation requires administrative approval and tenant-isolation verification." },
+];
+
+function priceFor(plan: Plan, period: BillingView) {
+  const value = Number(plan.price);
+  if (plan.billingCycle === period && value > 0 && Number.isFinite(value)) {
+    const amount = new Intl.NumberFormat("en-GH", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(value);
+    return { amount: plan.currency === "GHS" ? "GH₵" + amount : plan.currency + " " + amount, frequency: period === "annual" ? "per year" : "per month" };
   }
-  const symbol = plan.currency === "GHS" ? "GH₵" : `${plan.currency} `;
-  const value = new Intl.NumberFormat("en-GH", { maximumFractionDigits: 2, minimumFractionDigits: price % 1 ? 2 : 0 }).format(price);
-  return {
-    value: `${symbol}${value}`,
-    period: plan.billingCycle === "annual" ? "/ year" : "/ month",
-  };
+  return { amount: "Custom quote", frequency: period === "annual" ? "Annual terms on request" : "Pricing on request" };
 }
 
-function planHighlights(plan: Plan) {
-  const values = [
-    ...plan.modules.map((code) => moduleNames[code] || code.replaceAll("_", " ")),
-  ];
+function benefitsFor(plan: Plan) {
+  const values = plan.modules.map((name) => modules[name] ?? name.replaceAll("_", " "));
   if (plan.features?.custom_branding) values.push("Organisation branding");
   if (plan.features?.priority_support) values.push("Priority support");
   return [...new Set(values)];
 }
 
-const faq = [
-  {
-    question: "Can I inspect vehicles from multiple stations?",
-    answer: "Yes. Every package has its own station and vehicle capacity. Select the package that fits the scale of your inspection operations.",
-  },
-  {
-    question: "Can I add employees and control their permissions?",
-    answer: "Organisation administrators can provision employees within their organisation, subject to the plan's user limit. Role-based permissions and audit controls help safeguard your records.",
-  },
-  {
-    question: "Is Driver Training included in every plan?",
-    answer: "No. Each card shows the modules included in that package. Driver Training & Assessment is available only on plans that list that module.",
-  },
-  {
-    question: "Will my organisation's data be isolated?",
-    answer: "Each subscriber has an organisation-scoped workspace. Operational access is enabled only after platform approval and tenant-isolation verification.",
-  },
-  {
-    question: "Can I pay immediately after choosing a package?",
-    answer: "A subscription request is first reviewed by a platform administrator. Any subsequent payment or checkout requires the applicable subscription approval and payment configuration. Submitting the form is not a payment.",
-  },
-] as const;
+function ValueCell({ value }: { value: string | boolean }) {
+  if (typeof value === "boolean") {
+    return value
+      ? <span className="inline-flex items-center gap-1 text-emerald-700" aria-label="Included"><CheckCircle2 size={17} aria-hidden="true" /><span className="sr-only">Included</span></span>
+      : <span className="inline-flex items-center gap-1 text-slate-400" aria-label="Not included"><Minus size={16} aria-hidden="true" /><span className="sr-only">Not included</span></span>;
+  }
+  return <span className="font-medium text-zinc-700">{value}</span>;
+}
+
+function PlanAction({ plan, view, wide = false }: { plan: Plan; view: BillingView; wide?: boolean }) {
+  const href = "/subscribe?plan=" + encodeURIComponent(plan.code) + (view === "annual" ? "&billing=annual" : "");
+  return (
+    <Link href={href} className={"inline-flex items-center justify-center rounded-lg bg-[#141414] px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 " + (wide ? "w-full" : "")}>
+      {view === "annual" ? "Request annual quote" : "Get started"}
+    </Link>
+  );
+}
 
 export function VimsLandingPage({ plans }: { plans: Plan[] }) {
-  const featuredCode = plans.some((plan) => plan.code === "professional") ? "professional" : plans[0]?.code;
+  const [billingView, setBillingView] = useState<BillingView>("monthly");
+  const highlighted = plans.some((plan) => plan.code === "professional") ? "professional" : plans[1]?.code;
+
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f6f8fb] text-[#0b1b30]">
-      <header className="relative z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4 sm:px-7 lg:px-10">
-          <Link href="/welcome" className="flex min-w-0 items-center gap-3" aria-label="VIMS home">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-[#0c2434] text-emerald-300 shadow-sm">
-              <ShieldCheck aria-hidden="true" className="h-6 w-6" />
-            </span>
-            <span className="flex flex-col">
-              <span className="text-[20px] font-black leading-tight tracking-[-0.04em] text-[#09233a]">VIMS<span className="text-emerald-600">.</span></span>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Inspection Management</span>
-            </span>
-          </Link>
-          <nav aria-label="Landing page" className="hidden items-center gap-7 text-sm font-semibold text-slate-600 lg:flex">
-            <a href="#benefits" className="hover:text-emerald-700">Benefits</a>
-            <a href="#workflow" className="hover:text-emerald-700">How it works</a>
-            <a href="#pricing" className="hover:text-emerald-700">Packages</a>
-            <a href="#faq" className="hover:text-emerald-700">FAQs</a>
-          </nav>
-          <div className="hidden items-center gap-3 sm:flex">
-            <Link href="/login" className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[#17384e] hover:bg-slate-100">
-              Sign in
+    <div className="min-h-screen bg-[#efefef] px-0 py-0 text-[#171717] sm:px-5 sm:py-9 lg:py-14">
+      <div className="mx-auto min-h-screen max-w-[1270px] bg-white shadow-[0_12px_70px_rgba(0,0,0,.045)] sm:min-h-[95vh]">
+        <div className="px-4 pt-4 sm:px-7 sm:pt-5">
+          <header className="relative z-20 flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-[#141414] px-4 text-white shadow-[0_12px_25px_rgba(0,0,0,.15)] sm:rounded-full sm:px-5">
+            <Link href="/welcome" className="inline-flex shrink-0 items-center gap-2 text-[14px] font-extrabold tracking-[-.03em]" aria-label="VIMS home">
+              <span className="grid h-7 w-7 place-items-center rounded-full border border-white/60"><ShieldCheck size={15} /></span>
+              VIMS
             </Link>
-            <Link href="/subscribe" className="inline-flex items-center gap-2 rounded-xl bg-[#087f5b] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(5,150,105,.14)] transition hover:bg-[#086948]">
-              Request access <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-          <details className="group relative sm:hidden">
-            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              Menu <ChevronDown aria-hidden="true" className="h-4 w-4 transition group-open:rotate-180" />
-            </summary>
-            <nav aria-label="Mobile landing page" className="absolute right-0 top-12 z-30 flex w-52 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
-              <a className="rounded-lg px-3 py-2 hover:bg-slate-50" href="#benefits">Benefits</a>
-              <a className="rounded-lg px-3 py-2 hover:bg-slate-50" href="#workflow">How it works</a>
-              <a className="rounded-lg px-3 py-2 hover:bg-slate-50" href="#pricing">Packages</a>
-              <a className="rounded-lg px-3 py-2 hover:bg-slate-50" href="#faq">FAQs</a>
-              <Link className="rounded-lg px-3 py-2 hover:bg-slate-50" href="/login">Sign in</Link>
-              <Link className="rounded-lg bg-emerald-700 px-3 py-2 font-semibold text-white" href="/subscribe">Request subscription</Link>
+            <nav aria-label="Landing page" className="hidden flex-1 items-center gap-6 pl-5 text-[12px] font-semibold text-white/85 md:flex">
+              <Link href="/welcome" className="hover:text-white">Home</Link>
+              <a href="#benefits" className="hover:text-white">Features</a>
+              <a href="#pricing" className="hover:text-white">Pricing</a>
+              <a href="#workflow" className="hover:text-white">How it works</a>
+              <a href="#faq" className="hover:text-white">FAQs</a>
             </nav>
-          </details>
+            <div className="hidden items-center gap-4 sm:flex">
+              <Link href="/login" className="text-xs font-semibold text-white/90 hover:text-white">Log in</Link>
+              <Link href="/subscribe" className="rounded-full border border-white/20 bg-[#303030] px-5 py-2.5 text-xs font-bold transition hover:bg-[#464646]">Create account</Link>
+            </div>
+            <details className="group relative sm:hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">
+                Menu <ChevronDown size={15} className="transition group-open:rotate-180" />
+              </summary>
+              <nav aria-label="Mobile landing page" className="absolute right-0 top-11 z-30 flex w-52 flex-col rounded-xl border border-zinc-700 bg-[#181818] p-2 shadow-xl">
+                <a href="#pricing" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">Pricing</a>
+                <a href="#benefits" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">Features</a>
+                <a href="#faq" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">FAQs</a>
+                <Link href="/login" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">Log in</Link>
+                <Link href="/subscribe" className="rounded-lg bg-zinc-700 px-3 py-2 text-xs">Create account</Link>
+              </nav>
+            </details>
+          </header>
         </div>
-      </header>
 
-      <main>
-        <section className="relative isolate overflow-hidden bg-[#092131] text-white">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_80%_20%,rgba(16,185,129,.16),transparent_45%),linear-gradient(135deg,#0b2637_2%,#081b2d_55%,#092538_100%)]" />
-          <div aria-hidden="true" className="pointer-events-none absolute -right-20 top-10 -z-10 h-96 w-96 rounded-full border border-white/10" />
-          <div aria-hidden="true" className="pointer-events-none absolute right-10 top-32 -z-10 h-64 w-64 rounded-full border border-white/10" />
-          <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-20 pt-16 sm:px-7 sm:pt-20 lg:grid-cols-[1.02fr_.98fr] lg:gap-12 lg:px-10 lg:pb-24 lg:pt-24">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-xs font-bold tracking-wide text-emerald-200">
-                <Sparkles aria-hidden="true" className="h-4 w-4" />
-                An enterprise platform for safer fleets
-              </span>
-              <h1 className="mt-7 max-w-2xl text-[clamp(2.8rem,5vw,4.65rem)] font-extrabold leading-[1.07] tracking-[-0.055em]">
-                Safer vehicles.<br />
-                <span className="text-emerald-300">Smarter inspections.</span><br />
-                Better decisions.
-              </h1>
-              <p className="mt-7 max-w-xl text-base leading-8 text-slate-300 sm:text-lg">
-                Bring vehicle inspection, compliance, fleet records, digital certification and performance reporting together in one secure, organisation-ready workspace.
-              </p>
-              <div className="mt-9 flex flex-wrap items-center gap-3">
-                <a href="#pricing" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-sm font-extrabold text-[#063f35] transition hover:bg-emerald-300">
-                  Explore subscription packages <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                </a>
-                <Link href="/subscribe" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/25 px-6 py-3 text-sm font-semibold text-white hover:border-white/60 hover:bg-white/5">
-                  Request a workspace
-                </Link>
+        <main>
+          <section id="pricing" className="relative scroll-mt-4 overflow-hidden px-5 pb-4 pt-16 sm:px-10 lg:px-[7%] lg:pt-20">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-36 h-[410px] w-[410px] rounded-full border border-zinc-100">
+              <div className="absolute inset-9 rounded-full border border-zinc-100" />
+              <div className="absolute inset-[75px] rounded-full border border-zinc-100" />
+              <div className="absolute inset-[119px] rounded-full border border-zinc-100" />
+            </div>
+            <div className="relative">
+              <span className="text-[11px] font-bold uppercase tracking-[.17em] text-emerald-700">Vehicle Inspection Management System</span>
+              <h1 className="mt-3 text-[clamp(2.35rem,5vw,4.05rem)] font-extrabold leading-tight tracking-[-.06em] text-[#161616]">Pricing plans</h1>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-[#747474] sm:text-base">A plan for every inspection operation. Compare real VIMS limits and benefits before you request your company workspace.</p>
+
+              <div className="mt-10 inline-flex gap-1 rounded-xl border border-zinc-200 bg-[#f5f5f5] p-1" role="group" aria-label="Billing period">
+                <button type="button" aria-pressed={billingView === "annual"} onClick={() => setBillingView("annual")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "annual" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Annual pricing</button>
+                <button type="button" aria-pressed={billingView === "monthly"} onClick={() => setBillingView("monthly")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "monthly" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Monthly pricing</button>
               </div>
-              <div className="mt-11 flex flex-wrap gap-x-6 gap-y-3 text-xs font-medium text-slate-300">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-300" /> Organisation data isolation</span>
-                <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-300" /> Audit-ready operations</span>
-                <span className="inline-flex items-center gap-2"><Globe2 className="h-4 w-4 text-emerald-300" /> Web-based access</span>
+              {billingView === "annual" && <p className="mt-2 text-xs text-zinc-500">Annual prices are shown only when published for the plan. Other annual terms require a quote.</p>}
+            </div>
+            {plans.length === 0 ? (
+              <div className="mt-7 rounded-2xl border border-zinc-200 bg-zinc-50 p-8 text-center">
+                <h2 className="text-xl font-bold">Subscription packages are being updated</h2>
+                <p className="mt-2 text-sm text-zinc-500">Request a tailored VIMS proposal while the catalogue is updated.</p>
+                <Link href="/subscribe" className="mt-5 inline-flex rounded-lg bg-zinc-900 px-5 py-3 text-sm font-semibold text-white">Request proposal</Link>
               </div>
-            </div>
-
-            <div className="relative mx-auto w-full max-w-[570px]">
-              <div className="absolute -left-5 bottom-12 h-32 w-32 rounded-full bg-emerald-400/15 blur-3xl" aria-hidden="true" />
-              <div className="relative overflow-hidden rounded-[27px] border border-white/15 bg-white/95 p-3 text-[#12263a] shadow-[0_30px_75px_rgba(0,0,0,.25)] sm:p-4">
-                <div className="flex items-center justify-between gap-3 rounded-[18px] bg-[#10293b] px-4 py-4 text-white">
-                  <span className="inline-flex items-center gap-2 text-sm font-extrabold"><span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-400/15"><Layers3 className="h-4 w-4 text-emerald-300" /></span> VIMS Workspace</span>
-                  <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">Workflow preview</span>
-                </div>
-                <div className="p-2 sm:p-3">
-                  <div className="flex items-center justify-between gap-3 py-3">
-                    <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations overview</p><p className="mt-1 text-lg font-extrabold tracking-tight">Built for real inspections</p></div>
-                    <span className="rounded-lg bg-emerald-50 p-2.5 text-emerald-700"><ActivityIcon /></span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <PreviewTile icon={Truck} title="Fleet records" detail="Organised & searchable" />
-                    <PreviewTile icon={CalendarCheck2} title="Appointments" detail="Inspection scheduling" />
-                    <PreviewTile icon={FileCheck2} title="Certificates" detail="Digital verification" />
-                    <PreviewTile icon={BarChart3} title="Analytics" detail="Reports & insights" />
-                  </div>
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-extrabold text-slate-800">Inspection workflow</span>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-500">Illustrative preview</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {["Register", "Inspect", "Approve", "Certify"].map((step, index) => (
-                        <div key={step} className="text-center">
-                          <span className={`mx-auto grid h-9 w-9 place-items-center rounded-full text-xs font-extrabold ${index < 3 ? "bg-emerald-100 text-emerald-700" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>
-                            {index < 3 ? <Check aria-hidden="true" className="h-4 w-4" /> : "4"}
-                          </span>
-                          <span className="mt-2 block text-[10px] font-semibold text-slate-600">{step}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className="mt-3 text-center text-xs text-slate-400">Illustrative interface — not live inspection or customer data</p>
-            </div>
-          </div>
-        </section>
-
-        <section aria-label="VIMS capabilities" className="border-b border-slate-200 bg-white">
-          <div className="mx-auto grid max-w-7xl gap-5 px-5 py-7 sm:grid-cols-2 sm:px-7 lg:grid-cols-4 lg:px-10">
-            {[
-              { icon: ClipboardCheck, label: "Vehicle inspections" },
-              { icon: Shield, label: "Roadworthiness & compliance" },
-              { icon: FileCheck2, label: "Digital certificates" },
-              { icon: BarChart3, label: "Operational intelligence" },
-            ].map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-3 text-sm font-bold text-slate-600"><Icon aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700" />{label}</div>
-            ))}
-          </div>
-        </section>
-
-        <section id="benefits" className="scroll-mt-20 px-5 py-20 sm:px-7 lg:px-10 lg:py-24">
-          <div className="mx-auto max-w-7xl">
-            <SectionIntro eyebrow="Why organisations choose VIMS" title="One connected platform. Clearer control at every step."
-              body="Replace fragmented records and manual follow-ups with a structured digital system built for inspection centres, fleet operators, transport businesses and training providers." />
-            <div className="mt-11 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {benefits.map(({ icon: Icon, title, copy }) => (
-                <article key={title} className="group rounded-[22px] border border-slate-200 bg-white p-7 shadow-[0_10px_30px_rgba(20,35,55,.035)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_42px_rgba(20,35,55,.08)]">
-                  <div className="grid h-13 w-13 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><Icon aria-hidden="true" className="h-6 w-6" /></div>
-                  <h3 className="mt-6 text-lg font-extrabold tracking-tight text-slate-900">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{copy}</p>
-                </article>
-              ))}
-            </div>
-            <p className="mt-6 text-xs text-slate-500">Available modules and capacity depend on your selected subscription.</p>
-          </div>
-        </section>
-
-        <section id="workflow" className="scroll-mt-20 bg-white px-5 py-20 sm:px-7 lg:px-10 lg:py-24">
-          <div className="mx-auto max-w-7xl">
-            <SectionIntro eyebrow="Simple, controlled onboarding" title="From enquiry to inspection-ready."
-              body="Choose the level that matches your operations and request a dedicated company workspace. Activation follows a deliberate review and security process." />
-            <div className="mt-12 grid gap-5 lg:grid-cols-3">
-              {[
-                { number: "01", icon: Layers3, title: "Explore your package", body: "Compare users, stations, vehicles, inspection limits and included modules across the active packages." },
-                { number: "02", icon: Building2, title: "Request a subscription", body: "Send your organisation details and preferred plan through the secure request form." },
-                { number: "03", icon: LockKeyhole, title: "Approve & activate", body: "A platform administrator reviews provisioning, invitations and tenant isolation before enabling operations." },
-              ].map(({ number, icon: Icon, title, body }) => (
-                <article key={number} className="relative rounded-2xl border border-slate-200 bg-[#f8fafc] p-7">
-                  <div className="flex items-center justify-between">
-                    <span className="text-4xl font-extrabold tracking-[-0.07em] text-emerald-200">{number}</span>
-                    <Icon aria-hidden="true" className="h-7 w-7 text-emerald-700" />
-                  </div>
-                  <h3 className="mt-7 text-lg font-extrabold text-slate-900">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{body}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="pricing" className="scroll-mt-20 px-5 py-20 sm:px-7 lg:px-10 lg:py-24">
-          <div className="mx-auto max-w-7xl">
-            <SectionIntro eyebrow="Flexible subscriptions" title="A package for every stage of growth."
-              body="Transparent plan details from the current VIMS subscription catalogue. Compare actual limits and module access before sending your request." />
-            {plans.length > 0 ? (
-              <div className="mt-12 grid items-stretch gap-6 lg:grid-cols-3">
+            ) : (
+              <div className="mt-8 grid gap-5 lg:grid-cols-3">
                 {plans.map((plan) => {
-                  const featured = plan.code === featuredCode;
-                  const price = readablePrice(plan);
+                  const price = priceFor(plan, billingView);
+                  const isPopular = plan.code === highlighted;
                   return (
-                    <article key={plan.id} className={`relative flex flex-col overflow-hidden rounded-[26px] border bg-white shadow-[0_14px_40px_rgba(20,35,55,.055)] ${featured ? "border-emerald-500 ring-1 ring-emerald-500 shadow-[0_18px_44px_rgba(5,150,105,.12)]" : "border-slate-200"}`}>
-                      {featured && <div className="bg-emerald-700 px-4 py-2 text-center text-xs font-extrabold uppercase tracking-[.1em] text-white">Popular for growing teams</div>}
-                      <div className="flex flex-1 flex-col p-7 sm:p-8">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="grid h-11 w-11 place-items-center rounded-[15px] bg-emerald-50 text-emerald-700"><Layers3 aria-hidden="true" className="h-5 w-5" /></span>
-                          {plan.trialDays > 0 && <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">{plan.trialDays}-day trial policy</span>}
+                    <article key={plan.id} className="relative flex min-h-[265px] flex-col rounded-[20px] border border-[#ededed] bg-[#f3f3f3] px-5 pb-5 pt-6 sm:px-6">
+                      {isPopular && <span className="absolute -top-3 left-3 rounded-full bg-[#171717] px-3 py-1 text-[10px] font-bold text-white">Most popular</span>}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h2 className="text-lg font-extrabold tracking-tight">{plan.name} plan</h2>
+                          <p className="mt-1 min-h-11 text-xs leading-5 text-zinc-500">{plan.description || "Flexible inspection operations for your organisation."}</p>
                         </div>
-                        <h3 className="mt-6 text-2xl font-extrabold tracking-tight text-slate-900">{plan.name}</h3>
-                        <p className="mt-3 min-h-14 text-sm leading-7 text-slate-600">{plan.description || "A flexible VIMS package for your operations."}</p>
-                        <div className="mt-7 flex min-h-17 flex-col justify-center border-b border-slate-200 pb-7">
-                          <p className="text-[32px] font-black leading-tight tracking-[-0.045em] text-[#102b3d]">{price.value}</p>
-                          <p className="mt-1 text-xs font-semibold text-slate-500">{price.period}</p>
-                        </div>
-                        <p className="mt-6 text-xs font-bold uppercase tracking-wider text-slate-500">Package capacity</p>
-                        <dl className="mt-4 grid grid-cols-2 gap-4 rounded-2xl bg-slate-50 p-4">
-                          <CapacityItem label="Users" value={plan.maxUsers} icon={Users} />
-                          <CapacityItem label="Stations" value={plan.maxStations} icon={MapPinned} />
-                          <CapacityItem label="Vehicles" value={plan.maxVehicles} icon={Truck} />
-                          <CapacityItem label="Inspections / mo." value={plan.maxInspectionsPerMonth} icon={ClipboardCheck} />
-                        </dl>
-                        <p className="mt-7 text-xs font-bold uppercase tracking-wider text-slate-500">Included with this plan</p>
-                        <ul className="mt-4 flex-1 space-y-3">
-                          {planHighlights(plan).map((item) => (
-                            <li key={item} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
-                              <span className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Check aria-hidden="true" className="h-3.5 w-3.5" /></span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                        <Link href={`/subscribe?plan=${encodeURIComponent(plan.code)}`}
-                          className={`mt-9 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold transition ${featured ? "bg-[#087f5b] text-white hover:bg-[#086747]" : "border border-slate-300 bg-[#0d2436] text-white hover:bg-[#18384e]"}`}>
-                          Request {plan.name} <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                        </Link>
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-zinc-400 text-zinc-800"><CheckCircle2 size={18} aria-hidden="true" /></span>
                       </div>
+                      <div className="mt-auto flex min-h-[91px] items-center gap-2 pt-4">
+                        <span className="text-[clamp(1.75rem,2.6vw,2.55rem)] font-extrabold tracking-[-.055em]">{price.amount}</span>
+                        {price.amount !== "Custom quote" && <span className="max-w-[64px] text-[11px] leading-4 text-zinc-500">{price.frequency}</span>}
+                      </div>
+                      {price.amount === "Custom quote" && <p className="-mt-1 mb-3 text-[11px] text-zinc-500">{price.frequency}</p>}
+                      <div className="mt-2"><PlanAction plan={plan} view={billingView} wide /></div>
                     </article>
                   );
                 })}
               </div>
-            ) : (
-              <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-8 text-center">
-                <h3 className="text-xl font-extrabold">Subscription packages are being updated</h3>
-                <p className="mt-2 text-sm text-slate-600">You can still request a tailored VIMS proposal for your organisation.</p>
-                <Link href="/subscribe" className="mt-6 inline-flex rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white">Request a proposal</Link>
-              </div>
             )}
-            <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-6 text-slate-500">
-              Prices, modules and limits are sourced from the active VIMS plan catalogue and may change. A request is subject to administrative approval; no payment is collected on this page. Trial duration indicates plan policy, not immediate activation.
-            </p>
-          </div>
-        </section>
 
-        <section className="bg-[#0d2736] px-5 py-16 text-white sm:px-7 lg:px-10">
-          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 lg:flex-row lg:items-center">
-            <div>
-              <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-300"><Fingerprint className="h-4 w-4" aria-hidden="true" /> Security by design</span>
-              <h2 className="mt-3 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl">Your operations. Your people. Your organisation’s data.</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">Role-aware accounts, audit history and controlled organisation activation help protect critical inspection workflows.</p>
+            <p className="mt-5 text-xs leading-5 text-zinc-500">Prices and plan capacities are taken from the active VIMS catalogue. A request is subject to administrative approval; no payment is collected on this page.</p>
+          </section>
+
+          {plans.length > 0 && (
+            <section aria-labelledby="compare-title" className="px-5 pb-12 pt-7 sm:px-10 lg:px-[7%]">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 id="compare-title" className="text-xl font-extrabold tracking-tight sm:text-2xl">Compare what’s included</h2>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">Plan entitlements, operational capacities and security benefits.</p>
+                </div>
+                <span className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-medium text-zinc-600"><ShieldCheck size={13} className="mr-1 inline text-emerald-700" /> Separate company workspaces</span>
+              </div>
+              <div className="overflow-x-auto" role="region" aria-label="Subscription feature comparison" tabIndex={0}>
+                <table className="w-full min-w-[690px] table-fixed border-separate border-spacing-0 text-left">
+                  <caption className="sr-only">VIMS subscription packages and included benefits</caption>
+                  <thead>
+                    <tr className="text-xs text-zinc-900">
+                      <th scope="col" className="w-[29%] border-b border-zinc-200 py-4 pr-3 font-bold">Features</th>
+                      {plans.map((plan) => <th scope="col" key={plan.id} className="border-b border-zinc-200 px-3 py-4 text-center font-bold">{plan.name} plan</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison.map((group) => (
+                      <FragmentGroup key={group.title} group={group} plans={plans} />
+                    ))}
+                    <tr>
+                      <th scope="row" className="py-6 pr-3 text-xs font-semibold">Ready to get started?</th>
+                      {plans.map((plan) => (
+                        <td key={plan.id} className="px-2 py-6 text-center"><PlanAction plan={plan} view={billingView} wide /></td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-zinc-500">Features can require administrative setup and assigned roles. API access requires the API module to be included in the plan.</p>
+            </section>
+          )}
+
+          <section id="benefits" className="scroll-mt-6 border-t border-zinc-100 px-5 py-14 sm:px-10 lg:px-[7%]">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">Why VIMS</span>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight">All the essentials. One smarter workspace.</h2>
+              <p className="mt-3 text-sm leading-6 text-zinc-500">Designed for vehicle inspection centres, fleet teams and transport organisations. Module availability depends on your plan.</p>
             </div>
-            <Link href="/subscribe" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-extrabold text-[#0b2834] hover:bg-emerald-50">
-              Get your workspace <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </Link>
-          </div>
-        </section>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {benefits.map(({ icon: Icon, title, text }) => (
+                <article key={title} className="rounded-2xl border border-zinc-200 bg-[#f8f8f8] p-5">
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-white text-emerald-700"><Icon size={20} aria-hidden="true" /></div>
+                  <h3 className="mt-4 text-sm font-bold">{title}</h3>
+                  <p className="mt-2 text-xs leading-6 text-zinc-500">{text}</p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-5 text-[11px] text-zinc-500">Illustrative interface features; availability and user permissions depend on your subscription and account role.</p>
+          </section>
 
-        <section id="faq" className="scroll-mt-20 bg-white px-5 py-20 sm:px-7 lg:px-10 lg:py-24">
-          <div className="mx-auto max-w-4xl">
-            <SectionIntro eyebrow="Frequently asked questions" title="Everything you need before getting started."
-              body="Clear answers on package access, team management, subscription requests and organisation security." centered />
-            <div className="mt-10 space-y-3">
-              {faq.map(({ question, answer }) => (
-                <details key={question} className="group rounded-2xl border border-slate-200 bg-white px-5 py-5 open:border-emerald-200 open:bg-emerald-50/20 sm:px-6">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-extrabold text-slate-900 [&::-webkit-details-marker]:hidden sm:text-base">
-                    {question} <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700 transition-transform group-open:rotate-180" />
-                  </summary>
-                  <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">{answer}</p>
+          <section id="workflow" className="scroll-mt-6 border-y border-zinc-100 bg-[#fafafa] px-5 py-12 sm:px-10 lg:px-[7%]">
+            <div className="grid gap-5 md:grid-cols-[1fr_1.5fr] md:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Getting started</p>
+                <h2 className="mt-2 text-2xl font-extrabold tracking-tight">From plan to workspace</h2>
+              </div>
+              <ol className="grid gap-4 sm:grid-cols-3">
+                {[
+                  { step: "01", label: "Choose your plan" },
+                  { step: "02", label: "Submit your request" },
+                  { step: "03", label: "Approve & activate" },
+                ].map((item) => <li key={item.step} className="flex items-center gap-3 text-xs font-semibold text-zinc-700"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white font-bold text-emerald-700">{item.step}</span>{item.label}</li>)}
+              </ol>
+            </div>
+          </section>
+
+          <section id="faq" className="scroll-mt-6 px-5 py-14 sm:px-10 lg:px-[7%]">
+            <h2 className="text-2xl font-extrabold tracking-tight">Frequently asked questions</h2>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {faq.map(({ q, a }) => (
+                <details key={q} className="group rounded-xl border border-zinc-200 p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">{q}<ChevronDown size={17} className="shrink-0 transition group-open:rotate-180" /></summary>
+                  <p className="mt-3 text-xs leading-6 text-zinc-600">{a}</p>
                 </details>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
+        </main>
 
-        <section className="px-5 py-16 sm:px-7 lg:px-10">
-          <div className="mx-auto max-w-7xl rounded-[28px] bg-[linear-gradient(125deg,#0c3140,#116a59)] px-7 py-12 text-white sm:px-12 lg:flex lg:items-center lg:justify-between lg:gap-12">
+        <footer className="border-t border-zinc-100 px-5 pb-12 pt-14 sm:px-10 lg:px-[7%]">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.8fr_repeat(4,minmax(0,1fr))]">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-200">Ready to modernise?</p>
-              <h2 className="mt-3 max-w-2xl text-3xl font-extrabold tracking-tight sm:text-4xl">Give your inspection team a better way to work.</h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-emerald-50/85">Tell us what your organisation needs. We’ll help you select the appropriate VIMS subscription.</p>
+              <Link href="/welcome" className="inline-flex items-center gap-2 text-base font-extrabold">
+                <span className="grid h-8 w-8 place-items-center rounded-full border border-zinc-800"><ShieldCheck size={17} /></span> VIMS
+              </Link>
+              <p className="mt-4 max-w-[245px] text-xs leading-6 text-zinc-500">The enterprise platform for digital vehicle inspection, safer fleet operations and accountable compliance.</p>
             </div>
-            <Link href="/subscribe" className="mt-7 inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-extrabold text-[#0b403e] hover:bg-emerald-50 lg:mt-0">
-              Request subscription <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </Link>
+            <FooterColumn title="Platform" items={[{ label: "Overview", href: "/welcome" }, { label: "Features", href: "#benefits" }, { label: "Pricing", href: "#pricing" }]} />
+            <FooterColumn title="Organisation" items={[{ label: "Get started", href: "/subscribe" }, { label: "How it works", href: "#workflow" }, { label: "Login", href: "/login" }]} />
+            <FooterColumn title="Resources" items={[{ label: "FAQs", href: "#faq" }, { label: "Plan comparison", href: "#compare-title" }, { label: "Subscriptions", href: "/subscribe" }]} />
+            <FooterColumn title="Security" items={[{ label: "Tenant isolation", href: "#benefits" }, { label: "Plan access", href: "#compare-title" }, { label: "Secure sign in", href: "/login" }]} />
           </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-slate-200 bg-white px-5 py-9 sm:px-7 lg:px-10">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#09283a] text-emerald-300"><ShieldCheck className="h-5 w-5" /></span><span><span className="block text-sm font-extrabold text-slate-900">VIMS Enterprise</span><span className="block text-xs text-slate-500">Vehicle Inspection Management System</span></span></div>
-          <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs font-semibold text-slate-600">
-            <a href="#benefits" className="hover:text-emerald-700">Benefits</a>
-            <a href="#pricing" className="hover:text-emerald-700">Packages</a>
-            <Link href="/subscribe" className="hover:text-emerald-700">Request access</Link>
-            <Link href="/login" className="hover:text-emerald-700">Sign in</Link>
-          </nav>
-          <p className="text-xs text-slate-500">© {new Date().getFullYear()} VIMS</p>
-        </div>
-      </footer>
+          <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-6 text-[11px] text-zinc-500"><span>© {new Date().getFullYear()} VIMS. Vehicle Inspection Management System.</span><span>Secure inspection operations for modern organisations.</span></div>
+        </footer>
+      </div>
     </div>
   );
 }
 
-function ActivityIcon() {
-  return <Zap aria-hidden="true" className="h-5 w-5" />;
+function FragmentGroup({ group, plans }: { group: FeatureGroup; plans: Plan[] }) {
+  return <>
+    <tr><th scope="colgroup" colSpan={plans.length + 1} className="pt-8 pb-3 text-xs font-extrabold text-[#1a1a1a]">{group.title}</th></tr>
+    {group.rows.map((row) => (
+      <tr key={row.label}>
+        <th scope="row" className="border-t border-zinc-100 py-4 pr-3 align-middle text-xs font-semibold text-zinc-700">
+          <span>{row.label}</span>
+          {row.description && <span className="ml-1 cursor-help text-zinc-400" title={row.description} aria-label={row.description}>ⓘ</span>}
+        </th>
+        {plans.map((plan) => <td key={plan.id} className="border-t border-zinc-100 px-3 py-4 text-center text-xs"><ValueCell value={row.value(plan)} /></td>)}
+      </tr>
+    ))}
+  </>;
 }
 
-function PreviewTile({ icon: Icon, title, detail }: { icon: typeof Truck; title: string; detail: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <div className="flex items-center gap-2 text-emerald-700"><Icon aria-hidden="true" className="h-4 w-4" /><span className="text-[11px] font-extrabold text-slate-800">{title}</span></div>
-      <p className="mt-2 text-[10px] leading-4 text-slate-500">{detail}</p>
-    </div>
-  );
-}
-
-function CapacityItem({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Users }) {
-  return (
-    <div>
-      <dt className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"><Icon aria-hidden="true" className="h-3.5 w-3.5 text-emerald-700" />{label}</dt>
-      <dd className="mt-1 text-lg font-extrabold text-slate-900">{value.toLocaleString("en-GH")}</dd>
-    </div>
-  );
-}
-
-function SectionIntro({ eyebrow, title, body, centered = false }: {
-  eyebrow: string; title: string; body: string; centered?: boolean;
-}) {
-  return (
-    <div className={centered ? "text-center" : ""}>
-      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">{eyebrow}</p>
-      <h2 className={`mt-4 max-w-3xl text-3xl font-extrabold leading-tight tracking-[-0.045em] text-[#0d2738] sm:text-4xl ${centered ? "mx-auto" : ""}`}>{title}</h2>
-      <p className={`mt-5 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base ${centered ? "mx-auto" : ""}`}>{body}</p>
-    </div>
-  );
+function FooterColumn({ title, items }: { title: string; items: { label: string; href: string }[] }) {
+  return <div><h3 className="text-xs font-extrabold">{title}</h3><nav aria-label={title + " links"} className="mt-4 flex flex-col gap-3">{items.map((item) => <Link key={item.label} href={item.href} className="text-xs text-zinc-600 hover:text-black">{item.label}</Link>)}</nav></div>;
 }
