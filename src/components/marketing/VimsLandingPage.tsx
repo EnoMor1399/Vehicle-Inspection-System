@@ -262,31 +262,31 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
           </section>
 
           {plans.length > 0 && (
-            <section aria-labelledby="compare-title" className="px-5 pb-12 pt-7 sm:px-10 lg:px-[7%]">
+            <section aria-labelledby="compare-title" className="px-5 pb-16 pt-9 sm:px-10 lg:px-[7%]">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 id="compare-title" className="text-xl font-extrabold tracking-tight sm:text-2xl">Compare what’s included</h2>
+                  <h2 id="compare-title" className="text-2xl font-extrabold tracking-[-.04em] sm:text-3xl">Compare what’s included</h2>
                   <p className="mt-1 text-xs leading-5 text-zinc-500">Plan entitlements, operational capacities and security benefits.</p>
                 </div>
                 <span className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-medium text-zinc-600"><ShieldCheck size={13} className="mr-1 inline text-emerald-700" /> Separate company workspaces</span>
               </div>
-              <div className="overflow-x-auto" role="region" aria-label="Subscription feature comparison" tabIndex={0}>
-                <table className="w-full min-w-[690px] table-fixed border-separate border-spacing-0 text-left">
+              <div className="overflow-x-auto rounded-[20px] border border-zinc-200 bg-white shadow-[0_14px_42px_rgba(19,40,48,.045)]" role="region" aria-label="Subscription feature comparison" tabIndex={0}>
+                <table className="w-full min-w-[730px] table-fixed border-separate border-spacing-0 text-left">
                   <caption className="sr-only">VIMS subscription packages and included benefits</caption>
                   <thead>
-                    <tr className="text-xs text-zinc-900">
-                      <th scope="col" className="w-[29%] border-b border-zinc-200 py-4 pr-3 font-bold">Features</th>
-                      {plans.map((plan) => <th scope="col" key={plan.id} className="border-b border-zinc-200 px-3 py-4 text-center font-bold">{plan.name} plan</th>)}
+                    <tr className="bg-[#f5f7f7] text-xs text-zinc-900">
+                      <th scope="col" className="w-[29%] border-b border-zinc-200 px-5 py-5 font-extrabold">Features</th>
+                      {plans.map((plan) => <th scope="col" key={plan.id} className={"border-b border-zinc-200 px-3 py-5 text-center font-extrabold " + (plan.code === highlighted ? "bg-emerald-50 text-emerald-900" : "")}>{plan.name} plan</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {comparison.map((group) => (
-                      <FragmentGroup key={group.title} group={group} plans={plans} />
+                      <FragmentGroup key={group.title} group={group} plans={plans} highlighted={highlighted} />
                     ))}
                     <tr>
-                      <th scope="row" className="py-6 pr-3 text-xs font-semibold">Ready to get started?</th>
+                      <th scope="row" className="border-t border-zinc-100 bg-[#f8faf9] px-5 py-6 text-xs font-extrabold">Ready to get started?</th>
                       {plans.map((plan) => (
-                        <td key={plan.id} className="px-2 py-6 text-center"><PlanAction plan={plan} view={billingView} wide /></td>
+                        <td key={plan.id} className={"border-t border-zinc-100 px-3 py-6 text-center " + (plan.code === highlighted ? "bg-emerald-50/60" : "bg-[#f8faf9]")}><PlanAction plan={plan} view={billingView} wide /></td>
                       ))}
                     </tr>
                   </tbody>
@@ -363,16 +363,20 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
   );
 }
 
-function FragmentGroup({ group, plans }: { group: FeatureGroup; plans: Plan[] }) {
+function FragmentGroup({ group, plans, highlighted }: { group: FeatureGroup; plans: Plan[]; highlighted?: string }) {
   return <>
-    <tr><th scope="colgroup" colSpan={plans.length + 1} className="pt-8 pb-3 text-xs font-extrabold text-[#1a1a1a]">{group.title}</th></tr>
+    <tr><th scope="colgroup" colSpan={plans.length + 1} className="bg-[#edf3f1] px-5 pb-3 pt-7 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#143c34]">{group.title}</th></tr>
     {group.rows.map((row) => (
-      <tr key={row.label}>
-        <th scope="row" className="border-t border-zinc-100 py-4 pr-3 align-middle text-xs font-semibold text-zinc-700">
+      <tr key={row.label} className="group/row transition-colors hover:bg-emerald-50/40">
+        <th scope="row" className="border-t border-zinc-100 px-5 py-4 align-middle text-xs font-semibold text-zinc-700">
           <span>{row.label}</span>
           {row.description && <span className="ml-1 cursor-help text-zinc-400" title={row.description} aria-label={row.description}>ⓘ</span>}
         </th>
-        {plans.map((plan) => <td key={plan.id} className="border-t border-zinc-100 px-3 py-4 text-center text-xs"><ValueCell value={row.value(plan)} /></td>)}
+        {plans.map((plan) => (
+          <td key={plan.id} className={"border-t border-zinc-100 px-3 py-4 text-center text-xs " + (plan.code === highlighted ? "bg-emerald-50/55" : "")}>
+            <ValueCell value={row.value(plan)} />
+          </td>
+        ))}
       </tr>
     ))}
   </>;
