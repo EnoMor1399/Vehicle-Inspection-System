@@ -10,7 +10,7 @@ export default function ExpiredSuperAdminOperationsPage() {
     <main className="mx-auto max-w-3xl p-6 lg:p-10">
       <PageHeader eyebrow="Super Administrator · Security"
         title="Organization operations authorization expired"
-        description="Your elevated organization session is no longer valid. No further changes to any organization can be made until you exit and verify again." />
+        description="Your elevated organization session is no longer valid. Your organization operating session has ended. Your Super Admin account remains active; exit this company context to continue and reselect the organization when needed." />
       <Card className="p-6">
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-7 w-7 text-amber-600" />

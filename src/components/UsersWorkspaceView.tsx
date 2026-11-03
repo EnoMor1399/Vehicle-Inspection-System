@@ -8,6 +8,8 @@ import { ROLE_LABEL } from "@/lib/auth";
 import { canAccessDriverTraining, canAccessVehicleInspection } from "@/lib/system-access";
 import { formatDateTime } from "@/lib/utils";
 import { UserAccessEditor } from "@/app/users/UserAccessEditor";
+import { createVehicleInspectionEmployee } from "@/app/users/actions";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password";
 
 const ROLE_GROUPS = [
   { key: "super_admin", tone: "red" as const, label: "Super Administrator", desc: "Enterprise oversight" },
@@ -22,10 +24,12 @@ const ROLE_GROUPS = [
   { key: "transporter_user", tone: "emerald" as const, label: "Transporter Portal", desc: "External access" },
 ];
 
-export async function UsersWorkspaceView({ organizationId, canManage = false, canOpenTrainingUsers = false }: {
+export async function UsersWorkspaceView({ organizationId, canManage = false, canOpenTrainingUsers = false, createError = "", created = false }: {
  organizationId: string;
  canManage?: boolean;
  canOpenTrainingUsers?: boolean;
+ createError?: string;
+ created?: boolean;
 }) {
 
   const allUsers = await db
@@ -103,6 +107,54 @@ export async function UsersWorkspaceView({ organizationId, canManage = false, ca
           </div>
         </div>
       </Card>
+
+      {canManage && (
+        <Card className="mb-6 p-5 sm:p-6">
+          <h2 className="text-lg font-semibold text-slate-950">Create employee account</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Add inspection employees to this organization only. New accounts must change their initial password on sign-in.
+          </p>
+          {createError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{createError}</p>}
+          {created && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">Employee account created.</p>}
+          <form action={createVehicleInspectionEmployee} className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="text-sm font-medium text-slate-700">Full name
+              <input name="name" required minLength={2} maxLength={200} autoComplete="name" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="text-sm font-medium text-slate-700">Work email
+              <input name="email" type="email" required maxLength={200} autoComplete="email" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="text-sm font-medium text-slate-700">Phone (optional)
+              <input name="phone" type="tel" maxLength={50} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="text-sm font-medium text-slate-700">Employee role
+              <select name="role" required defaultValue="inspector" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2">
+                <option value="inspector">Inspector</option>
+                <option value="operations_manager">Operations Manager</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="data_entry">Data Entry Officer</option>
+                <option value="auditor">Auditor</option>
+                <option value="compliance_officer">Compliance Officer</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-slate-700">Inspection station (optional)
+              <select name="locationId" defaultValue="" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2">
+                <option value="">No station assigned</option>
+                {locationOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-medium text-slate-700">Initial password
+              <input name="password" type="password" required minLength={PASSWORD_MIN_LENGTH} maxLength={128}
+                autoComplete="new-password" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" />
+            </label>
+            <div className="sm:col-span-2 xl:col-span-3 flex items-center justify-end">
+              <button type="submit" className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700">
+                Create employee
+              </button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {roleCounts.map((r) => (

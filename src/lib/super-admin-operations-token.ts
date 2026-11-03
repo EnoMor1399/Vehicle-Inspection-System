@@ -3,7 +3,10 @@ import { isValidOrganizationId } from "@/lib/organization-id";
 
 export const OPERATION_COOKIE_NAME = "vims_superadmin_operations";
 export const STEP_UP_COOKIE_NAME = "vims_superadmin_stepup";
-export const OPERATION_TTL_SECONDS = 15 * 60;
+// Organization context lasts through a normal working session; the capability
+// remains signed, tenant-bound and revocable with the login session.
+// Sensitive operational writes still require independent fresh MFA step-up.
+export const OPERATION_TTL_SECONDS = 12 * 60 * 60;
 export const STEP_UP_TTL_SECONDS = 2 * 60;
 
 export type OperationCapability = {
@@ -111,6 +114,7 @@ const REVIEWED_OPERATION_PATHS = ["/vehicles", "/transporters", "/inspections",
   "/daily-inspections", "/schedule", "/locations", "/driver-training",
   "/reports", "/compliance", "/predictive", "/powerbi", "/rfid",
   "/users", "/documents", "/import", "/settings", "/audit",
+  "/organization/account",
   "/notifications", "/portal", "/apps", "/api-docs", "/guide"] as const;
 
 export function isAuthorizedOperationPage(pathname: string): boolean {

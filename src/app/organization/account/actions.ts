@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOrganizationAccountManager } from "@/lib/require-auth";
+import { requireOrganizationAccountManager, requirePlatformSuperAdmin } from "@/lib/require-auth";
 import {
   createOrganizationAdministratorInvitation,
   getOrganizationAccountSnapshot,
@@ -21,11 +21,27 @@ export type OrganizationAccountState = {
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+// A target ID is accepted only for a real Super Admin in platform mode.
+// Subscriber owners and scoped organization operations cannot supply an
+// arbitrary tenant ID to obtain cross-company write access.
+async function resolveAccountActor(formData: FormData) {
+  const target = formData.get("targetOrganizationId");
+  if (target !== null) {
+    if (typeof target !== "string" || !/^[a-f0-9-]{36}$/i.test(target)) {
+      throw new Error("Invalid target organization");
+    }
+    const actor = await requirePlatformSuperAdmin();
+    return { actor, organizationId: target, isPlatform: true };
+  }
+  const actor = await requireOrganizationAccountManager();
+  return { actor, organizationId: actor.organizationId, isPlatform: false };
+}
+
 export async function updateOrganizationAccount(
   _previous: OrganizationAccountState,
   formData: FormData,
 ): Promise<OrganizationAccountState> {
-  const actor = await requireOrganizationAccountManager();
+  const { actor, organizationId, isPlatform } = await resolveAccountActor(formData);
   const parsed = z.object({
     name: z.string().trim().min(2).max(255),
     legalName: z.string().trim().max(255).optional(),
@@ -63,8 +79,14 @@ export async function updateOrganizationAccount(
   }
 
   try {
+    if (isPlatform) await logAudit({
+      organizationId, userId: actor.id, userName: actor.name,
+      action: "update", entityType: "super_admin_operation",
+      summary: "Super Admin authorized subscriber account profile change",
+      after: { organizationId, intent: true }, required: true,
+    });
     const organization = await updateOrganizationProfile({
-      organizationId: actor.organizationId,
+      organizationId,
       ...parsed.data,
       email: parsed.data.email || undefined,
     });
@@ -84,10 +106,17 @@ export async function updateOrganizationAccount(
       themeColor: organization.themeColor,
       accentColor: organization.accentColor,
       footerText: `© ${new Date().getFullYear()} ${organization.name}. All rights reserved.`,
-    }, actor.id, actor.organizationId);
+    }, actor.id, organizationId);
 
+    await logAudit({
+      organizationId, userId: actor.id, userName: actor.name,
+      action: "update", entityType: "organization", entityId: organizationId,
+      summary: isPlatform ? "Super Admin updated subscriber organization profile" : "Organization profile updated",
+      after: { organizationId, name: organization.name }, required: true,
+    });
     revalidatePath("/", "layout");
     revalidatePath("/organization/account");
+    if (isPlatform) revalidatePath(`/platform/organizations/${organizationId}/account`);
     return { ok: true, message: "Organization profile updated." };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Unable to update organization." };
@@ -98,7 +127,7 @@ export async function inviteOrganizationAdministrator(
   _previous: OrganizationAccountState,
   formData: FormData,
 ): Promise<OrganizationAccountState> {
-  const actor = await requireOrganizationAccountManager();
+  const { actor, organizationId, isPlatform } = await resolveAccountActor(formData);
   const parsed = z.object({
     name: z.string().trim().max(200).optional(),
     email: z.string().trim().email().max(200),
@@ -111,14 +140,20 @@ export async function inviteOrganizationAdministrator(
   if (!parsed.success) return { ok: false, message: "Enter a valid administrator invitation." };
 
   try {
+    if (isPlatform) await logAudit({
+      organizationId, userId: actor.id, userName: actor.name,
+      action: "create", entityType: "super_admin_operation",
+      summary: "Super Admin authorized subscriber administrator invitation",
+      after: { organizationId, intent: true }, required: true,
+    });
     const token = await createOrganizationAdministratorInvitation({
-      organizationId: actor.organizationId,
+      organizationId,
       actorUserId: actor.id,
       email: parsed.data.email,
       name: parsed.data.name,
       role: parsed.data.role as SubscriberAdminRole,
     });
-    const { organization } = await getOrganizationAccountSnapshot(actor.organizationId);
+    const { organization } = await getOrganizationAccountSnapshot(organizationId);
     const invitationPath = `/invite/${token}`;
     const delivery = await sendWorkspaceInvitationEmail({
       recipient: parsed.data.email.trim().toLowerCase(),
@@ -128,12 +163,12 @@ export async function inviteOrganizationAdministrator(
       invitationPath,
     });
     await logAudit({
-      organizationId: actor.organizationId,
+      organizationId,
       userId: actor.id,
       userName: actor.name,
       action: "create",
       entityType: "organization_administrator_invitation",
-      entityId: actor.organizationId,
+      entityId: organizationId,
       summary: "Created operational administrator invitation and attempted email delivery",
       after: {
         recipient: parsed.data.email.trim().toLowerCase(),
@@ -142,6 +177,7 @@ export async function inviteOrganizationAdministrator(
       },
     });
     revalidatePath("/organization/account");
+    if (isPlatform) revalidatePath(`/platform/organizations/${organizationId}/account`);
     return {
       ok: true,
       message: delivery.accepted

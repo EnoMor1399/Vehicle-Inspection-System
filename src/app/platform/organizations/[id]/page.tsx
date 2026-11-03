@@ -55,6 +55,10 @@ export default async function PlatformOrganizationDetailPage({
         View full organisation oversight →
       </Link>
 
+      <Link href={`/platform/organizations/${organization.id}/account`} className="mb-4 ml-2 inline-flex rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50">
+        Open full Organization Account →
+      </Link>
+
       <PageHeader
         eyebrow="Platform Subscription Management"
         title={organization.name}
