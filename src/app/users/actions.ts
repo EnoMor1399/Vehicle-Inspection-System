@@ -370,7 +370,7 @@ export async function createVehicleInspectionEmployee(formData: FormData): Promi
       }
       await tx.insert(users).values({
         id, organizationId: actor.organizationId, name, email, phone: phone || null,
-        role, passwordHash, mustChangePassword: true, isActive: true,
+        role: role as (typeof users.$inferInsert)["role"], passwordHash, mustChangePassword: true, isActive: true,
         locationId: stationId, transporterId: null,
         permissions: { [VEHICLE_INSPECTION_ACCESS_KEY]: true, [DRIVER_TRAINING_ACCESS_KEY]: false },
       });
