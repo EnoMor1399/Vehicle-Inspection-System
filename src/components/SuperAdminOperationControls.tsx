@@ -94,7 +94,7 @@ export function SuperAdminOperationControls({
           <div className="min-w-0 flex-1">
             <p className="font-bold">Super Admin operating in {operations.organizationName}</p>
             <p className="text-xs">
-              Scoped writes · authenticated as the real Super Admin · expires {new Date(operations.expiresAt).toLocaleTimeString()}.
+              Organization access · authenticated as the real Super Admin · session valid until {new Date(operations.expiresAt).toLocaleString()}.
               {operations.stepUpExpiresAt ? " Sensitive actions authorized temporarily." : " Sensitive actions need another MFA verification."}
             </p>
           </div>
