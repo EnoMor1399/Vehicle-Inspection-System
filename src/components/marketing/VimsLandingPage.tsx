@@ -3,9 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight, BarChart3, Building2, Check, CheckCircle2, ChevronDown,
-  ClipboardCheck, FileCheck2, Fingerprint, GraduationCap, LockKeyhole,
-  MapPin, Minus, ShieldCheck, Truck, Users,
+  BarChart3, CheckCircle2, ChevronDown,
+  ClipboardCheck, LockKeyhole, Minus, ShieldCheck, Truck,
 } from "lucide-react";
 import type { subscriptionPlans } from "@/db/schema";
 
@@ -13,13 +12,6 @@ type Plan = typeof subscriptionPlans.$inferSelect;
 type BillingView = "monthly" | "annual";
 type FeatureRow = { label: string; description?: string; value: (plan: Plan) => string | boolean };
 type FeatureGroup = { title: string; rows: FeatureRow[] };
-
-const modules: Record<string, string> = {
-  vehicle_inspection: "Vehicle inspections",
-  driver_training: "Driver training & assessment",
-  reports: "Reports & analytics",
-  api: "API & integrations",
-};
 
 const comparison: FeatureGroup[] = [
   {
@@ -76,13 +68,6 @@ function priceFor(plan: Plan, period: BillingView) {
     return { amount: plan.currency === "GHS" ? "GH₵" + amount : plan.currency + " " + amount, frequency: period === "annual" ? "per year" : "per month" };
   }
   return { amount: "Custom quote", frequency: period === "annual" ? "Annual terms on request" : "Pricing on request" };
-}
-
-function benefitsFor(plan: Plan) {
-  const values = plan.modules.map((name) => modules[name] ?? name.replaceAll("_", " "));
-  if (plan.features?.custom_branding) values.push("Organisation branding");
-  if (plan.features?.priority_support) values.push("Priority support");
-  return [...new Set(values)];
 }
 
 function ValueCell({ value }: { value: string | boolean }) {
