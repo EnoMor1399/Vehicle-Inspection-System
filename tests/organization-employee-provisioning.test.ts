@@ -18,6 +18,9 @@ test("Super Admin operating context survives short tasks but stays bound to sess
   const sessionId = "aaaa0000-0000-4000-8000-000000000002";
   const organizationId = "aaaa0000-0000-4000-8000-000000000003";
   const sessionToken = "a".repeat(128);
+  const previousSecret = process.env.SUPERADMIN_OPERATIONS_SIGNING_SECRET;
+  process.env.SUPERADMIN_OPERATIONS_SIGNING_SECRET = "test-only-operations-signing-secret-not-for-production-12345";
+  try {
   const token = mintOperationsCapability({
     purpose: "operate", actorId, sessionId, organizationId, sessionToken, now,
   });
@@ -33,6 +36,10 @@ test("Super Admin operating context survives short tasks but stays bound to sess
     token, purpose: "operate", actorId, sessionId,
     sessionToken: "b".repeat(128), organizationId, now,
   }), null);
+  } finally {
+    if (previousSecret === undefined) delete process.env.SUPERADMIN_OPERATIONS_SIGNING_SECRET;
+    else process.env.SUPERADMIN_OPERATIONS_SIGNING_SECRET = previousSecret;
+  }
 });
 
 test("inspection organization admins can create only staff within their own tenant", () => {
