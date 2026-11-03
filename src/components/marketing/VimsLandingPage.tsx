@@ -1,10 +1,10 @@
 import Link from "next/link";
 import {
-  ArrowRight, BadgeCheck, BarChart3, BookOpenCheck, Building2,
+  ArrowRight, BarChart3, Building2,
   CalendarCheck2, Check, CheckCircle2, ChevronDown, ClipboardCheck,
   FileCheck2, Fingerprint, Globe2, GraduationCap, Layers3, LockKeyhole,
-  MapPinned, PlayCircle, Shield, ShieldCheck, Sparkles, Truck, Users,
-  Workflow, Zap,
+  MapPinned, Shield, ShieldCheck, Sparkles, Truck, Users,
+  Zap,
 } from "lucide-react";
 import type { subscriptionPlans } from "@/db/schema";
 
