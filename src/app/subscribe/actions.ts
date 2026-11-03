@@ -72,7 +72,7 @@ export async function submitSubscriptionRequest(
       estimatedVehicles: parsed.data.estimatedVehicles,
       desiredPlanCode: parsed.data.desiredPlanCode,
       requestedModules: formData.getAll("requestedModules").map(String).slice(0, 10),
-      notes: parsed.data.notes,
+      notes: (formData.get("requestedBillingCycle") === "annual" ? "Annual billing quote requested.\n" : "") + (parsed.data.notes || ""),
       sourceIpHash,
     });
 
