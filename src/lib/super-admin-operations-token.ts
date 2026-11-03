@@ -114,6 +114,7 @@ const REVIEWED_OPERATION_PATHS = ["/vehicles", "/transporters", "/inspections",
   "/daily-inspections", "/schedule", "/locations", "/driver-training",
   "/reports", "/compliance", "/predictive", "/powerbi", "/rfid",
   "/users", "/documents", "/import", "/settings", "/audit",
+  "/organization/account",
   "/notifications", "/portal", "/apps", "/api-docs", "/guide"] as const;
 
 export function isAuthorizedOperationPage(pathname: string): boolean {
