@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { locations, sessions, transporters, users } from "@/db/schema";
 import { trainingInstructorProfiles } from "@/db/training-readiness-schema";
 import { and, count, eq, sql } from "drizzle-orm";
 import { getCurrentUser, canManageUsers } from "@/lib/auth";
+import { hashPassword, validateEmail, validatePasswordStrength } from "@/lib/password";
 import { logAudit } from "@/lib/audit";
 import { canManageTrainingUsers, trainingPermissionsForRole } from "@/lib/training-access";
 import {
@@ -315,4 +317,76 @@ export async function updateUserAccess(input: {
   revalidatePath("/driver-training/instructors");
   revalidatePath("/driver-training/sessions");
   return { ok: true };
+}
+
+ 
+const EMPLOYEE_ROLES = new Set([
+  "operations_manager", "supervisor", "inspector", "data_entry",
+  "auditor", "compliance_officer", "viewer",
+]);
+
+function employeeCreationError(message: string): never {
+  redirect("/users?createError=" + encodeURIComponent(message));
+}
+
+// Operational administrators can provision employees in their own
+// organization, never platform admins, organization owners or other tenants.
+export async function createVehicleInspectionEmployee(formData: FormData): Promise<void> {
+  const actor = await getCurrentUser();
+  if (!["super_admin", "vehicle_inspection_admin", "admin"].includes(actor.role)
+    || !canManageUsers(actor)) {
+    throw new Error("Only a Vehicle Inspection Administrator or Super Administrator may create inspection employees.");
+  }
+  const str = (field: string) => {
+    const value = formData.get(field);
+    return typeof value === "string" ? value : "";
+  };
+  const name = str("name").trim().replace(/\s+/g, " ");
+  const email = str("email").trim().toLowerCase();
+  const phone = str("phone").trim();
+  const role = str("role").trim();
+  const password = str("password");
+  const stationId = str("locationId").trim() || null;
+
+  if (name.length < 2 || name.length > 200) employeeCreationError("Enter a valid employee name.");
+  if (!validateEmail(email) || email.length > 200) employeeCreationError("Enter a valid email address.");
+  if (phone.length > 50) employeeCreationError("Phone number is too long.");
+  if (!EMPLOYEE_ROLES.has(role) || !isUserRole(role)) employeeCreationError("Select an employee role.");
+  const check = validatePasswordStrength(password);
+  if (!check.valid) employeeCreationError(check.errors[0] || "Choose a stronger initial password.");
+
+  const passwordHash = await hashPassword(password);
+  const id = newId();
+  try {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
+      const [existing] = await tx.select({ id: users.id }).from(users)
+        .where(sql`lower(${users.email}) = ${email}`).limit(1);
+      if (existing) throw new Error("An employee with this email already exists.");
+      if (stationId) {
+        const [station] = await tx.select({ id: locations.id }).from(locations)
+          .where(and(eq(locations.organizationId, actor.organizationId), eq(locations.id, stationId))).limit(1);
+        if (!station) throw new Error("The selected inspection station is not in your organization.");
+      }
+      await tx.insert(users).values({
+        id, organizationId: actor.organizationId, name, email, phone: phone || null,
+        role, passwordHash, mustChangePassword: true, isActive: true,
+        locationId: stationId, transporterId: null,
+        permissions: { [VEHICLE_INSPECTION_ACCESS_KEY]: true, [DRIVER_TRAINING_ACCESS_KEY]: false },
+      });
+    });
+  } catch (error) {
+    const limit = extractSubscriptionCapacityError(error);
+    employeeCreationError(limit || (error instanceof Error ? error.message : "Unable to create employee."));
+  }
+  await logAudit({
+    organizationId: actor.organizationId,
+    userId: actor.id, userName: actor.name,
+    action: "create", entityType: "user", entityId: id, entityLabel: email,
+    summary: "Organization administrator created Vehicle Inspection employee",
+    after: { name, role, email, locationId: stationId, mustChangePassword: true },
+    required: true,
+  });
+  revalidatePath("/users");
+  redirect("/users?created=1");
 }
