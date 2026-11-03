@@ -79,6 +79,12 @@ export async function updateOrganizationAccount(
   }
 
   try {
+    if (isPlatform) await logAudit({
+      organizationId, userId: actor.id, userName: actor.name,
+      action: "update", entityType: "super_admin_operation",
+      summary: "Super Admin authorized subscriber account profile change",
+      after: { organizationId, intent: true }, required: true,
+    });
     const organization = await updateOrganizationProfile({
       organizationId,
       ...parsed.data,
@@ -134,6 +140,12 @@ export async function inviteOrganizationAdministrator(
   if (!parsed.success) return { ok: false, message: "Enter a valid administrator invitation." };
 
   try {
+    if (isPlatform) await logAudit({
+      organizationId, userId: actor.id, userName: actor.name,
+      action: "create", entityType: "super_admin_operation",
+      summary: "Super Admin authorized subscriber administrator invitation",
+      after: { organizationId, intent: true }, required: true,
+    });
     const token = await createOrganizationAdministratorInvitation({
       organizationId,
       actorUserId: actor.id,
