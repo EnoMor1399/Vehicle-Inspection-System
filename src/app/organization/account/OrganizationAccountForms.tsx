@@ -11,7 +11,7 @@ import {
 
 const initial: OrganizationAccountState = { ok: false, message: "" };
 
-export function OrganizationProfileForm({ organization }: { organization: {
+export function OrganizationProfileForm({ organization, targetOrganizationId }: { targetOrganizationId?: string; organization: {
   name: string;
   legalName: string | null;
   registrationNumber: string | null;
@@ -30,6 +30,7 @@ export function OrganizationProfileForm({ organization }: { organization: {
   const [state, action, pending] = useActionState(updateOrganizationAccount, initial);
   return (
     <form action={action} className="space-y-4">
+      {targetOrganizationId && <input type="hidden" name="targetOrganizationId" value={targetOrganizationId} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Organization name"><input name="name" required defaultValue={organization.name} className={inputClass} /></Field>
         <Field label="Legal name"><input name="legalName" defaultValue={organization.legalName || ""} className={inputClass} /></Field>
@@ -55,10 +56,11 @@ export function OrganizationProfileForm({ organization }: { organization: {
   );
 }
 
-export function AdministratorInvitationForm({ trainingEnabled }: { trainingEnabled: boolean }) {
+export function AdministratorInvitationForm({ trainingEnabled, targetOrganizationId }: { trainingEnabled: boolean; targetOrganizationId?: string }) {
   const [state, action, pending] = useActionState(inviteOrganizationAdministrator, initial);
   return (
     <form action={action} className="space-y-4">
+      {targetOrganizationId && <input type="hidden" name="targetOrganizationId" value={targetOrganizationId} />}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Administrator name"><input name="name" className={inputClass} /></Field>
         <Field label="Email"><input name="email" type="email" required className={inputClass} /></Field>
