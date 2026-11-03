@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  BarChart3, CheckCircle2, ChevronDown,
-  ClipboardCheck, LockKeyhole, Minus, ShieldCheck, Truck,
+  ArrowRight, ArrowUpRight, BarChart3, CalendarCheck2, Check, CheckCircle2, ChevronDown,
+  ClipboardCheck, FileCheck2, Layers3, LockKeyhole, Minus, ShieldCheck, Sparkles, Truck, UsersRound,
 } from "lucide-react";
 import type { subscriptionPlans } from "@/db/schema";
 
@@ -95,39 +95,102 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
   return (
     <div className="min-h-screen bg-[#efefef] px-0 py-0 text-[#171717] sm:px-5 sm:py-9 lg:py-14">
       <div className="mx-auto min-h-screen max-w-[1270px] bg-white shadow-[0_12px_70px_rgba(0,0,0,.045)] sm:min-h-[95vh]">
-        <div className="px-4 pt-4 sm:px-7 sm:pt-5">
-          <header className="relative z-20 flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-[#141414] px-4 text-white shadow-[0_12px_25px_rgba(0,0,0,.15)] sm:rounded-full sm:px-5">
-            <Link href="/welcome" className="inline-flex shrink-0 items-center gap-2 text-[14px] font-extrabold tracking-[-.03em]" aria-label="VIMS home">
-              <span className="grid h-7 w-7 place-items-center rounded-full border border-white/60"><ShieldCheck size={15} /></span>
-              VIMS
+        <div className="relative z-30 px-4 pt-4 sm:px-7 sm:pt-6 lg:px-10">
+          <header className="flex min-h-[66px] items-center justify-between gap-3 rounded-[19px] border border-white/10 bg-[#101b22] px-4 text-white shadow-[0_14px_32px_rgba(8,18,28,.16)] sm:rounded-full sm:px-6">
+            <Link href="/welcome" className="inline-flex shrink-0 items-center gap-2.5 text-sm font-black tracking-[-.03em]" aria-label="VIMS home">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-400 text-[#05281e]"><ShieldCheck size={20} aria-hidden="true" /></span>
+              <span>VIMS<span className="text-emerald-400">.</span><span className="ml-2 hidden border-l border-white/20 pl-3 text-[10px] font-medium uppercase tracking-[.15em] text-slate-400 lg:inline">Enterprise</span></span>
             </Link>
-            <nav aria-label="Landing page" className="hidden flex-1 items-center gap-6 pl-5 text-[12px] font-semibold text-white/85 md:flex">
-              <Link href="/welcome" className="hover:text-white">Home</Link>
-              <a href="#benefits" className="hover:text-white">Features</a>
-              <a href="#pricing" className="hover:text-white">Pricing</a>
-              <a href="#workflow" className="hover:text-white">How it works</a>
-              <a href="#faq" className="hover:text-white">FAQs</a>
+            <nav aria-label="Landing page" className="hidden flex-1 items-center justify-center gap-6 text-[12px] font-semibold text-white/80 md:flex">
+              <a href="#overview" className="transition hover:text-emerald-300">Home</a>
+              <a href="#benefits" className="transition hover:text-emerald-300">Features</a>
+              <a href="#pricing" className="transition hover:text-emerald-300">Pricing</a>
+              <a href="#workflow" className="transition hover:text-emerald-300">How it works</a>
+              <a href="#faq" className="transition hover:text-emerald-300">FAQs</a>
             </nav>
-            <div className="hidden items-center gap-4 sm:flex">
-              <Link href="/login" className="text-xs font-semibold text-white/90 hover:text-white">Log in</Link>
-              <Link href="/subscribe" className="rounded-full border border-white/20 bg-[#303030] px-5 py-2.5 text-xs font-bold transition hover:bg-[#464646]">Create account</Link>
+            <div className="hidden items-center gap-3 sm:flex">
+              <Link href="/login" className="rounded-full px-3 py-2.5 text-xs font-semibold text-white/85 transition hover:text-emerald-300">Log in</Link>
+              <Link href="/subscribe" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-extrabold text-[#12232c] transition hover:bg-emerald-100">Request access <ArrowUpRight size={15} aria-hidden="true" /></Link>
             </div>
             <details className="group relative sm:hidden">
-              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">
-                Menu <ChevronDown size={15} className="transition group-open:rotate-180" />
-              </summary>
-              <nav aria-label="Mobile landing page" className="absolute right-0 top-11 z-30 flex w-52 flex-col rounded-xl border border-zinc-700 bg-[#181818] p-2 shadow-xl">
-                <a href="#pricing" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">Pricing</a>
-                <a href="#benefits" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">Features</a>
-                <a href="#faq" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">FAQs</a>
-                <Link href="/login" className="rounded-lg px-3 py-2 text-xs hover:bg-zinc-700">Log in</Link>
-                <Link href="/subscribe" className="rounded-lg bg-zinc-700 px-3 py-2 text-xs">Create account</Link>
+              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">Menu <ChevronDown size={15} className="transition group-open:rotate-180" /></summary>
+              <nav aria-label="Mobile landing page" className="absolute right-0 top-11 z-30 flex w-56 flex-col rounded-2xl border border-zinc-700 bg-[#101b22] p-2 shadow-2xl">
+                <a href="#overview" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Home</a>
+                <a href="#pricing" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Pricing</a>
+                <a href="#benefits" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Features</a>
+                <a href="#faq" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">FAQs</a>
+                <Link href="/login" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Log in</Link>
+                <Link href="/subscribe" className="rounded-lg bg-emerald-400 px-3 py-2.5 text-xs font-bold text-[#103024]">Request access</Link>
               </nav>
             </details>
           </header>
         </div>
 
         <main>
+          <section id="overview" className="scroll-mt-4 px-4 pb-3 pt-5 sm:px-7 lg:px-10">
+            <div className="relative isolate overflow-hidden rounded-[28px] bg-[#0a2431] px-6 py-11 text-white sm:px-10 sm:py-14 lg:px-14 lg:py-[68px]">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_17%,rgba(52,211,153,.25),transparent_36%),linear-gradient(120deg,#102d3c_0%,#091c2a_67%,#0e3441_100%)]" />
+              <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-48 -z-10 h-[520px] w-[520px] rounded-full border border-white/10" />
+              <div aria-hidden="true" className="pointer-events-none absolute -right-5 -top-24 -z-10 h-[370px] w-[370px] rounded-full border border-white/10" />
+              <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
+                <div className="relative max-w-[600px]">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-bold tracking-wide text-emerald-200"><Sparkles size={14} aria-hidden="true" /> Designed for modern inspection operations</span>
+                  <h1 className="mt-6 text-[clamp(2.55rem,5vw,4.65rem)] font-extrabold leading-[1.08] tracking-[-.055em]">Every inspection.<br /><span className="text-emerald-300">One powerful</span><br />platform.</h1>
+                  <p className="mt-6 max-w-[515px] text-sm leading-7 text-slate-300 sm:text-base sm:leading-8">Run vehicle inspections, manage fleet compliance and keep certificates, people and reports connected — all from one secure VIMS workspace.</p>
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <a href="#pricing" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-sm font-extrabold text-[#09352a] shadow-[0_12px_28px_rgba(52,211,153,.18)] transition hover:-translate-y-0.5 hover:bg-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">Explore pricing <ArrowRight size={17} aria-hidden="true" /></a>
+                    <Link href="/subscribe" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/25 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">Request a workspace</Link>
+                  </div>
+                  <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-semibold text-slate-300">
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300" /> Company data isolation</span>
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300" /> Digital inspection workflows</span>
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300" /> Audit-ready records</span>
+                  </div>
+                </div>
+                <div className="relative mx-auto w-full max-w-[560px]">
+                  <div className="absolute -inset-4 rounded-[30px] bg-emerald-400/10 blur-2xl" aria-hidden="true" />
+                  <div className="relative overflow-hidden rounded-[23px] border border-white/20 bg-white p-3 text-slate-900 shadow-[0_30px_65px_rgba(0,0,0,.32)] sm:p-4">
+                    <div className="flex items-center justify-between rounded-xl bg-[#0b2735] px-4 py-3 text-white">
+                      <span className="inline-flex items-center gap-2 text-xs font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-400 text-[#07352b]"><ShieldCheck size={16} /></span> VIMS Operations</span>
+                      <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">Workflow preview</span>
+                    </div>
+                    <div className="px-1 pb-1 pt-5 sm:px-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-400">Operations workspace</p><h2 className="mt-1 text-base font-extrabold tracking-tight">All your inspections, connected.</h2></div>
+                        <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Layers3 size={19} /></span>
+                      </div>
+                      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
+                        {[
+                          { icon: Truck, title: "Fleet records", subtitle: "Vehicles & transporters" },
+                          { icon: ClipboardCheck, title: "Inspections", subtitle: "Digital assessments" },
+                          { icon: FileCheck2, title: "Certificates", subtitle: "Review & verification" },
+                          { icon: BarChart3, title: "Reporting", subtitle: "Operational insight" },
+                        ].map(({ icon: Icon, title, subtitle }) => (
+                          <div key={title} className="rounded-xl border border-slate-100 bg-[#f7f9fb] px-3 py-3.5">
+                            <span className="inline-flex items-center gap-2 text-[11px] font-bold"><Icon size={16} className="shrink-0 text-emerald-700" />{title}</span>
+                            <p className="mt-1 text-[10px] text-slate-500">{subtitle}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 rounded-xl border border-slate-100 bg-[#f7f9fb] p-3 sm:p-4">
+                        <div className="flex items-center justify-between gap-2"><span className="text-xs font-extrabold">Inspection workflow</span><span className="text-[10px] font-medium text-slate-400">Illustrative interface</span></div>
+                        <div className="mt-4 grid grid-cols-4 gap-1">
+                          {["Register", "Inspect", "Review", "Certify"].map((label, index) => (
+                            <div key={label} className="flex flex-col items-center gap-2 text-center">
+                              <span className={"grid h-9 w-9 place-items-center rounded-full text-xs font-extrabold " + (index < 3 ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500")}>{index < 3 ? <Check size={16} aria-hidden="true" /> : "4"}</span>
+                              <span className="text-[9px] font-semibold text-slate-600 sm:text-[10px]">{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute -bottom-5 -left-4 hidden items-center gap-2 rounded-xl border border-white/20 bg-[#163b42] px-3.5 py-3 text-white shadow-xl sm:inline-flex"><span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-400/15 text-emerald-300"><ShieldCheck size={18} /></span><span className="text-[11px] font-extrabold">Secure by design</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section id="pricing" className="relative scroll-mt-4 overflow-hidden px-5 pb-4 pt-16 sm:px-10 lg:px-[7%] lg:pt-20">
             <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-36 h-[410px] w-[410px] rounded-full border border-zinc-100">
               <div className="absolute inset-9 rounded-full border border-zinc-100" />
