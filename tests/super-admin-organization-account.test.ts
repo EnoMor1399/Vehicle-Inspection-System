@@ -6,7 +6,7 @@ const source = (path: string) => readFileSync(path, "utf8");
 
 test("platform Super Admin can inspect chosen organization account without owner impersonation", () => {
   const route = source("src/app/platform/organizations/[id]/account/page.tsx");
-  const account = source("src/app/organization/account/page.tsx");
+  const account = source("src/app/organization/account/OrganizationAccountContent.tsx");
   assert.match(route, /await requirePlatformSuperAdmin\(\)/);
   assert.match(route, /isValidOrganizationId\(id\)/);
   assert.match(route, /getOrganizationAccountSnapshot\(id\)/);
