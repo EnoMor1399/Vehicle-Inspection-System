@@ -27,3 +27,20 @@ BEGIN
       CHECK (promo_starts_on IS NULL OR promo_ends_on IS NULL OR promo_starts_on <= promo_ends_on);
   END IF;
 END $$;
+
+-- A billing cycle is chosen explicitly when subscribers request and receive
+-- a plan; new requests default to monthly for backwards compatibility.
+ALTER TABLE organization_onboarding_requests
+  ADD COLUMN IF NOT EXISTS requested_billing_cycle billing_cycle NOT NULL DEFAULT 'monthly';
+
+ALTER TABLE organization_subscriptions
+  ADD COLUMN IF NOT EXISTS billing_cycle billing_cycle NOT NULL DEFAULT 'monthly';
+
+-- Preserve existing explicitly annual plan assignments without changing any
+-- existing invoice amount, payment, due date or paid period.
+UPDATE organization_subscriptions AS subscription
+SET billing_cycle = 'annual'
+FROM subscription_plans AS plan
+WHERE subscription.plan_id = plan.id
+  AND plan.billing_cycle = 'annual'
+  AND subscription.billing_cycle = 'monthly';
