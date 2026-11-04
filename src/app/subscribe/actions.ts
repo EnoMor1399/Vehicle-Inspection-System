@@ -17,6 +17,7 @@ const onboardingSchema = z.object({
   estimatedUsers: z.coerce.number().int().min(1).max(100000).optional(),
   estimatedVehicles: z.coerce.number().int().min(0).max(10000000).optional(),
   desiredPlanCode: z.string().trim().max(50).optional(),
+  requestedBillingCycle: z.enum(["monthly", "annual"]).default("monthly"),
   notes: z.string().trim().max(4000).optional(),
   website: z.string().max(0).optional(), // honeypot
 });
@@ -41,6 +42,7 @@ export async function submitSubscriptionRequest(
     estimatedUsers: formData.get("estimatedUsers") || undefined,
     estimatedVehicles: formData.get("estimatedVehicles") || undefined,
     desiredPlanCode: formData.get("desiredPlanCode") || undefined,
+    requestedBillingCycle: formData.get("requestedBillingCycle") || "monthly",
     notes: formData.get("notes") || undefined,
     website: formData.get("website") || undefined,
   });
@@ -71,6 +73,7 @@ export async function submitSubscriptionRequest(
       estimatedUsers: parsed.data.estimatedUsers,
       estimatedVehicles: parsed.data.estimatedVehicles,
       desiredPlanCode: parsed.data.desiredPlanCode,
+      requestedBillingCycle: parsed.data.requestedBillingCycle,
       requestedModules: formData.getAll("requestedModules").map(String).slice(0, 10),
       notes: (formData.get("requestedBillingCycle") === "annual" ? "Annual billing quote requested.\n" : "") + (parsed.data.notes || ""),
       sourceIpHash,
