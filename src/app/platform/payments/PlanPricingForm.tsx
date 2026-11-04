@@ -98,6 +98,7 @@ export function PlanPricingForm({ plan }: { plan: EditablePlan }) {
           <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-600">
             <Percent className="h-4 w-4 text-emerald-700" aria-hidden="true" /> Annual savings
           </div>
+          {!monthly && <><input type="hidden" name="annualDiscountPercent" value="0" /><input type="hidden" name="promoDiscountPercent" value="0" /></>}
           <label className="block text-xs font-semibold text-slate-700">
             Annual discount (%)
             <input name="annualDiscountPercent" type="number" min={0} max={90} step={1}
