@@ -222,7 +222,12 @@ export async function updateSubscriptionPlanPricing(
   let preview;
   try {
     preview = calculateAnnualPlanPrice(nextOffer);
-    if (Number(values.price) > 0 && preview && preview.annualMinor === 0) {
+    // Test maximum promo effect even when a scheduled promotion is not yet
+    // active, so saving today's price cannot create a future zero-price quote.
+    const fullDiscount = calculateAnnualPlanPrice({
+      ...nextOffer, promoStartsOn: null, promoEndsOn: null,
+    });
+    if (Number(values.price) > 0 && fullDiscount && fullDiscount.annualMinor === 0) {
       return { ok: false, message: "Combined discounts cannot reduce a paid annual subscription to zero." };
     }
   } catch {
