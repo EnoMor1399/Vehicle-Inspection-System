@@ -7,6 +7,7 @@ import {
   ClipboardCheck, FileCheck2, Layers3, LockKeyhole, Minus, ShieldCheck, Sparkles, Truck,
 } from "lucide-react";
 import type { subscriptionPlans } from "@/db/schema";
+import { calculateAnnualPlanPrice } from "@/lib/subscription-plan-pricing";
 
 type Plan = typeof subscriptionPlans.$inferSelect;
 type BillingView = "monthly" | "annual";
@@ -57,17 +58,32 @@ const benefits = [
 const faq = [
   { q: "Can we add staff to our organisation?", a: "Yes. Organisation administrators can create employee accounts inside their own organisation, within the subscribed user capacity." },
   { q: "Is driver training included with every package?", a: "No. Included modules differ by package. Consult the comparison table to confirm whether Driver Training & Assessment is included." },
-  { q: "Can we request annual billing?", a: "Yes. Select Annual pricing to request a quote. The current catalogue may not publish an annual rate, so the final price must be confirmed during review." },
+  { q: "How is annual billing calculated?", a: "Annual catalogue pricing starts at twelve months of the published monthly price. Super Admin annual savings and any active promotion are applied automatically. Your subscription remains subject to approval before payment." },
   { q: "Will our data be separate from other subscribers?", a: "Each company is assigned its own organisation-scoped workspace. Activation requires administrative approval and tenant-isolation verification." },
 ];
 
 function priceFor(plan: Plan, period: BillingView) {
   const value = Number(plan.price);
+  if (period === "annual" && plan.billingCycle === "monthly") {
+    const annual = calculateAnnualPlanPrice(plan);
+    if (annual) {
+      const symbol = plan.currency === "GHS" ? "GH₵" : plan.currency + " ";
+      return {
+        amount: symbol + new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(annual.annualPrice)),
+        frequency: "per year",
+        previous: annual.savingsMinor > 0 ? symbol + annual.baseAnnualPrice : null,
+        savings: annual.savingsMinor > 0 ? symbol + annual.savingsPrice : null,
+        promo: annual.activePromoLabel,
+        discount: annual.annualDiscountPercent,
+        promotionalPercent: annual.activePromoPercent,
+      };
+    }
+  }
   if (plan.billingCycle === period && value > 0 && Number.isFinite(value)) {
     const amount = new Intl.NumberFormat("en-GH", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(value);
-    return { amount: plan.currency === "GHS" ? "GH₵" + amount : plan.currency + " " + amount, frequency: period === "annual" ? "per year" : "per month" };
+    return { amount: plan.currency === "GHS" ? "GH₵" + amount : plan.currency + " " + amount, frequency: period === "annual" ? "per year" : "per month", previous: null, savings: null, promo: null, discount: 0, promotionalPercent: 0 };
   }
-  return { amount: "Custom quote", frequency: period === "annual" ? "Annual terms on request" : "Pricing on request" };
+  return { amount: "Custom quote", frequency: period === "annual" ? "Annual terms on request" : "Pricing on request", previous: null, savings: null, promo: null, discount: 0, promotionalPercent: 0 };
 }
 
 function ValueCell({ value }: { value: string | boolean }) {
@@ -83,7 +99,7 @@ function PlanAction({ plan, view, wide = false, featured = false }: { plan: Plan
   const href = "/subscribe?plan=" + encodeURIComponent(plan.code) + (view === "annual" ? "&billing=annual" : "");
   return (
     <Link href={href} className={"group/cta inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 " + (featured ? "bg-emerald-400 text-[#092c25] hover:bg-emerald-300" : "bg-[#141414] text-white hover:bg-[#2b3741]") + (wide ? " w-full" : "")}>
-      {view === "annual" ? "Request annual quote" : "Get started"} <ArrowUpRight size={16} aria-hidden="true" className="transition group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5" />
+      {view === "annual" ? (priceFor(plan, view).amount === "Custom quote" ? "Request annual quote" : "Request annual plan") : "Get started"} <ArrowUpRight size={16} aria-hidden="true" className="transition group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5" />
     </Link>
   );
 }
@@ -206,7 +222,7 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
                 <button type="button" aria-pressed={billingView === "annual"} onClick={() => setBillingView("annual")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "annual" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Annual pricing</button>
                 <button type="button" aria-pressed={billingView === "monthly"} onClick={() => setBillingView("monthly")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "monthly" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Monthly pricing</button>
               </div>
-              {billingView === "annual" && <p className="mt-2 text-xs text-zinc-500">Annual prices are shown only when published for the plan. Other annual terms require a quote.</p>}
+              {billingView === "annual" && <p className="mt-2 text-xs text-zinc-500">Annual price = monthly price × 12, less the Super Admin annual discount and any active promotion. Custom-priced plans require a quotation.</p>}
             </div>
             {plans.length === 0 ? (
               <div className="mt-7 rounded-2xl border border-zinc-200 bg-zinc-50 p-8 text-center">
@@ -232,10 +248,18 @@ export function VimsLandingPage({ plans }: { plans: Plan[] }) {
                         <span className={"grid h-11 w-11 shrink-0 place-items-center rounded-2xl border " + (isPopular ? "border-white/15 bg-white/10 text-emerald-200" : "border-emerald-100 bg-white text-emerald-700")}><Layers3 size={22} aria-hidden="true" /></span>
                       </div>
                       <p className={"mt-3 min-h-[50px] text-[13px] leading-[1.65] " + (isPopular ? "text-slate-200" : "text-zinc-500")}>{plan.description || "Flexible inspection operations for your organisation."}</p>
+                      {price.previous && <p className={"mt-4 text-xs font-semibold " + (isPopular ? "text-slate-300" : "text-zinc-500")}>Regular annual price: <span className="line-through">{price.previous}</span></p>}
                       <div className={"mt-5 flex min-h-[73px] items-center gap-2 border-b pb-5 " + (isPopular ? "border-white/15" : "border-zinc-200")}>
                         <span className="text-[clamp(1.75rem,2.5vw,2.5rem)] font-black tracking-[-.06em]">{price.amount}</span>
                         {price.amount !== "Custom quote" && <span className={"max-w-[70px] text-[11px] leading-4 " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{price.frequency}</span>}
                       </div>
+                      {billingView === "annual" && price.savings && (
+                        <div className={"mt-3 flex flex-wrap items-center gap-2 text-[11px] font-bold " + (isPopular ? "text-emerald-200" : "text-emerald-700")}>
+                          <span className={"rounded-full px-3 py-1 " + (isPopular ? "bg-white/10" : "bg-emerald-100")}>Save {price.savings} / year</span>
+                          {price.discount > 0 && <span>{price.discount}% annual saving</span>}
+                          {price.promo && <span className={"rounded-full px-3 py-1 " + (isPopular ? "bg-amber-200/20 text-amber-100" : "bg-amber-100 text-amber-800")}>{price.promo} · {price.promotionalPercent}% off</span>}
+                        </div>
+                      )}
                       <p className={"mt-4 text-[10px] font-extrabold uppercase tracking-[.16em] " + (isPopular ? "text-emerald-200" : "text-zinc-500")}>Included capacity</p>
                       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
                         {[
