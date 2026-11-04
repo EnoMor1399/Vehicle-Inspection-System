@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { calculateAnnualPlanPrice } from "@/lib/subscription-plan-pricing";
 import { Building2, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { submitSubscriptionRequest, type SubscriptionRequestState } from "./actions";
 
@@ -10,7 +11,12 @@ type Plan = {
   description: string | null;
   price: string;
   currency: string;
-  billingCycle: string;
+  billingCycle: "monthly" | "annual" | "custom";
+  annualDiscountPercent: number;
+  promoDiscountPercent: number;
+  promoLabel: string | null;
+  promoStartsOn: string | null;
+  promoEndsOn: string | null;
   trialDays: number;
   maxUsers: number;
   maxStations: number;
@@ -22,6 +28,9 @@ const initialState: SubscriptionRequestState = { ok: false, message: "" };
 
 export function SubscribeForm({ plans, initialPlanCode, initialBillingMode = "monthly" }: { plans: Plan[]; initialPlanCode?: string; initialBillingMode?: "monthly" | "annual" }) {
   const [state, action, pending] = useActionState(submitSubscriptionRequest, initialState);
+  const [selectedPlan, setSelectedPlan] = useState(plans.some((plan) => plan.code === initialPlanCode) ? initialPlanCode! : (plans[0]?.code || "starter"));
+  const current = plans.find((plan) => plan.code === selectedPlan);
+  const annualPrice = initialBillingMode === "annual" && current ? calculateAnnualPlanPrice(current) : null;
 
   if (state.ok) {
     return (
@@ -63,7 +72,7 @@ export function SubscribeForm({ plans, initialPlanCode, initialBillingMode = "mo
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700">Preferred plan</label>
-        <select name="desiredPlanCode" className={inputClass} defaultValue={plans.some((plan) => plan.code === initialPlanCode) ? initialPlanCode : (plans[0]?.code || "starter")}>
+        <select name="desiredPlanCode" className={inputClass} value={selectedPlan} onChange={(e) => setSelectedPlan(e.target.value)}>
           {plans.map((plan) => (
             <option key={plan.code} value={plan.code}>
               {plan.name} · up to {plan.maxUsers} users · {plan.maxVehicles.toLocaleString()} vehicles
@@ -71,6 +80,18 @@ export function SubscribeForm({ plans, initialPlanCode, initialBillingMode = "mo
           ))}
         </select>
       </div>
+
+      {current && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-950">
+        <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">{initialBillingMode === "annual" ? "Annual catalogue estimate" : "Monthly catalogue estimate"}</p>
+        <p className="mt-2 text-xl font-extrabold">
+          {annualPrice ? `${current.currency} ${annualPrice.annualPrice} / year`
+            : current.billingCycle === initialBillingMode && Number(current.price) > 0
+              ? `${current.currency} ${Number(current.price).toFixed(2)} / ${initialBillingMode === "annual" ? "year" : "month"}`
+              : "Custom quote"}
+        </p>
+        {annualPrice && annualPrice.savingsMinor > 0 && <p className="mt-1 text-xs">Annual savings: {current.currency} {annualPrice.savingsPrice}{annualPrice.activePromoLabel ? " · " + annualPrice.activePromoLabel : ""}</p>}
+        <p className="mt-2 text-xs leading-5">The Super Admin will confirm the price at approval. This request is not a payment.</p>
+      </div>}
 
       <div>
         <p className="mb-2 text-sm font-medium text-slate-700">Required modules</p>
