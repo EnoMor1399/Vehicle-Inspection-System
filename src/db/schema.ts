@@ -259,6 +259,7 @@ export const organizationSubscriptions = pgTable(
     planId: varchar("plan_id", { length: 36 })
       .notNull()
       .references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+    billingCycle: billingCycleEnum("billing_cycle").notNull().default("monthly"),
     status: subscriptionStatusEnum("status").notNull().default("trialing"),
     provider: varchar("provider", { length: 40 }).notNull().default("manual"),
     providerCustomerId: varchar("provider_customer_id", { length: 150 }),
@@ -354,6 +355,7 @@ export const organizationOnboardingRequests = pgTable(
     estimatedUsers: integer("estimated_users"),
     estimatedVehicles: integer("estimated_vehicles"),
     desiredPlanCode: varchar("desired_plan_code", { length: 50 }),
+    requestedBillingCycle: billingCycleEnum("requested_billing_cycle").notNull().default("monthly"),
     requestedModules: jsonb("requested_modules").$type<string[]>().notNull().default(["vehicle_inspection"]),
     notes: text("notes"),
     status: onboardingRequestStatusEnum("status").notNull().default("pending"),
