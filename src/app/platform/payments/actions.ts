@@ -8,6 +8,7 @@ import { organizations, organizationSubscriptions, subscriptionPayments, subscri
 import { requirePlatformSuperAdmin } from "@/lib/require-auth";
 import { logAudit } from "@/lib/audit";
 import { paymentsAvailable, toGhsPesewas, verifyAndRecordPayment } from "@/lib/paystack-payments";
+import { calculateAnnualPlanPrice } from "@/lib/subscription-plan-pricing";
 
 const controlSchema = z.object({
   organizationId: z.string().uuid(),
@@ -142,6 +143,16 @@ export async function verifySubscriptionPayment(
 
 export type PlanPricingState = { ok: boolean; message: string };
 
+const promoDate = z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]);
+function normalizedPromoDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value + "T00:00:00.000Z");
+  if (Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== value) {
+    throw new Error("Promotion date is invalid.");
+  }
+  return value;
+}
+
 export async function updateSubscriptionPlanPricing(
   _previous: PlanPricingState,
   formData: FormData,
@@ -152,22 +163,75 @@ export async function updateSubscriptionPlanPricing(
     price: z.string().trim().regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/),
     billingCycle: z.enum(["monthly", "annual", "custom"]),
     isActive: z.enum(["true", "false"]),
+    annualDiscountPercent: z.coerce.number().int().min(0).max(90),
+    promoDiscountPercent: z.coerce.number().int().min(0).max(90),
+    promoLabel: z.string().trim().max(80),
+    promoStartsOn: promoDate,
+    promoEndsOn: promoDate,
   }).safeParse({
     planId: formData.get("planId"),
     price: formData.get("price"),
     billingCycle: formData.get("billingCycle"),
     isActive: formData.get("isActive"),
+    annualDiscountPercent: formData.get("annualDiscountPercent"),
+    promoDiscountPercent: formData.get("promoDiscountPercent"),
+    promoLabel: formData.get("promoLabel") ?? "",
+    promoStartsOn: formData.get("promoStartsOn") ?? "",
+    promoEndsOn: formData.get("promoEndsOn") ?? "",
   });
-  if (!parsed.success) return { ok: false, message: "Enter a valid GHS price (up to two decimal places), cycle, and availability." };
+  if (!parsed.success) {
+    return { ok: false, message: "Enter valid prices and annual/promo discounts (0–90%), with correctly formatted dates." };
+  }
+  const values = parsed.data;
+  let startDate: string | null;
+  let endDate: string | null;
+  try {
+    startDate = normalizedPromoDate(values.promoStartsOn);
+    endDate = normalizedPromoDate(values.promoEndsOn);
+  } catch {
+    return { ok: false, message: "Enter valid promotion dates." };
+  }
+  if (startDate && endDate && startDate > endDate) {
+    return { ok: false, message: "The promotion end date cannot precede its start date." };
+  }
+  if (values.billingCycle !== "monthly" &&
+      (values.annualDiscountPercent > 0 || values.promoDiscountPercent > 0)) {
+    return { ok: false, message: "Annual discount and promo settings require a monthly base plan." };
+  }
+  // Do not leave invisible offers on a zero-priced custom plan.
+  if (Number(values.price) === 0 && (values.annualDiscountPercent || values.promoDiscountPercent)) {
+    return { ok: false, message: "Set a positive monthly base price before enabling discounts." };
+  }
 
   const [plan] = await db.select().from(subscriptionPlans)
-    .where(eq(subscriptionPlans.id, parsed.data.planId)).limit(1);
+    .where(eq(subscriptionPlans.id, values.planId)).limit(1);
   if (!plan) return { ok: false, message: "Subscription plan not found." };
   if (plan.currency !== "GHS") {
     return { ok: false, message: "Only Ghana cedi pricing can be updated in this Paystack control centre." };
   }
-  // Super Admin approval is audited. Updating catalog prices does not alter
-  // already assigned invoices or retroactively charge any subscriber.
+  const nextOffer = {
+    price: Number(values.price).toFixed(2),
+    billingCycle: values.billingCycle,
+    currency: plan.currency,
+    annualDiscountPercent: values.annualDiscountPercent,
+    promoDiscountPercent: values.promoDiscountPercent,
+    promoLabel: values.promoDiscountPercent ? values.promoLabel || null : null,
+    promoStartsOn: values.promoDiscountPercent ? startDate : null,
+    promoEndsOn: values.promoDiscountPercent ? endDate : null,
+  };
+  let preview;
+  try {
+    preview = calculateAnnualPlanPrice(nextOffer);
+    if (Number(values.price) > 0 && preview && preview.annualMinor === 0) {
+      return { ok: false, message: "Combined discounts cannot reduce a paid annual subscription to zero." };
+    }
+  } catch {
+    return { ok: false, message: "The resulting annual price is invalid. Review the monthly price and discounts." };
+  }
+
+  // Audit before mutation, fail closed if the audit service is unavailable.
+  // Catalog updates cannot rewrite already approved organization invoices,
+  // outstanding Paystack amounts or existing payment records.
   try {
     await logAudit({
       organizationId: actor.organizationId,
@@ -177,25 +241,40 @@ export async function updateSubscriptionPlanPricing(
       entityType: "platform_subscription_plan_pricing",
       entityId: plan.id,
       entityLabel: plan.name,
-      summary: "Super Admin updated VIMS subscription plan pricing and availability",
-      before: { price: plan.price, billingCycle: plan.billingCycle, isActive: plan.isActive },
+      summary: "Super Admin updated monthly pricing, annual discount and promotional offer",
+      before: {
+        price: plan.price,
+        billingCycle: plan.billingCycle,
+        isActive: plan.isActive,
+        annualDiscountPercent: plan.annualDiscountPercent,
+        promoDiscountPercent: plan.promoDiscountPercent,
+        promoLabel: plan.promoLabel,
+        promoStartsOn: plan.promoStartsOn,
+        promoEndsOn: plan.promoEndsOn,
+      },
       after: {
-        price: parsed.data.price,
-        billingCycle: parsed.data.billingCycle,
-        isActive: parsed.data.isActive === "true",
-        currency: "GHS",
+        ...nextOffer,
+        isActive: values.isActive === "true",
+        calculatedAnnualPrice: preview?.annualPrice || null,
       },
       required: true,
     });
     await db.update(subscriptionPlans).set({
-      price: Number(parsed.data.price).toFixed(2),
-      billingCycle: parsed.data.billingCycle,
-      isActive: parsed.data.isActive === "true",
+      ...nextOffer,
+      isActive: values.isActive === "true",
       updatedAt: new Date(),
     }).where(eq(subscriptionPlans.id, plan.id));
     revalidatePath("/platform/payments");
     revalidatePath("/platform/organizations");
-    return { ok: true, message: "Plan catalog updated. Existing organization invoices were not changed." };
+    revalidatePath("/");
+    revalidatePath("/welcome");
+    revalidatePath("/subscribe");
+    return {
+      ok: true,
+      message: preview
+        ? `Plan saved. Current annual catalogue price: GH₵${preview.annualPrice}. Existing invoices and payments were not changed.`
+        : "Plan saved. Annual pricing requires a positive monthly base amount. Existing invoices were not changed.",
+    };
   } catch {
     return { ok: false, message: "Could not update plan pricing safely. Review the audit service and retry." };
   }
