@@ -58,7 +58,7 @@ export default async function PlatformPaymentMonitorPage() {
         <div>
           <h2 className="text-lg font-bold text-slate-950">Subscription plan catalog</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Set prices, billing cycles and plan availability for future subscriber assignments.
+            Set the monthly base price, automatically calculate the annual price, and schedule annual discounts or promotional offers for future subscriber assignments.
             Existing organization subscriptions keep their approved invoice amounts until the Super Admin updates them individually.
           </p>
         </div>
@@ -70,6 +70,11 @@ export default async function PlatformPaymentMonitorPage() {
             price: plan.price,
             billingCycle: plan.billingCycle,
             isActive: plan.isActive,
+            annualDiscountPercent: plan.annualDiscountPercent,
+            promoDiscountPercent: plan.promoDiscountPercent,
+            promoLabel: plan.promoLabel,
+            promoStartsOn: plan.promoStartsOn,
+            promoEndsOn: plan.promoEndsOn,
           }} />
         ))}
         {!plans.length && <p className="text-sm text-slate-500">No subscription plans have been configured.</p>}
