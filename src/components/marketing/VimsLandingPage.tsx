@@ -1,0 +1,422 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import {
+  ArrowRight, ArrowUpRight, BarChart3, Check, CheckCircle2, ChevronDown,
+  ClipboardCheck, FileCheck2, Layers3, LockKeyhole, Minus, ShieldCheck, Sparkles, Truck,
+} from "lucide-react";
+import type { subscriptionPlans } from "@/db/schema";
+import { calculateAnnualPlanPrice } from "@/lib/subscription-plan-pricing";
+
+type Plan = typeof subscriptionPlans.$inferSelect;
+type BillingView = "monthly" | "annual";
+type FeatureRow = { label: string; description?: string; value: (plan: Plan) => string | boolean };
+type FeatureGroup = { title: string; rows: FeatureRow[] };
+
+const comparison: FeatureGroup[] = [
+  {
+    title: "Inspection operations",
+    rows: [
+      { label: "Digital vehicle inspection", value: (plan) => plan.modules.includes("vehicle_inspection") },
+      { label: "Fleet and transporter records", value: (plan) => plan.modules.includes("vehicle_inspection") },
+      { label: "Inspection reports and certificates", value: (plan) => plan.modules.includes("vehicle_inspection") },
+      { label: "Users", description: "Maximum active user accounts", value: (plan) => plan.maxUsers.toLocaleString("en-GH") },
+      { label: "Stations", description: "Maximum inspection locations", value: (plan) => plan.maxStations.toLocaleString("en-GH") },
+      { label: "Registered vehicles", value: (plan) => plan.maxVehicles.toLocaleString("en-GH") },
+      { label: "Inspections per month", value: (plan) => plan.maxInspectionsPerMonth.toLocaleString("en-GH") },
+    ],
+  },
+  {
+    title: "Modules & reporting",
+    rows: [
+      { label: "Reports & analytics", value: (plan) => plan.modules.includes("reports") },
+      { label: "Driver training & assessment", value: (plan) => plan.modules.includes("driver_training") },
+      { label: "API & integrations", description: "Requires the API module in your plan", value: (plan) => plan.modules.includes("api") },
+    ],
+  },
+  {
+    title: "Organisation & security",
+    rows: [
+      { label: "Dedicated organisation workspace", value: () => true },
+      { label: "Role-based employee access", value: () => true },
+      { label: "Activity and audit history", value: () => true },
+      { label: "Organisation branding", value: (plan) => Boolean(plan.features?.custom_branding) },
+      { label: "Priority support", value: (plan) => Boolean(plan.features?.priority_support) },
+      { label: "Trial policy", value: (plan) => plan.trialDays > 0 ? plan.trialDays + " days" : "On request" },
+    ],
+  },
+];
+
+const benefits = [
+  { icon: ClipboardCheck, title: "Structured inspections", text: "Digital assessment workflows, traceable findings and approvals." },
+  { icon: Truck, title: "Connected fleet records", text: "Vehicles, transporters, compliance history and certificates in one place." },
+  { icon: BarChart3, title: "Operational visibility", text: "Actionable reporting for inspection and fleet management teams." },
+  { icon: LockKeyhole, title: "Protected company data", text: "Role-aware access and separate organisation workspaces." },
+];
+
+const faq = [
+  { q: "Can we add staff to our organisation?", a: "Yes. Organisation administrators can create employee accounts inside their own organisation, within the subscribed user capacity." },
+  { q: "Is driver training included with every package?", a: "No. Included modules differ by package. Consult the comparison table to confirm whether Driver Training & Assessment is included." },
+  { q: "How is annual billing calculated?", a: "Annual catalogue pricing starts at twelve months of the published monthly price. Super Admin annual savings and any active promotion are applied automatically. Your subscription remains subject to approval before payment." },
+  { q: "Will our data be separate from other subscribers?", a: "Each company is assigned its own organisation-scoped workspace. Activation requires administrative approval and tenant-isolation verification." },
+];
+
+function priceFor(plan: Plan, period: BillingView) {
+  const value = Number(plan.price);
+  if (period === "annual" && plan.billingCycle === "monthly") {
+    const annual = calculateAnnualPlanPrice(plan);
+    if (annual) {
+      const symbol = plan.currency === "GHS" ? "GH₵" : plan.currency + " ";
+      return {
+        amount: symbol + new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(annual.annualPrice)),
+        frequency: "per year",
+        previous: annual.savingsMinor > 0 ? symbol + annual.baseAnnualPrice : null,
+        savings: annual.savingsMinor > 0 ? symbol + annual.savingsPrice : null,
+        promo: annual.activePromoLabel,
+        discount: annual.annualDiscountPercent,
+        promotionalPercent: annual.activePromoPercent,
+      };
+    }
+  }
+  if (plan.billingCycle === period && value > 0 && Number.isFinite(value)) {
+    const amount = new Intl.NumberFormat("en-GH", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(value);
+    return { amount: plan.currency === "GHS" ? "GH₵" + amount : plan.currency + " " + amount, frequency: period === "annual" ? "per year" : "per month", previous: null, savings: null, promo: null, discount: 0, promotionalPercent: 0 };
+  }
+  return { amount: "Custom quote", frequency: period === "annual" ? "Annual terms on request" : "Pricing on request", previous: null, savings: null, promo: null, discount: 0, promotionalPercent: 0 };
+}
+
+function ValueCell({ value }: { value: string | boolean }) {
+  if (typeof value === "boolean") {
+    return value
+      ? <span className="inline-flex items-center gap-1 text-emerald-700" aria-label="Included"><CheckCircle2 size={17} aria-hidden="true" /><span className="sr-only">Included</span></span>
+      : <span className="inline-flex items-center gap-1 text-slate-400" aria-label="Not included"><Minus size={16} aria-hidden="true" /><span className="sr-only">Not included</span></span>;
+  }
+  return <span className="font-medium text-zinc-700">{value}</span>;
+}
+
+function PlanAction({ plan, view, wide = false, featured = false }: { plan: Plan; view: BillingView; wide?: boolean; featured?: boolean }) {
+  const href = "/subscribe?plan=" + encodeURIComponent(plan.code) + (view === "annual" ? "&billing=annual" : "");
+  return (
+    <Link href={href} className={"group/cta inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 " + (featured ? "bg-emerald-400 text-[#092c25] hover:bg-emerald-300" : "bg-[#141414] text-white hover:bg-[#2b3741]") + (wide ? " w-full" : "")}>
+      {view === "annual" ? (priceFor(plan, view).amount === "Custom quote" ? "Request annual quote" : "Request annual plan") : "Get started"} <ArrowUpRight size={16} aria-hidden="true" className="transition group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5" />
+    </Link>
+  );
+}
+
+export function VimsLandingPage({ plans }: { plans: Plan[] }) {
+  const [billingView, setBillingView] = useState<BillingView>("monthly");
+  const highlighted = plans.some((plan) => plan.code === "professional") ? "professional" : plans[1]?.code;
+
+  return (
+    <div className="min-h-screen bg-[#efefef] px-0 py-0 text-[#171717] sm:px-5 sm:py-9 lg:py-14">
+      <div className="mx-auto min-h-screen max-w-[1270px] bg-white shadow-[0_12px_70px_rgba(0,0,0,.045)] sm:min-h-[95vh]">
+        <div className="relative z-30 px-4 pt-4 sm:px-7 sm:pt-6 lg:px-10">
+          <header className="flex min-h-[66px] items-center justify-between gap-3 rounded-[19px] border border-white/10 bg-[#101b22] px-4 text-white shadow-[0_14px_32px_rgba(8,18,28,.16)] sm:rounded-full sm:px-6">
+            <Link href="/welcome" className="inline-flex shrink-0 items-center gap-2.5 text-sm font-black tracking-[-.03em]" aria-label="VIMS home">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-400 text-[#05281e]"><ShieldCheck size={20} aria-hidden="true" /></span>
+              <span>VIMS<span className="text-emerald-400">.</span><span className="ml-2 hidden border-l border-white/20 pl-3 text-[10px] font-medium uppercase tracking-[.15em] text-slate-400 lg:inline">Enterprise</span></span>
+            </Link>
+            <nav aria-label="Landing page" className="hidden flex-1 items-center justify-center gap-6 text-[12px] font-semibold text-white/80 md:flex">
+              <a href="#overview" className="transition hover:text-emerald-300">Home</a>
+              <a href="#benefits" className="transition hover:text-emerald-300">Features</a>
+              <a href="#pricing" className="transition hover:text-emerald-300">Pricing</a>
+              <a href="#workflow" className="transition hover:text-emerald-300">How it works</a>
+              <a href="#faq" className="transition hover:text-emerald-300">FAQs</a>
+            </nav>
+            <div className="hidden items-center gap-3 sm:flex">
+              <Link href="/login" className="rounded-full px-3 py-2.5 text-xs font-semibold text-white/85 transition hover:text-emerald-300">Log in</Link>
+              <Link href="/subscribe" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-extrabold text-[#12232c] transition hover:bg-emerald-100">Request access <ArrowUpRight size={15} aria-hidden="true" /></Link>
+            </div>
+            <details className="group relative sm:hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">Menu <ChevronDown size={15} className="transition group-open:rotate-180" /></summary>
+              <nav aria-label="Mobile landing page" className="absolute right-0 top-11 z-30 flex w-56 flex-col rounded-2xl border border-zinc-700 bg-[#101b22] p-2 shadow-2xl">
+                <a href="#overview" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Home</a>
+                <a href="#pricing" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Pricing</a>
+                <a href="#benefits" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Features</a>
+                <a href="#faq" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">FAQs</a>
+                <Link href="/login" className="rounded-lg px-3 py-2.5 text-xs hover:bg-zinc-700">Log in</Link>
+                <Link href="/subscribe" className="rounded-lg bg-emerald-400 px-3 py-2.5 text-xs font-bold text-[#103024]">Request access</Link>
+              </nav>
+            </details>
+          </header>
+        </div>
+
+        <main>
+          <section id="overview" className="scroll-mt-4 px-4 pb-3 pt-5 sm:px-7 lg:px-10">
+            <div className="relative isolate overflow-hidden rounded-[28px] bg-[#0a2431] px-6 py-11 text-white sm:px-10 sm:py-14 lg:px-14 lg:py-[68px]">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_17%,rgba(52,211,153,.25),transparent_36%),linear-gradient(120deg,#102d3c_0%,#091c2a_67%,#0e3441_100%)]" />
+              <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-48 -z-10 h-[520px] w-[520px] rounded-full border border-white/10" />
+              <div aria-hidden="true" className="pointer-events-none absolute -right-5 -top-24 -z-10 h-[370px] w-[370px] rounded-full border border-white/10" />
+              <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
+                <div className="relative max-w-[600px]">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-bold tracking-wide text-emerald-200"><Sparkles size={14} aria-hidden="true" /> Designed for modern inspection operations</span>
+                  <h1 className="mt-6 text-[clamp(2.55rem,5vw,4.65rem)] font-extrabold leading-[1.08] tracking-[-.055em]">Every inspection.<br /><span className="text-emerald-300">One powerful</span><br />platform.</h1>
+                  <p className="mt-6 max-w-[515px] text-sm leading-7 text-slate-300 sm:text-base sm:leading-8">Run vehicle inspections, manage fleet compliance and keep certificates, people and reports connected — all from one secure VIMS workspace.</p>
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <a href="#pricing" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-sm font-extrabold text-[#09352a] shadow-[0_12px_28px_rgba(52,211,153,.18)] transition hover:-translate-y-0.5 hover:bg-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">Explore pricing <ArrowRight size={17} aria-hidden="true" /></a>
+                    <Link href="/subscribe" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/25 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">Request a workspace</Link>
+                  </div>
+                  <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-semibold text-slate-300">
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300" /> Company data isolation</span>
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300" /> Digital inspection workflows</span>
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300" /> Audit-ready records</span>
+                  </div>
+                </div>
+                <div className="relative mx-auto w-full max-w-[560px]">
+                  <div className="absolute -inset-4 rounded-[30px] bg-emerald-400/10 blur-2xl" aria-hidden="true" />
+                  <div className="relative overflow-hidden rounded-[23px] border border-white/20 bg-white p-3 text-slate-900 shadow-[0_30px_65px_rgba(0,0,0,.32)] sm:p-4">
+                    <div className="flex items-center justify-between rounded-xl bg-[#0b2735] px-4 py-3 text-white">
+                      <span className="inline-flex items-center gap-2 text-xs font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-400 text-[#07352b]"><ShieldCheck size={16} /></span> VIMS Operations</span>
+                      <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">Workflow preview</span>
+                    </div>
+                    <div className="px-1 pb-1 pt-5 sm:px-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-400">Operations workspace</p><h2 className="mt-1 text-base font-extrabold tracking-tight">All your inspections, connected.</h2></div>
+                        <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Layers3 size={19} /></span>
+                      </div>
+                      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
+                        {[
+                          { icon: Truck, title: "Fleet records", subtitle: "Vehicles & transporters" },
+                          { icon: ClipboardCheck, title: "Inspections", subtitle: "Digital assessments" },
+                          { icon: FileCheck2, title: "Certificates", subtitle: "Review & verification" },
+                          { icon: BarChart3, title: "Reporting", subtitle: "Operational insight" },
+                        ].map(({ icon: Icon, title, subtitle }) => (
+                          <div key={title} className="rounded-xl border border-slate-100 bg-[#f7f9fb] px-3 py-3.5">
+                            <span className="inline-flex items-center gap-2 text-[11px] font-bold"><Icon size={16} className="shrink-0 text-emerald-700" />{title}</span>
+                            <p className="mt-1 text-[10px] text-slate-500">{subtitle}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 rounded-xl border border-slate-100 bg-[#f7f9fb] p-3 sm:p-4">
+                        <div className="flex items-center justify-between gap-2"><span className="text-xs font-extrabold">Inspection workflow</span><span className="text-[10px] font-medium text-slate-400">Illustrative interface</span></div>
+                        <div className="mt-4 grid grid-cols-4 gap-1">
+                          {["Register", "Inspect", "Review", "Certify"].map((label, index) => (
+                            <div key={label} className="flex flex-col items-center gap-2 text-center">
+                              <span className={"grid h-9 w-9 place-items-center rounded-full text-xs font-extrabold " + (index < 3 ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500")}>{index < 3 ? <Check size={16} aria-hidden="true" /> : "4"}</span>
+                              <span className="text-[9px] font-semibold text-slate-600 sm:text-[10px]">{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute -bottom-5 -left-4 hidden items-center gap-2 rounded-xl border border-white/20 bg-[#163b42] px-3.5 py-3 text-white shadow-xl sm:inline-flex"><span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-400/15 text-emerald-300"><ShieldCheck size={18} /></span><span className="text-[11px] font-extrabold">Secure by design</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="pricing" className="relative scroll-mt-4 overflow-hidden px-5 pb-4 pt-16 sm:px-10 lg:px-[7%] lg:pt-20">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-36 h-[410px] w-[410px] rounded-full border border-zinc-100">
+              <div className="absolute inset-9 rounded-full border border-zinc-100" />
+              <div className="absolute inset-[75px] rounded-full border border-zinc-100" />
+              <div className="absolute inset-[119px] rounded-full border border-zinc-100" />
+            </div>
+            <div className="relative">
+              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[.14em] text-emerald-700"><Sparkles size={13} aria-hidden="true" /> Simple plans. Serious capability.</span>
+              <h1 className="mt-5 text-[clamp(2.5rem,5vw,4.25rem)] font-extrabold leading-[1.08] tracking-[-.06em] text-[#161616]">Pricing plans</h1>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-[#747474] sm:text-base">Choose the right foundation for safer, smarter operations. Every package is tailored to the scale of your organisation, with clear limits and a simple onboarding process.</p>
+
+              <div className="mt-9 inline-flex gap-1 rounded-xl border border-zinc-200 bg-[#f5f5f5] p-1 shadow-inner" role="group" aria-label="Billing period">
+                <button type="button" aria-pressed={billingView === "annual"} onClick={() => setBillingView("annual")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "annual" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Annual pricing</button>
+                <button type="button" aria-pressed={billingView === "monthly"} onClick={() => setBillingView("monthly")} className={"rounded-lg px-4 py-2 text-xs font-semibold transition " + (billingView === "monthly" ? "bg-white text-black shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-black")}>Monthly pricing</button>
+              </div>
+              {billingView === "annual" && <p className="mt-2 text-xs text-zinc-500">Annual price = monthly price × 12, less the Super Admin annual discount and any active promotion. Custom-priced plans require a quotation.</p>}
+            </div>
+            {plans.length === 0 ? (
+              <div className="mt-7 rounded-2xl border border-zinc-200 bg-zinc-50 p-8 text-center">
+                <h2 className="text-xl font-bold">Subscription packages are being updated</h2>
+                <p className="mt-2 text-sm text-zinc-500">Request a tailored VIMS proposal while the catalogue is updated.</p>
+                <Link href="/subscribe" className="mt-5 inline-flex rounded-lg bg-zinc-900 px-5 py-3 text-sm font-semibold text-white">Request proposal</Link>
+              </div>
+            ) : (
+              <div className="mt-8 grid gap-5 lg:grid-cols-3">
+                {plans.map((plan) => {
+                  const price = priceFor(plan, billingView);
+                  const isPopular = plan.code === highlighted;
+                  return (
+                    <article key={plan.id} className={"group relative flex min-h-[420px] flex-col overflow-visible rounded-[24px] border px-6 pb-6 pt-8 transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_60px_rgba(6,42,38,.15)] sm:px-7 " + (isPopular
+                      ? "border-[#12483d] bg-[radial-gradient(ellipse_at_95%_2%,rgba(52,211,153,.18),transparent_48%),linear-gradient(155deg,#123b3c,#092b35)] text-white shadow-[0_18px_48px_rgba(8,45,49,.19)]"
+                      : "border-zinc-200 bg-[#f8f9f9] text-zinc-900 shadow-[0_10px_25px_rgba(17,33,44,.045)]")}>
+                      {isPopular && <span className="absolute -top-3 left-5 rounded-full border border-emerald-100/20 bg-emerald-400 px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[.1em] text-[#073427] shadow-md">Featured plan</span>}
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className={"text-[10px] font-extrabold uppercase tracking-[.18em] " + (isPopular ? "text-emerald-200" : "text-emerald-700")}>VIMS subscription</p>
+                          <h2 className="mt-2 text-[23px] font-extrabold tracking-[-.04em]">{plan.name}</h2>
+                        </div>
+                        <span className={"grid h-11 w-11 shrink-0 place-items-center rounded-2xl border " + (isPopular ? "border-white/15 bg-white/10 text-emerald-200" : "border-emerald-100 bg-white text-emerald-700")}><Layers3 size={22} aria-hidden="true" /></span>
+                      </div>
+                      <p className={"mt-3 min-h-[50px] text-[13px] leading-[1.65] " + (isPopular ? "text-slate-200" : "text-zinc-500")}>{plan.description || "Flexible inspection operations for your organisation."}</p>
+                      {price.previous && <p className={"mt-4 text-xs font-semibold " + (isPopular ? "text-slate-300" : "text-zinc-500")}>Regular annual price: <span className="line-through">{price.previous}</span></p>}
+                      <div className={"mt-5 flex min-h-[73px] items-center gap-2 border-b pb-5 " + (isPopular ? "border-white/15" : "border-zinc-200")}>
+                        <span className="text-[clamp(1.75rem,2.5vw,2.5rem)] font-black tracking-[-.06em]">{price.amount}</span>
+                        {price.amount !== "Custom quote" && <span className={"max-w-[70px] text-[11px] leading-4 " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{price.frequency}</span>}
+                      </div>
+                      {billingView === "annual" && price.savings && (
+                        <div className={"mt-3 flex flex-wrap items-center gap-2 text-[11px] font-bold " + (isPopular ? "text-emerald-200" : "text-emerald-700")}>
+                          <span className={"rounded-full px-3 py-1 " + (isPopular ? "bg-white/10" : "bg-emerald-100")}>Save {price.savings} / year</span>
+                          {price.discount > 0 && <span>{price.discount}% annual saving</span>}
+                          {price.promo && <span className={"rounded-full px-3 py-1 " + (isPopular ? "bg-amber-200/20 text-amber-100" : "bg-amber-100 text-amber-800")}>{price.promo} · {price.promotionalPercent}% off</span>}
+                        </div>
+                      )}
+                      <p className={"mt-4 text-[10px] font-extrabold uppercase tracking-[.16em] " + (isPopular ? "text-emerald-200" : "text-zinc-500")}>Included capacity</p>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
+                        {[
+                          { label: "Users", value: plan.maxUsers },
+                          { label: "Stations", value: plan.maxStations },
+                          { label: "Vehicles", value: plan.maxVehicles },
+                          { label: "Inspections / mo.", value: plan.maxInspectionsPerMonth },
+                        ].map((item) => (
+                          <div key={item.label} className={"rounded-xl border px-3 py-2.5 " + (isPopular ? "border-white/10 bg-white/[.07]" : "border-zinc-200/80 bg-white")}>
+                            <div className="text-[17px] font-extrabold tracking-tight">{item.value.toLocaleString("en-GH")}</div>
+                            <div className={"mt-0.5 text-[10px] font-medium " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{item.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-auto pt-6"><PlanAction plan={plan} view={billingView} featured={isPopular} wide /></div>
+                      {plan.trialDays > 0 && <p className={"mt-3 text-center text-[10px] " + (isPopular ? "text-slate-300" : "text-zinc-500")}>{plan.trialDays}-day trial policy · activation subject to approval</p>}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="mt-5 text-xs leading-5 text-zinc-500">Prices and plan capacities are taken from the active VIMS catalogue. A request is subject to administrative approval; no payment is collected on this page.</p>
+          </section>
+
+          {plans.length > 0 && (
+            <section aria-labelledby="compare-title" className="px-5 pb-16 pt-9 sm:px-10 lg:px-[7%]">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 id="compare-title" className="text-2xl font-extrabold tracking-[-.04em] sm:text-3xl">Compare what’s included</h2>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">Plan entitlements, operational capacities and security benefits.</p>
+                </div>
+                <span className="rounded-full border border-zinc-200 px-3 py-1.5 text-[11px] font-medium text-zinc-600"><ShieldCheck size={13} className="mr-1 inline text-emerald-700" /> Separate company workspaces</span>
+              </div>
+              <div className="overflow-x-auto rounded-[20px] border border-zinc-200 bg-white shadow-[0_14px_42px_rgba(19,40,48,.045)]" role="region" aria-label="Subscription feature comparison" tabIndex={0}>
+                <table className="w-full min-w-[730px] table-fixed border-separate border-spacing-0 text-left">
+                  <caption className="sr-only">VIMS subscription packages and included benefits</caption>
+                  <thead>
+                    <tr className="bg-[#f5f7f7] text-xs text-zinc-900">
+                      <th scope="col" className="w-[29%] border-b border-zinc-200 px-5 py-5 font-extrabold">Features</th>
+                      {plans.map((plan) => <th scope="col" key={plan.id} className={"border-b border-zinc-200 px-3 py-5 text-center font-extrabold " + (plan.code === highlighted ? "bg-emerald-50 text-emerald-900" : "")}>{plan.name} plan</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison.map((group) => (
+                      <FragmentGroup key={group.title} group={group} plans={plans} highlighted={highlighted} />
+                    ))}
+                    <tr>
+                      <th scope="row" className="border-t border-zinc-100 bg-[#f8faf9] px-5 py-6 text-xs font-extrabold">Ready to get started?</th>
+                      {plans.map((plan) => (
+                        <td key={plan.id} className={"border-t border-zinc-100 px-3 py-6 text-center " + (plan.code === highlighted ? "bg-emerald-50/60" : "bg-[#f8faf9]")}><PlanAction plan={plan} view={billingView} wide /></td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-zinc-500">Features can require administrative setup and assigned roles. API access requires the API module to be included in the plan.</p>
+            </section>
+          )}
+
+          <section id="benefits" className="scroll-mt-6 border-t border-zinc-100 bg-[#f8faf9] px-5 py-20 sm:px-10 lg:px-[7%]">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">Why VIMS</span>
+              <h2 className="mt-3 text-3xl font-extrabold leading-[1.15] tracking-[-.05em] sm:text-4xl">All the essentials. <span className="text-emerald-700">One smarter workspace.</span></h2>
+              <p className="mt-3 text-sm leading-6 text-zinc-500">Designed for vehicle inspection centres, fleet teams and transport organisations. Module availability depends on your plan.</p>
+            </div>
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {benefits.map(({ icon: Icon, title, text }) => (
+                <article key={title} className="group rounded-[22px] border border-zinc-200 bg-white p-6 shadow-[0_10px_30px_rgba(9,38,36,.035)] transition duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_22px_42px_rgba(9,38,36,.09)]">
+                  <div className="grid h-12 w-12 place-items-center rounded-[15px] bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100"><Icon size={20} aria-hidden="true" /></div>
+                  <h3 className="mt-5 text-[15px] font-extrabold tracking-tight">{title}</h3>
+                  <p className="mt-3 text-xs leading-6 text-zinc-500">{text}</p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-5 text-[11px] text-zinc-500">Illustrative interface features; availability and user permissions depend on your subscription and account role.</p>
+          </section>
+
+          <section id="workflow" className="scroll-mt-6 border-y border-zinc-100 bg-white px-5 py-16 sm:px-10 lg:px-[7%]">
+            <div className="grid gap-8 md:grid-cols-[.85fr_1.15fr] md:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Simple onboarding</p>
+                <h2 className="mt-2 text-3xl font-extrabold tracking-[-.04em]">From plan to workspace</h2>
+              </div>
+              <ol className="grid gap-4 sm:grid-cols-3">
+                {[
+                  { step: "01", label: "Choose your plan" },
+                  { step: "02", label: "Submit your request" },
+                  { step: "03", label: "Approve & activate" },
+                ].map((item) => <li key={item.step} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-[#f7f9f8] p-3 text-xs font-bold text-zinc-700"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white font-bold text-emerald-700">{item.step}</span>{item.label}</li>)}
+              </ol>
+            </div>
+          </section>
+
+          <section id="faq" className="scroll-mt-6 px-5 py-14 sm:px-10 lg:px-[7%]">
+            <h2 className="text-2xl font-extrabold tracking-tight">Frequently asked questions</h2>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {faq.map(({ q, a }) => (
+                <details key={q} className="group rounded-xl border border-zinc-200 p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">{q}<ChevronDown size={17} className="shrink-0 transition group-open:rotate-180" /></summary>
+                  <p className="mt-3 text-xs leading-6 text-zinc-600">{a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+          <section className="px-4 pb-10 pt-4 sm:px-7 lg:px-10">
+            <div className="relative overflow-hidden rounded-[26px] bg-[#0b2b35] px-7 py-10 text-white sm:px-10 sm:py-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-32 h-96 w-96 rounded-full border border-white/10" />
+              <div className="relative">
+                <p className="text-[11px] font-bold uppercase tracking-[.16em] text-emerald-300">Your next step</p>
+                <h2 className="mt-3 max-w-2xl text-2xl font-extrabold tracking-[-.04em] sm:text-3xl">Ready to modernise your inspection operations?</h2>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300">Select a plan and request your VIMS workspace. Our team will review your organisation’s requirements before activation.</p>
+              </div>
+              <Link href="/subscribe" className="relative mt-7 inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-sm font-extrabold text-[#082b23] transition hover:bg-emerald-300 lg:mt-0">Request your workspace <ArrowUpRight size={17} aria-hidden="true" /></Link>
+            </div>
+          </section>
+        </main>
+
+        <footer className="border-t border-zinc-100 bg-[#fcfdfd] px-5 pb-12 pt-14 sm:px-10 lg:px-[7%]">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.8fr_repeat(4,minmax(0,1fr))]">
+            <div>
+              <Link href="/welcome" className="inline-flex items-center gap-2 text-base font-extrabold">
+                <span className="grid h-8 w-8 place-items-center rounded-full border border-zinc-800"><ShieldCheck size={17} /></span> VIMS
+              </Link>
+              <p className="mt-4 max-w-[245px] text-xs leading-6 text-zinc-500">The enterprise platform for digital vehicle inspection, safer fleet operations and accountable compliance.</p>
+            </div>
+            <FooterColumn title="Platform" items={[{ label: "Overview", href: "/welcome" }, { label: "Features", href: "#benefits" }, { label: "Pricing", href: "#pricing" }]} />
+            <FooterColumn title="Organisation" items={[{ label: "Get started", href: "/subscribe" }, { label: "How it works", href: "#workflow" }, { label: "Login", href: "/login" }]} />
+            <FooterColumn title="Resources" items={[{ label: "FAQs", href: "#faq" }, { label: "Plan comparison", href: "#compare-title" }, { label: "Subscriptions", href: "/subscribe" }]} />
+            <FooterColumn title="Security" items={[{ label: "Tenant isolation", href: "#benefits" }, { label: "Plan access", href: "#compare-title" }, { label: "Secure sign in", href: "/login" }]} />
+          </div>
+          <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-6 text-[11px] text-zinc-500"><span>© {new Date().getFullYear()} VIMS. Vehicle Inspection Management System.</span><span>Secure inspection operations for modern organisations.</span></div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function FragmentGroup({ group, plans, highlighted }: { group: FeatureGroup; plans: Plan[]; highlighted?: string }) {
+  return <>
+    <tr><th scope="colgroup" colSpan={plans.length + 1} className="bg-[#edf3f1] px-5 pb-3 pt-7 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#143c34]">{group.title}</th></tr>
+    {group.rows.map((row) => (
+      <tr key={row.label} className="group/row transition-colors hover:bg-emerald-50/40">
+        <th scope="row" className="border-t border-zinc-100 px-5 py-4 align-middle text-xs font-semibold text-zinc-700">
+          <span>{row.label}</span>
+          {row.description && <span className="ml-1 cursor-help text-zinc-400" title={row.description} aria-label={row.description}>ⓘ</span>}
+        </th>
+        {plans.map((plan) => (
+          <td key={plan.id} className={"border-t border-zinc-100 px-3 py-4 text-center text-xs " + (plan.code === highlighted ? "bg-emerald-50/55" : "")}>
+            <ValueCell value={row.value(plan)} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>;
+}
+
+function FooterColumn({ title, items }: { title: string; items: { label: string; href: string }[] }) {
+  return <div><h3 className="text-xs font-extrabold">{title}</h3><nav aria-label={title + " links"} className="mt-4 flex flex-col gap-3">{items.map((item) => <Link key={item.label} href={item.href} className="text-xs text-zinc-600 hover:text-black">{item.label}</Link>)}</nav></div>;
+}

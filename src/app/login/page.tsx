@@ -93,6 +93,7 @@ export default async function LoginPage() {
                 </Link>
               </p>
               <p className="mt-2 text-xs leading-5 text-[var(--vims-ink-muted)]">{copy["login.subscription_description"]}</p>
+              <p className="mt-2 text-xs text-[var(--vims-ink-muted)]"><Link href="/welcome#pricing" className="font-semibold text-emerald-700 underline underline-offset-4">Compare VIMS subscription packages</Link></p>
               <p className="mt-4 text-xs leading-5 text-[var(--vims-ink-muted)]">
                 Authorized access only. Activity may be recorded for security and audit purposes.
               </p>

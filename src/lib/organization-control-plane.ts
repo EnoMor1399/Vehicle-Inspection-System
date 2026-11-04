@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "crypto";
+import { calculateAnnualPlanPrice } from "@/lib/subscription-plan-pricing";
 import { and, count, desc, eq, gt, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import {
@@ -201,6 +202,7 @@ export async function createOnboardingRequest(input: {
   estimatedUsers?: number | null;
   estimatedVehicles?: number | null;
   desiredPlanCode?: string;
+  requestedBillingCycle?: "monthly" | "annual";
   requestedModules?: string[];
   notes?: string;
   sourceIpHash?: string | null;
@@ -224,6 +226,7 @@ export async function createOnboardingRequest(input: {
     estimatedUsers: input.estimatedUsers || null,
     estimatedVehicles: input.estimatedVehicles || null,
     desiredPlanCode: input.desiredPlanCode?.trim().slice(0, 50) || null,
+    requestedBillingCycle: input.requestedBillingCycle === "annual" ? "annual" : "monthly",
     requestedModules: input.requestedModules?.length ? input.requestedModules.slice(0, 10) : ["vehicle_inspection"],
     notes: input.notes?.trim().slice(0, 4000) || null,
     sourceIpHash: input.sourceIpHash || null,
@@ -262,6 +265,13 @@ export async function convertOnboardingRequest(input: {
       "A platform administrator must complete the database tenant cutover.",
     );
   }
+
+  const billingCycle = plan.billingCycle === "annual" ? "annual"
+    : request.requestedBillingCycle === "annual" ? "annual" : "monthly";
+  const annualQuote = billingCycle === "annual" ? calculateAnnualPlanPrice(plan, new Date()) : null;
+  const billedAmount = billingCycle === "annual" && annualQuote ? annualQuote.annualPrice : plan.price;
+  // The Super Admin approves the calculated catalogue quote during onboarding.
+  // Existing invoices are never repriced by later catalogue or promo changes.
 
   const organizationId = newId();
   const subscriptionId = newId();
@@ -321,13 +331,14 @@ export async function convertOnboardingRequest(input: {
       planId: plan.id,
       status: trialEndsAt ? "trialing" : "active",
       provider: "manual",
-      amount: plan.price,
+      amount: billedAmount,
+      billingCycle,
       currency: plan.currency,
       currentPeriodStart: now,
       trialEndsAt,
       seats: Math.max(1, Math.min(plan.maxUsers, request.estimatedUsers || 1)),
       createdBy: input.actorUserId,
-      notes: "Created from subscriber onboarding request",
+      notes: "Created from subscriber onboarding request" + (billingCycle === "annual" ? " (annual catalogue amount at approval)" : ""),
     });
 
     await tx.insert(organizationInvitations).values({
@@ -1000,6 +1011,8 @@ export async function updateOrganizationSubscriptionLifecycle(input: {
   planCode: string;
   status: ManagedSubscriptionStatus;
   amount?: string | number | null;
+  billingCycle?: "monthly" | "annual";
+  useCatalogPrice?: boolean;
   currency?: string | null;
   currentPeriodEnd?: Date | null;
   trialEndsAt?: Date | null;
@@ -1054,15 +1067,26 @@ export async function updateOrganizationSubscriptionLifecycle(input: {
     throw new Error("A grace end date is required for a grace-period subscription");
   }
 
-  const amountValue = input.amount === null || input.amount === undefined || input.amount === ""
-    ? String(targetPlan.price)
-    : String(input.amount);
+  const billingCycle = input.billingCycle === "annual" ? "annual" : input.billingCycle === "monthly" ? "monthly"
+    : current.subscription.billingCycle === "annual" ? "annual" : "monthly";
+  const annualQuote = billingCycle === "annual" ? calculateAnnualPlanPrice(targetPlan, new Date()) : null;
+  const catalogueAmount = billingCycle === "annual"
+    ? annualQuote?.annualPrice ?? (targetPlan.billingCycle === "annual" ? String(targetPlan.price) : null)
+    : targetPlan.billingCycle === "monthly" ? String(targetPlan.price) : null;
+  if (input.useCatalogPrice && catalogueAmount === null) {
+    throw new Error("This plan requires a manually approved quote for the selected billing period.");
+  }
+  const amountValue = input.useCatalogPrice
+    ? catalogueAmount!
+    : input.amount === null || input.amount === undefined || input.amount === ""
+      ? String(current.subscription.amount)
+      : String(input.amount);
   const amountNumber = Number(amountValue);
   if (!Number.isFinite(amountNumber) || amountNumber < 0 || amountNumber > 9999999999) {
     throw new Error("Subscription amount is invalid");
   }
 
-  const currency = (input.currency || targetPlan.currency || "GHS").trim().toUpperCase();
+  const currency = (input.useCatalogPrice ? targetPlan.currency : input.currency || targetPlan.currency || "GHS").trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a 3-letter ISO code");
 
   const notes = input.notes?.trim() || null;
@@ -1072,6 +1096,7 @@ export async function updateOrganizationSubscriptionLifecycle(input: {
   const planChanged = current.plan.id !== targetPlan.id;
   const statusChanged = current.subscription.status !== input.status;
   const billingTermsChanged = planChanged
+    || billingCycle !== current.subscription.billingCycle
     || Number(amountValue) !== Number(current.subscription.amount)
     || currency !== current.subscription.currency;
 
@@ -1099,6 +1124,7 @@ export async function updateOrganizationSubscriptionLifecycle(input: {
         planId: targetPlan.id,
         status: input.status,
         amount: amountValue,
+        billingCycle,
         currency,
         currentPeriodEnd: input.currentPeriodEnd || null,
         trialEndsAt: input.trialEndsAt || null,

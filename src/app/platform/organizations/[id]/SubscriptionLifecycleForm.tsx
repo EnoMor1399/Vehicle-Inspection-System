@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { calculateAnnualPlanPrice } from "@/lib/subscription-plan-pricing";
 import { Loader2, Save, ShieldAlert } from "lucide-react";
 import {
   updateSubscriberSubscription,
@@ -16,12 +17,21 @@ type PlanOption = {
   maxVehicles: number;
   maxInspectionsPerMonth: number;
   modules: string[];
+  price: string;
+  currency: string;
+  billingCycle: "monthly" | "annual" | "custom";
+  annualDiscountPercent: number;
+  promoDiscountPercent: number;
+  promoLabel: string | null;
+  promoStartsOn: string | null;
+  promoEndsOn: string | null;
 };
 
 type CurrentSubscription = {
   planCode: string;
   status: string;
   amount: string;
+  billingCycle: "monthly" | "annual" | "custom";
   currency: string;
   currentPeriodEnd: string | null;
   trialEndsAt: string | null;
@@ -49,14 +59,24 @@ export function SubscriptionLifecycleForm({
   current: CurrentSubscription;
 }) {
   const [state, action, pending] = useActionState(updateSubscriberSubscription, initialState);
+  const [selectedPlan, setSelectedPlan] = useState(current.planCode);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(current.billingCycle === "annual" ? "annual" : "monthly");
+  const [autoPrice, setAutoPrice] = useState(false);
+  const [amount, setAmount] = useState(current.amount);
+  const target = plans.find((plan) => plan.code === selectedPlan);
+  const annualQuote = target && billingCycle === "annual" ? calculateAnnualPlanPrice(target) : null;
+  const autoAmount = billingCycle === "annual"
+    ? annualQuote?.annualPrice ?? (target?.billingCycle === "annual" ? target.price : null)
+    : target?.billingCycle === "monthly" ? target.price : null;
 
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="organizationId" value={organizationId} />
+      <input type="hidden" name="useCatalogPrice" value={autoPrice ? "true" : "false"} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Subscription plan">
-          <select name="planCode" defaultValue={current.planCode} className={inputClass}>
+          <select name="planCode" value={selectedPlan} onChange={(e) => { setSelectedPlan(e.target.value); setAutoPrice(true); }} className={inputClass}>
             {plans.map((plan) => (
               <option key={plan.code} value={plan.code}>
                 {plan.name} · {plan.maxUsers} users · {plan.maxVehicles.toLocaleString()} vehicles
@@ -77,12 +97,24 @@ export function SubscriptionLifecycleForm({
           </select>
         </Field>
 
-        <Field label="Amount">
+        <Field label="Billing period">
+          <select name="billingCycle" value={billingCycle} onChange={(e) => {
+            setBillingCycle(e.target.value as "monthly" | "annual");
+            setAutoPrice(true);
+          }} className={inputClass}>
+            <option value="monthly">Monthly</option>
+            <option value="annual">Annual (12 × monthly, less offers)</option>
+          </select>
+        </Field>
+
+        <Field label={autoPrice ? "Calculated catalogue amount" : "Approved invoice amount"}>
           <input
             name="amount"
             inputMode="decimal"
-            defaultValue={current.amount}
-            className={inputClass}
+            value={autoPrice ? (autoAmount || "") : amount}
+            readOnly={autoPrice}
+            onChange={(e) => { setAmount(e.target.value); setAutoPrice(false); }}
+            className={inputClass + (autoPrice ? " bg-emerald-50 font-semibold" : "")}
             placeholder="0.00"
           />
         </Field>
@@ -135,6 +167,22 @@ export function SubscriptionLifecycleForm({
         </label>
       </div>
 
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+        <label className="inline-flex items-center gap-2 font-bold">
+          <input type="checkbox" checked={autoPrice} onChange={(e) => setAutoPrice(e.target.checked)}
+            className="h-4 w-4 rounded border-emerald-400 text-emerald-700" />
+          Use automatically calculated catalogue amount
+        </label>
+        <p className="mt-2 text-xs leading-5">
+          {autoAmount
+            ? `Calculated ${billingCycle} rate: ${target?.currency || "GHS"} ${Number(autoAmount).toFixed(2)}. `
+            : "This plan requires a manually approved price for the selected billing cycle. "}
+          {annualQuote?.savingsMinor ? `Annual savings: ${target?.currency} ${annualQuote.savingsPrice}. ` : ""}
+          Existing invoices remain unchanged unless you save new billing terms. Any pending payment blocks a change.
+        </p>
+        <p className="mt-1 text-xs text-emerald-800">Set the subscription period end and confirm renewal terms separately; saving this form does not charge the subscriber.</p>
+      </div>
+
       <Field label="Subscription notes">
         <textarea
           name="notes"
@@ -165,7 +213,7 @@ export function SubscriptionLifecycleForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || (autoPrice && !autoAmount)}
         className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

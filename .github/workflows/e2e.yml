@@ -15,7 +15,8 @@ concurrency:
 jobs:
   browser-e2e:
     name: Browser workflows against PostgreSQL
-    runs-on: ubuntu-latest
+    # Playwright 1.55 does not support Ubuntu 26.04; pin a supported image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
       postgres:

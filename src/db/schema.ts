@@ -223,6 +223,13 @@ export const subscriptionPlans = pgTable(
     description: text("description"),
     billingCycle: billingCycleEnum("billing_cycle").notNull().default("monthly"),
     price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
+    // Annual catalog price is derived from 12 monthly periods on read.
+    // Both percentages are 0..90. Promotion applies after annual discount.
+    annualDiscountPercent: integer("annual_discount_percent").notNull().default(0),
+    promoDiscountPercent: integer("promo_discount_percent").notNull().default(0),
+    promoLabel: varchar("promo_label", { length: 80 }),
+    promoStartsOn: date("promo_starts_on"),
+    promoEndsOn: date("promo_ends_on"),
     currency: varchar("currency", { length: 3 }).notNull().default("GHS"),
     trialDays: integer("trial_days").notNull().default(14),
     maxUsers: integer("max_users").notNull().default(10),
@@ -252,6 +259,7 @@ export const organizationSubscriptions = pgTable(
     planId: varchar("plan_id", { length: 36 })
       .notNull()
       .references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+    billingCycle: billingCycleEnum("billing_cycle").notNull().default("monthly"),
     status: subscriptionStatusEnum("status").notNull().default("trialing"),
     provider: varchar("provider", { length: 40 }).notNull().default("manual"),
     providerCustomerId: varchar("provider_customer_id", { length: 150 }),
@@ -347,6 +355,7 @@ export const organizationOnboardingRequests = pgTable(
     estimatedUsers: integer("estimated_users"),
     estimatedVehicles: integer("estimated_vehicles"),
     desiredPlanCode: varchar("desired_plan_code", { length: 50 }),
+    requestedBillingCycle: billingCycleEnum("requested_billing_cycle").notNull().default("monthly"),
     requestedModules: jsonb("requested_modules").$type<string[]>().notNull().default(["vehicle_inspection"]),
     notes: text("notes"),
     status: onboardingRequestStatusEnum("status").notNull().default("pending"),
