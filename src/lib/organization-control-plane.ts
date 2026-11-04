@@ -1086,7 +1086,7 @@ export async function updateOrganizationSubscriptionLifecycle(input: {
     throw new Error("Subscription amount is invalid");
   }
 
-  const currency = (input.currency || targetPlan.currency || "GHS").trim().toUpperCase();
+  const currency = (input.useCatalogPrice ? targetPlan.currency : input.currency || targetPlan.currency || "GHS").trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a 3-letter ISO code");
 
   const notes = input.notes?.trim() || null;
