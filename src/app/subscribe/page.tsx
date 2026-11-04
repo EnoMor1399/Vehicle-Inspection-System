@@ -21,7 +21,7 @@ export default async function SubscribePage({ searchParams }: {
           <ArrowLeft className="h-4 w-4" /> Back to packages
         </Link>
 
-        {annualQuote && <p role="status" className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Annual pricing enquiry: this form requests a quote and does not collect payment. The subscription team will confirm annual terms.</p>}
+        {annualQuote && <p role="status" className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Annual subscription request: the annual price is automatically calculated from the selected monthly plan and any active discounts or promotions. Final terms require Super Admin approval; no payment is collected here.</p>}
         <div className="mt-7 grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
@@ -88,6 +88,11 @@ export default async function SubscribePage({ searchParams }: {
             price: String(plan.price),
             currency: plan.currency,
             billingCycle: plan.billingCycle,
+            annualDiscountPercent: plan.annualDiscountPercent,
+            promoDiscountPercent: plan.promoDiscountPercent,
+            promoLabel: plan.promoLabel,
+            promoStartsOn: plan.promoStartsOn,
+            promoEndsOn: plan.promoEndsOn,
             trialDays: plan.trialDays,
             maxUsers: plan.maxUsers,
             maxStations: plan.maxStations,
