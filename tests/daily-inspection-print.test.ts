@@ -41,3 +41,9 @@ test("print button keeps existing browser print action and report retains valida
   assert.match(page, /item\.severity/);
   assert.match(page, /Inspector remarks/);
 });
+
+test("print CSS does not contain a malformed escaped Tailwind class selector", () => {
+  const styles = read("src/app/globals.css");
+  assert.doesNotMatch(styles, /\\.print\\\\\\\\:hidden/);
+  assert.match(styles, /body:has\\(\\.daily-inspection-print-root\\) \\.no-print \\{\\s*display: none !important;/);
+});
