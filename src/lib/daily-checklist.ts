@@ -81,8 +81,8 @@ const PRELOADING_COMMON: { category: string; icon: string; items: Item[] }[] = [
     whereFitted("Electrical bonding/earthing cable continuous, without joints or loose contacts where required for hazardous loading"),
   ]},
   { category: "H. Tractor–Trailer Coupling", icon: "vehicle", items: [
-    required("Fifth-wheel/turntable coupling and safety lock positively engaged, secured and functional"),
-    required("Trailer service/parking brakes and electrical/air connections connected and working"),
+    whereFitted("Fifth-wheel/turntable coupling and safety lock positively engaged, secured and functional on articulated units"),
+    whereFitted("Trailer service/parking brakes and electrical/air connections connected and working where a trailer is attached"),
   ]},
   { category: "I. Bulk / Container / Flat Trailer", icon: "vehicle", items: [
     required("Handrails and steps firmly secured with anti-slip surfaces"),
@@ -107,7 +107,7 @@ const BULK_TANKER_ONLY: { category: string; icon: string; items: Item[] }[] = [
     required("Bulk calibration certificate valid, capacity verified and expiry not passed"),
     required("Tanker compartment lids/manholes, seals, valves and outlets sound and secured"),
     required("Discharge hose(s) show no tears, cracks or damage causing leakage and use correct intact couplings"),
-    required("Tyres including spare have minimum 4 mm tread under supplied tanker checklist specification"),
+    required("Tyres, including the spare where carried, have minimum 4 mm tread under supplied tanker checklist specification"),
   ]},
 ];
 
