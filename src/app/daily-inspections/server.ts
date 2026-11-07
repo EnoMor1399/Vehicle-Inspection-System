@@ -110,7 +110,8 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
   const preloadingDetails = validatePreloadingDetails(input.preloadingDetails);
   const vehicleType: DailyInspectionVehicleType = preloadingDetails.vehicleType || "general";
   validateCompletedDailyChecklist(input.checklist, vehicleType);
-  validateDailyInspectionEvidence(input.checklist);
+  const checklist = input.checklist;
+  validateDailyInspectionEvidence(checklist);
   const odometer = parseOdometer(input.odometer);
 
   const [vehicle] = await db
