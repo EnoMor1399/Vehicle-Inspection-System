@@ -429,9 +429,86 @@ html.dark {
     width: 100% !important;
   }
 
+  /*
+   * Daily Pre-Trip reports use an explicit print root, just like certificate
+   * and assessment reports. Without this override the blanket body * rule
+   * above hides every inspection row and results in an empty PDF/printout.
+   */
+  .daily-inspection-print-root,
+  .daily-inspection-print-root * {
+    visibility: visible !important;
+  }
+
+  /* Remove the application chrome and its flex/sidebar offsets from paper. */
+  body:has(.daily-inspection-print-root) [data-app-shell],
+  body:has(.daily-inspection-print-root) [data-app-shell] > div,
+  body:has(.daily-inspection-print-root) .app-shell-content {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body:has(.daily-inspection-print-root) [data-app-shell] > aside,
+  body:has(.daily-inspection-print-root) [data-app-shell] > div > header,
+  body:has(.daily-inspection-print-root) [data-app-shell] > div > [role="status"],
+  body:has(.daily-inspection-print-root) .no-print,
+  body:has(.daily-inspection-print-root) .print\\:hidden {
+    display: none !important;
+  }
+
+  .daily-inspection-print-root {
+    page: vims-pretrip;
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #0f172a !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .daily-inspection-print-root :is(.shadow-sm, .shadow-md, .shadow-lg, .shadow-xl) {
+    box-shadow: none !important;
+  }
+  .daily-inspection-print-root :is(.bg-\\[var\\(--vims-panel-solid\\)\\], .bg-\\[var\\(--vims-panel-soft\\)\\]) {
+    background: #fff !important;
+  }
+  .daily-inspection-print-root .print-report-header {
+    display: block !important;
+  }
+  .daily-inspection-print-root .print-report-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .daily-inspection-print-root h2,
+  .daily-inspection-print-root h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .daily-inspection-print-root img {
+    max-width: 100% !important;
+  }
+
   .no-print {
     display: none !important;
   }
+}
+
+/* Named pages isolate the A4 report margins from certificate templates. */
+@page vims-pretrip {
+  size: A4 portrait;
+  margin: 12mm;
 }
 
 @keyframes shimmer {
