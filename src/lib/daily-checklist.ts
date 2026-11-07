@@ -77,10 +77,8 @@ const BASE_SECTIONS: { category: string; icon: string; items: Item[] }[] = [
 
 const PRELOADING_COMMON: { category: string; icon: string; items: Item[] }[] = [
   { category: "Pre-Loading: Additional Fire & Bonding Controls", icon: "emergency", items: [
-    required("Hot surfaces and exhaust adequately shielded against accidental fuel leakage or spillage"),
-    required("One appropriate 2 kg extinguisher in cabin and two appropriate 9 kg extinguishers outside, reachable without obstruction (reference pre-loading specification)"),
-    required("Electrical bonding/earthing cable continuous, intact, without joints or loose contacts"),
-    required("All exterior extinguishers have valid service certification and no visible seal, hose, trigger or vessel damage"),
+    whereFitted("Hot surfaces and exhaust shielded against accidental fuel leakage or spillage where carrying flammables"),
+    whereFitted("Electrical bonding/earthing cable continuous, without joints or loose contacts where required for hazardous loading"),
   ]},
   { category: "H. Tractor–Trailer Coupling", icon: "vehicle", items: [
     required("Fifth-wheel/turntable coupling and safety lock positively engaged, secured and functional"),
@@ -101,6 +99,10 @@ const PRELOADING_COMMON: { category: string; icon: string; items: Item[] }[] = [
 
 const BULK_TANKER_ONLY: { category: string; icon: string; items: Item[] }[] = [
   { category: "Bulk Tanker Calibration & Containment", icon: "document", items: [
+    required("One appropriate 2 kg extinguisher in cabin and two appropriate 9 kg extinguishers outside, reachable without obstruction (reference bulk tanker pre-loading specification)"),
+    required("All exterior extinguishers have valid service certification and no visible seal, hose, trigger or vessel damage"),
+    required("Electrical bonding/earthing cable continuous, intact, without joints or loose contacts"),
+    required("Hot surfaces and exhaust protected from potential fuel spillage or leakage"),
     required("Bulk identification matches tanker and loading documentation"),
     required("Bulk calibration certificate valid, capacity verified and expiry not passed"),
     required("Tanker compartment lids/manholes, seals, valves and outlets sound and secured"),
