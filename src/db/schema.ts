@@ -401,7 +401,7 @@ export const dailyInspections = pgTable(
     passedItems: integer("passed_items").notNull().default(0),
     failedItems: integer("failed_items").notNull().default(0),
     // Critical defects requiring immediate attention
-    criticalDefects: jsonb("critical_defects").$type<{ item: string; notes: string; photo?: string }[]>().default([]),
+    criticalDefects: jsonb("critical_defects").$type<{ item: string; notes: string; severity?: DailyDefectSeverity; photo?: string }[]>().default([]),
     // Driver attestation
     driverSignature: text("driver_signature"),
     preloadingDetails: jsonb("preloading_details").$type<DailyPreloadingDetails>().notNull().default({}),
