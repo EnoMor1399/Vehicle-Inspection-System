@@ -232,7 +232,7 @@ export function DailyInspectionForm({
           </Field>
           <Field label="Registration Number"><TextInput readOnly value={selectedVehicle?.registrationNumber || ""} placeholder="Select a vehicle above" /></Field>
           <Field label="Make"><TextInput readOnly value={selectedVehicle?.make || ""} placeholder="Vehicle make" /></Field>
-          <Field label="Chassis / VIN"><TextInput readOnly value={selectedVehicle?.chassisNumber || ""} placeholder="Not recorded on selected vehicle" /></Field>
+          <Field label="Chassis / VIN"><TextInput readOnly={Boolean(selectedVehicle?.chassisNumber)} value={selectedVehicle?.chassisNumber || preloading.chassisNumber || ""} onChange={(e) => setPreloadingField("chassisNumber", e.target.value)} placeholder="Enter chassis/VIN if missing from registry" /></Field>
           <Field label="Driver Licence Class">
             <TextInput value={preloading.driverLicenceClass || ""} onChange={(e) => setPreloadingField("driverLicenceClass", e.target.value)} placeholder="e.g. Class E" />
           </Field>
