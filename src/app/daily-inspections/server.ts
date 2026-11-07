@@ -8,8 +8,8 @@ import { newId } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import { tenantLocalActorUserId } from "@/lib/tenant-local-actor";
 import { getCurrentUser, canApprove, canManageInspections, canAccessTransporterScope } from "@/lib/auth";
-import type { DailyChecklistCategory } from "@/db/schema";
-import { summarizeDailyChecklist } from "@/lib/daily-checklist";
+import type { DailyChecklistCategory, DailyPreloadingDetails, DailyInspectionVehicleType } from "@/db/schema";
+import { summarizeDailyChecklist, validateCompletedDailyChecklist } from "@/lib/daily-checklist";
 import { validateDailyInspectionEvidence, validateSignatureDataUrl } from "@/lib/inspection-evidence";
 
 export type DailyInspectionInput = {
@@ -22,39 +22,55 @@ export type DailyInspectionInput = {
   checklist: DailyChecklistCategory[];
   driverSignature?: string;
   notes?: string;
+  preloadingDetails?: DailyPreloadingDetails;
 };
 
-function validateDailyChecklist(checklist: DailyChecklistCategory[]) {
-  if (!Array.isArray(checklist) || checklist.length === 0 || checklist.length > 20) {
-    throw new Error("A valid daily inspection checklist is required");
+const VALID_VEHICLE_TYPES = ["general", "bulk_tanker", "tractor_trailer", "container_flatbed"] as const;
+
+function validatePreloadingDetails(details?: DailyPreloadingDetails): DailyPreloadingDetails {
+  const record = details || {};
+  const vehicleType = record.vehicleType || "general";
+  if (!VALID_VEHICLE_TYPES.includes(vehicleType)) {
+    throw new Error("Select a supported pre-trip inspection type.");
   }
-
-  let totalItems = 0;
-  for (const category of checklist) {
-    if (!category || typeof category.category !== "string" || !category.category.trim() || category.category.length > 100) {
-      throw new Error("Daily checklist contains an invalid category");
-    }
-    if (!Array.isArray(category.items) || category.items.length > 100) {
-      throw new Error("Daily checklist category contains too many items");
-    }
-
-    totalItems += category.items.length;
-    if (totalItems > 250) throw new Error("Daily checklist contains too many items");
-
-    for (const item of category.items) {
-      if (!item || typeof item.name !== "string" || !item.name.trim() || item.name.length > 200) {
-        throw new Error("Daily checklist item name is invalid");
-      }
-      if (!(["pass", "fail", "na"] as const).includes(item.result)) {
-        throw new Error("Daily checklist item contains an invalid result");
-      }
-      if (item.notes && item.notes.length > 1000) {
-        throw new Error("Daily checklist item notes must not exceed 1000 characters");
-      }
+  const textFields: (keyof DailyPreloadingDetails)[] = [
+    "transporterName", "chassisNumber", "vehicleMake", "bulkIdentificationNumber",
+    "bulkCapacity", "bulkCalibrationCertificateNumber", "driverLicenceClass",
+    "inspectionPremises", "inspectorName",
+  ];
+  for (const key of textFields) {
+    const value = record[key];
+    if (value !== undefined && (typeof value !== "string" || value.length > 200)) {
+      throw new Error("Inspection details contain an invalid field.");
     }
   }
-
-  validateDailyInspectionEvidence(checklist);
+  if (record.bulkCalibrationExpiryDate &&
+    (!/^\\d{4}-\\d{2}-\\d{2}$/.test(record.bulkCalibrationExpiryDate) ||
+    Number.isNaN(Date.parse(record.bulkCalibrationExpiryDate + "T00:00:00Z")))) {
+    throw new Error("Bulk calibration certificate expiry date is invalid.");
+  }
+  if (vehicleType !== "general") {
+    if (!record.inspectionPremises?.trim() || !record.inspectorName?.trim()) {
+      throw new Error("Inspection premises and inspector name are required for pre-loading checks.");
+    }
+    if (!record.inspectorSignature) {
+      throw new Error("Inspector signature is required for pre-loading validation.");
+    }
+    validateSignatureDataUrl(record.inspectorSignature, "Inspector signature");
+    if (vehicleType === "bulk_tanker" && (
+      !record.bulkIdentificationNumber?.trim() ||
+      !record.bulkCapacity?.trim() ||
+      !record.bulkCalibrationCertificateNumber?.trim() ||
+      !record.bulkCalibrationExpiryDate
+    )) {
+      throw new Error("Bulk ID, capacity and calibration certificate/expiry details are required for tankers.");
+    }
+    if (vehicleType === "bulk_tanker" &&
+      record.bulkCalibrationExpiryDate! < new Date().toISOString().slice(0, 10)) {
+      throw new Error("An expired bulk calibration certificate cannot clear a pre-loading inspection.");
+    }
+  }
+  return { ...record, vehicleType };
 }
 
 function parseOdometer(value?: string): number | null {
@@ -91,7 +107,10 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
   if (input.notes && input.notes.length > 2000) throw new Error("Inspection notes must not exceed 2000 characters");
   if (!input.driverSignature) throw new Error("Driver signature is required to attest this inspection");
   validateSignatureDataUrl(input.driverSignature, "Driver signature");
-  validateDailyChecklist(input.checklist);
+  const preloadingDetails = validatePreloadingDetails(input.preloadingDetails);
+  const vehicleType: DailyInspectionVehicleType = preloadingDetails.vehicleType || "general";
+  validateCompletedDailyChecklist(input.checklist, vehicleType);
+  validateDailyInspectionEvidence(input.checklist);
   const odometer = parseOdometer(input.odometer);
 
   const [vehicle] = await db
@@ -120,20 +139,19 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
     }
   }
 
-  let status: "passed" | "failed" | "defect_noted" = "passed";
-  let clearedForTrip = true;
-  if (summary.failed > 0) {
-    const criticalCategories = ["Brakes", "Lights & Signals", "Tires & Wheels"];
-    const hasCriticalFail = input.checklist.some(
-      (cat) => criticalCategories.includes(cat.category) && cat.items.some((it) => it.result === "fail")
-    );
-    if (hasCriticalFail || summary.failed >= 3) {
-      status = "failed";
-      clearedForTrip = false;
-    } else {
-      status = "defect_noted";
-    }
-  }
+  // Pre-departure checks are fail-closed: every failed applicable item grounds
+  // the vehicle. A supervisor's later review is NOT a clearance override.
+  // Client exceptions must be documented and verified outside this workflow;
+  // they never convert a failed safety check to an automatic PASS.
+  const status: "passed" | "failed" = summary.failed > 0 ? "failed" : "passed";
+  const clearedForTrip = summary.failed === 0;
+  const checklistReference = "PT-" + input.inspectionDate.replaceAll("-", "") + "-" + id.slice(0, 8).toUpperCase();
+  const inspectionMetadata: DailyPreloadingDetails = {
+    ...preloadingDetails,
+    vehicleMake: vehicle.make,
+    chassisNumber: vehicle.chassisNumber || vehicle.vin || preloadingDetails.chassisNumber || "",
+    checklistReference,
+  };
 
   await db.insert(dailyInspections).values({
     id,
@@ -154,6 +172,7 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
     failedItems: summary.failed,
     criticalDefects,
     driverSignature: input.driverSignature,
+    preloadingDetails: inspectionMetadata,
     clearedForTrip,
     notes: input.notes?.trim() || null,
   } as any);
