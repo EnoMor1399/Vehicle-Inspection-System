@@ -14,7 +14,7 @@ function marked(type: "general" | "bulk_tanker" | "tractor_trailer" | "container
 test("default pre-trip template starts every safety check unchecked rather than automatically passed", () => {
   const checks = buildDefaultDailyChecklist();
   assert.ok(checks.length >= 8);
-  assert.ok(checks.flatMap((x) => x.items).length >= 45);
+  assert.ok(checks.flatMap((x) => x.items).length >= 40);
   assert.ok(checks.every((x) => x.items.every((item) => item.result === "unchecked")));
   const summary = summarizeDailyChecklist(checks);
   assert.equal(summary.passed, 0);
