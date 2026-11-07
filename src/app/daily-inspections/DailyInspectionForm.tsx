@@ -129,7 +129,7 @@ export function DailyInspectionForm({
           preloadingDetails: {
             ...preloading, vehicleType, inspectorSignature: isPreloading ? inspectorSignature : undefined,
             vehicleMake: selectedVehicle?.make || "",
-            chassisNumber: selectedVehicle?.chassisNumber || "",
+            chassisNumber: selectedVehicle?.chassisNumber || preloading.chassisNumber || "",
             transporterName: preloading.transporterName?.trim() || selectedVehicle?.transporterName || "",
           },
         });
