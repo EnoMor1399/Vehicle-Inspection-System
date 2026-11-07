@@ -41,3 +41,11 @@ test("print button keeps existing browser print action and report retains valida
   assert.match(page, /item\.severity/);
   assert.match(page, /Inspector remarks/);
 });
+
+test("print CSS hides application chrome using a valid selector, without an invalid Tailwind pseudoclass", () => {
+  const styles = read("src/app/globals.css");
+  const invalid = styles.split("\n").filter((line) => line.includes("body:has(.daily-inspection-print-root)") && line.includes(".print") && line.includes(":hidden"));
+  assert.equal(invalid.length, 0, "Unknown :hidden pseudo-class invalidates the entire CSS rule");
+  assert.ok(styles.includes("body:has(.daily-inspection-print-root) .no-print {"));
+  assert.ok(styles.includes("display: none !important;"));
+});
