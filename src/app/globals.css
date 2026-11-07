@@ -481,7 +481,7 @@ html.dark {
   .daily-inspection-print-root :is(.shadow-sm, .shadow-md, .shadow-lg, .shadow-xl) {
     box-shadow: none !important;
   }
-  .daily-inspection-print-root :is(.bg-\\[var\\(--vims-panel-solid\\)\\], .bg-\\[var\\(--vims-panel-soft\\)\\]) {
+  .daily-inspection-print-root [class*="bg-[var("] {
     background: #fff !important;
   }
   .daily-inspection-print-root .print-report-header {
