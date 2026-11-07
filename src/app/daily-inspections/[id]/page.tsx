@@ -27,6 +27,19 @@ const CATEGORY_ICONS: Record<string, string> = {
   "Emergency Equipment": "🚨",
   Documentation: "📄",
   "Exterior & General": "🚛",
+  "B. Driver & Vehicle Documentation": "📋",
+  "C. General / Physical Condition": "🚛",
+  "D. Electricals": "💡",
+  "E. Fire Hazard & Emergency Controls": "🧯",
+  "F. Wheels / Tyres": "🛞",
+  "G. Brakes": "🛑",
+  "General Mechanical & Fluids": "💧",
+  "Trip & Loading Readiness": "✅",
+  "Pre-Loading: Additional Fire & Bonding Controls": "🧯",
+  "H. Tractor–Trailer Coupling": "🔗",
+  "I. Bulk / Container / Flat Trailer": "🚛",
+  "J. Other Accessories": "⚠️",
+  "Bulk Tanker Calibration & Containment": "📄",
 };
 
 export default async function DailyInspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,6 +64,8 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
   if (!row || !canAccessTransporterScope(user, row.vehicle.transporterId)) notFound();
 
   const { inspection: i, vehicle: v } = row;
+  const preloading = i.preloadingDetails || {};
+  const hasPreloading = preloading.vehicleType && preloading.vehicleType !== "general";
   const checklist = (i.checklist || []) as DailyChecklistCategory[];
   const criticalDefects = (i.criticalDefects || []) as { item: string; notes: string; photo?: string }[];
   const canApprove = canApproveInspection(user);
@@ -67,7 +82,7 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
       <PageHeader
         eyebrow="Daily Pre-Trip Inspection"
         title={`${v.registrationNumber} · ${formatDate(i.inspectionDate)}`}
-        description={`${v.make} ${v.model || ""} · Driver: ${i.driverName || "—"}`}
+        description={`${v.make} ${v.model || ""} · Driver: ${i.driverName || "—"} · Ref: ${preloading.checklistReference || i.id.slice(0, 8)}`}
         action={
           <div className="flex items-center gap-2">
             <StatusBadge status={i.status} />
@@ -115,7 +130,7 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
             <div>
               <h2 className="text-lg font-bold text-red-900">Vehicle Must Not Depart</h2>
               <p className="text-sm text-red-800 mt-1 mb-3">
-                Critical safety defects were identified. This vehicle is <strong>grounded</strong> until all critical items are repaired and re-inspected.
+                One or more failed safety checks were identified. This vehicle is <strong>grounded</strong> until all failed items are repaired and re-inspected.
               </p>
               {criticalDefects.length > 0 && (
                 <ul className="space-y-1 text-sm text-red-900">
@@ -147,6 +162,17 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
             <InfoRow label="Vehicle" value={`${v.registrationNumber} · ${v.make} ${v.model || ""}`} />
             <InfoRow label="Trip Purpose" value={i.tripPurpose || "—"} />
             <InfoRow label="Route" value={i.routeDescription || "—"} />
+            <InfoRow label="Checklist Ref." value={preloading.checklistReference || "Legacy record"} />
+            <InfoRow label="Inspection Type" value={(preloading.vehicleType || "general").replaceAll("_", " ")} />
+            {preloading.inspectionPremises && <InfoRow label="Inspection Premises" value={preloading.inspectionPremises} />}
+            {preloading.transporterName && <InfoRow label="Transporter" value={preloading.transporterName} />}
+            {preloading.chassisNumber && <InfoRow label="Chassis / VIN" value={preloading.chassisNumber} />}
+            {preloading.driverLicenceClass && <InfoRow label="Driver Licence Class" value={preloading.driverLicenceClass} />}
+            {preloading.bulkIdentificationNumber && <InfoRow label="Bulk Identification No." value={preloading.bulkIdentificationNumber} />}
+            {preloading.bulkCapacity && <InfoRow label="Bulk Capacity" value={preloading.bulkCapacity} />}
+            {preloading.bulkCalibrationCertificateNumber && <InfoRow label="Bulk Calibration Cert. No." value={preloading.bulkCalibrationCertificateNumber} />}
+            {preloading.bulkCalibrationExpiryDate && <InfoRow label="Bulk Calibration Expiry" value={preloading.bulkCalibrationExpiryDate} />}
+
           </dl>
           {i.notes && (
             <div className="mt-4 pt-4 border-t border-slate-200">
@@ -169,6 +195,16 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
           ) : (
             <p className="text-sm text-slate-500 italic">No signature captured</p>
           )}
+          {hasPreloading && <div className="mt-4 border-t border-slate-200 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-600">Pre-loading inspector validation</p>
+            <p className="text-sm font-semibold text-slate-900">{preloading.inspectorName || "—"}</p>
+            {preloading.inspectorSignature ? (
+              <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={preloading.inspectorSignature} alt="Pre-loading inspector signature" className="mx-auto h-16" />
+              </div>
+            ) : <p className="text-xs text-slate-500">Signature not recorded</p>}
+          </div>}
           {i.supervisorReview && (
             <div className="mt-3 pt-3 border-t border-slate-200">
               <p className="text-xs uppercase tracking-wider text-emerald-700 font-semibold flex items-center gap-1">
