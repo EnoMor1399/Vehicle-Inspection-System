@@ -170,8 +170,15 @@ export function validateCompletedDailyChecklist(
       if (answer.result === "na" && (!expectedItem.optional || !answer.notes?.trim())) {
         throw new Error("N/A is allowed only for optional equipment and requires an explanation.");
       }
-      if (answer.result === "fail" && !answer.notes?.trim()) {
-        throw new Error("Describe each failed item before submitting the inspection.");
+      if (answer.result === "fail") {
+        if (!["minor", "major", "critical"].includes(answer.severity || "")) {
+          throw new Error("Select Minor, Major or Critical severity for each failed item.");
+        }
+        if (!answer.notes?.trim()) {
+          throw new Error("Inspector remarks are required for every failed item.");
+        }
+      } else if (answer.severity !== undefined) {
+        throw new Error("Defect severity can only be recorded for failed checks.");
       }
       count++;
     }

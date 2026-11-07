@@ -71,8 +71,15 @@ test("N/A is permitted only for optional equipment with a written reason; every 
   optional.notes = "Not fitted to this vehicle";
   assert.doesNotThrow(() => validateCompletedDailyChecklist(checklist, "general"));
   optional.result = "fail";
+  optional.notes = "Damaged coupling";
+  assert.throws(() => validateCompletedDailyChecklist(checklist, "general"), /Select Minor, Major or Critical severity/i);
+  optional.severity = "major";
   optional.notes = "";
-  assert.throws(() => validateCompletedDailyChecklist(checklist, "general"), /Describe each failed item/i);
+  assert.throws(() => validateCompletedDailyChecklist(checklist, "general"), /Inspector remarks are required/i);
+  optional.notes = "Damaged coupling requires repair before departure";
+  assert.doesNotThrow(() => validateCompletedDailyChecklist(checklist, "general"));
+  optional.severity = "invalid" as never;
+  assert.throws(() => validateCompletedDailyChecklist(checklist, "general"), /Select Minor, Major or Critical severity/i);
 });
 
 test("new pre-loading checks fail closed, require inspector identity and preserve historical records", () => {
@@ -96,4 +103,32 @@ test("prior checklist JSON remains available without new source fields", () => {
   const legacy = [{ category: "Legacy", items: [{ name: "Wheels", result: "pass" as const }] }];
   assert.equal(summarizeDailyChecklist(legacy).passed, 1);
   assert.equal(summarizeDailyChecklist(legacy).unchecked, 0);
+});
+
+test("failed-check severity and inspector remarks are enforced, stored, and displayed without allowing trip clearance", () => {
+  const form = read("src/app/daily-inspections/DailyInspectionForm.tsx");
+  const server = read("src/app/daily-inspections/server.ts");
+  const report = read("src/app/daily-inspections/[id]/page.tsx");
+  const schema = read("src/db/schema.ts");
+  const validator = read("src/lib/daily-checklist.ts");
+  assert.match(schema, /DailyDefectSeverity = "minor" \| "major" \| "critical"/);
+  assert.match(schema, /severity\?: DailyDefectSeverity/);
+  assert.match(form, /<option value="minor">Minor<\/option>/);
+  assert.match(form, /<option value="major">Major<\/option>/);
+  assert.match(form, /<option value="critical">Critical<\/option>/);
+  assert.match(form, /placeholder="Inspector remarks"/);
+  assert.match(form, /setItemSeverity\(catIdx, itemIdx/);
+  assert.match(form, /!item\.severity \|\| !item\.notes\?\.trim\(\)/);
+  assert.match(validator, /if \(answer\.result === "fail"\)/);
+  assert.match(validator, /Inspector remarks are required for every failed item/);
+  assert.match(server, /severity: it\.severity/);
+  assert.match(server, /const clearedForTrip = summary\.failed === 0/);
+  assert.match(report, /item\.severity === "critical"/);
+  assert.match(report, /Inspector remarks/);
+});
+
+test("changing a failed check to pass clears stale classification and remarks", () => {
+  const form = read("src/app/daily-inspections/DailyInspectionForm.tsx");
+  assert.match(form, /severity: result === "fail" && items\[itemIdx\]\.result === "fail"/);
+  assert.match(form, /notes: items\[itemIdx\]\.result === result \? items\[itemIdx\]\.notes : ""/);
 });
