@@ -320,15 +320,16 @@ export function DailyInspectionForm({
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-slate-900 text-sm">{item.name}</p>
+                      {item.result === "unchecked" && <p className="mt-1 text-xs font-semibold text-amber-700">Not checked</p>}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <ResultButton active={item.result === "pass"} tone="emerald" onClick={() => setItemResult(catIdx, itemIdx, "pass")}>
+                      <ResultButton label="Pass" active={item.result === "pass"} tone="emerald" onClick={() => setItemResult(catIdx, itemIdx, "pass")}>
                         <Check className="h-4 w-4" />
                       </ResultButton>
-                      <ResultButton active={item.result === "fail"} tone="red" onClick={() => setItemResult(catIdx, itemIdx, "fail")}>
+                      <ResultButton label="Fail" active={item.result === "fail"} tone="red" onClick={() => setItemResult(catIdx, itemIdx, "fail")}>
                         <XCircle className="h-4 w-4" />
                       </ResultButton>
-                      <ResultButton active={item.result === "na"} tone="slate" disabled={!item.optional} onClick={() => setItemResult(catIdx, itemIdx, "na")}>
+                      <ResultButton label={item.optional ? "Not applicable" : "Not applicable (not permitted for required item)"} active={item.result === "na"} tone="slate" disabled={!item.optional} onClick={() => setItemResult(catIdx, itemIdx, "na")}>
                         <Minus className="h-4 w-4" />
                       </ResultButton>
                     </div>
@@ -397,14 +398,14 @@ export function DailyInspectionForm({
   );
 }
 
-function ResultButton({ active, tone, onClick, disabled = false, children }: { active: boolean; tone: "emerald" | "red" | "slate"; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function ResultButton({ label, active, tone, onClick, disabled = false, children }: { label: string; active: boolean; tone: "emerald" | "red" | "slate"; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   const colors: Record<string, string> = {
     emerald: active ? "bg-emerald-600 text-white" : "text-emerald-600 hover:bg-emerald-50",
     red: active ? "bg-red-600 text-white" : "text-red-600 hover:bg-red-50",
     slate: active ? "bg-slate-700 text-white" : "text-slate-500 hover:bg-slate-100",
   };
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={active} className={`h-9 w-9 grid place-items-center rounded-lg border transition ${active ? "border-transparent" : "border-slate-200"} ${colors[tone]}`}>
+    <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled} aria-pressed={active} className={`h-9 w-9 grid place-items-center rounded-lg border transition ${active ? "border-transparent" : "border-slate-200"} ${colors[tone]}`}>
       {children}
     </button>
   );
