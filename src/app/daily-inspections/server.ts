@@ -127,13 +127,14 @@ export async function submitDailyInspection(input: DailyInspectionInput) {
 
   const id = newId();
   const summary = summarizeDailyChecklist(input.checklist);
-  const criticalDefects: { item: string; notes: string; photo?: string }[] = [];
+  const criticalDefects: { item: string; notes: string; severity?: "minor" | "major" | "critical"; photo?: string }[] = [];
   for (const cat of input.checklist) {
     for (const it of cat.items) {
       if (it.result === "fail") {
         criticalDefects.push({
           item: `${cat.category}: ${it.name}`,
           notes: it.notes || "",
+          severity: it.severity,
           photo: it.photos?.[0],
         });
       }
