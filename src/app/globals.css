@@ -457,8 +457,7 @@ html.dark {
   body:has(.daily-inspection-print-root) [data-app-shell] > aside,
   body:has(.daily-inspection-print-root) [data-app-shell] > div > header,
   body:has(.daily-inspection-print-root) [data-app-shell] > div > [role="status"],
-  body:has(.daily-inspection-print-root) .no-print,
-  body:has(.daily-inspection-print-root) .print\\:hidden {
+  body:has(.daily-inspection-print-root) .no-print {
     display: none !important;
   }
 
