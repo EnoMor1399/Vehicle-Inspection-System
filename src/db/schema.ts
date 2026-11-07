@@ -447,10 +447,15 @@ export interface DailyPreloadingDetails {
   inspectorSignature?: string;
 }
 
+export type DailyDefectSeverity = "minor" | "major" | "critical";
+
 export interface DailyChecklistItem {
   name: string;
   result: "unchecked" | "pass" | "fail" | "na";
   optional?: boolean;
+  /** Required for failed checks; reflects inspector-assigned defect priority. */
+  severity?: DailyDefectSeverity;
+  /** Inspector remarks for failed checks; N/A explanation for optional checks. */
   notes?: string;
   photos?: string[];
 }
