@@ -75,7 +75,7 @@ export async function DailyInspectionWorkspaceView({ organizationId, readOnly = 
       <PageHeader
         eyebrow="Pre-Trip Safety"
         title="Daily Inspections"
-        description="Pre-trip inspection protocol for tires, brakes, lights, and fluids."
+        description="Complete digital pre-trip and pre-loading inspections, covering vehicle condition, documentation, safety equipment, trailers and tankers."
         action={!readOnly ?
           <Link href="/daily-inspections/new">
             <Button>
@@ -101,17 +101,17 @@ export async function DailyInspectionWorkspaceView({ organizationId, readOnly = 
             <h2 className="text-base sm:text-lg font-semibold text-slate-950 mb-1">Pre-Trip Protocol</h2>
             <p className="text-xs sm:text-sm text-slate-700 leading-relaxed mb-3">
               Every vehicle must complete this daily inspection <strong>before leaving the yard</strong>.
-              Verifies tires, brakes, lights, fluids across 9 categories.
+              Supports general vehicles, bulk tankers, tractor-trailers and container/flatbed trailers with context-specific safety checks.
             </p>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-600">
               <span className="inline-flex items-center gap-1 sm:gap-1.5">
                 <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" /> Pass: cleared
               </span>
               <span className="inline-flex items-center gap-1 sm:gap-1.5">
-                <AlertTriangle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600" /> Defect: monitor
+                <AlertTriangle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600" /> Every applicable check must be recorded
               </span>
               <span className="inline-flex items-center gap-1 sm:gap-1.5">
-                <XCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-red-600" /> Fail: grounded
+                <XCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-red-600" /> Any failure: grounded pending correction and re-inspection
               </span>
             </div>
           </div>

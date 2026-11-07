@@ -404,6 +404,7 @@ export const dailyInspections = pgTable(
     criticalDefects: jsonb("critical_defects").$type<{ item: string; notes: string; photo?: string }[]>().default([]),
     // Driver attestation
     driverSignature: text("driver_signature"),
+    preloadingDetails: jsonb("preloading_details").$type<DailyPreloadingDetails>().notNull().default({}),
     supervisorReview: boolean("supervisor_review").notNull().default(false),
     supervisorId: varchar("supervisor_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
     supervisorNotes: text("supervisor_notes"),
@@ -429,9 +430,27 @@ export const dailyInspections = pgTable(
   })
 );
 
+export type DailyInspectionVehicleType = "general" | "bulk_tanker" | "tractor_trailer" | "container_flatbed";
+export interface DailyPreloadingDetails {
+  vehicleType?: DailyInspectionVehicleType;
+  checklistReference?: string;
+  transporterName?: string;
+  chassisNumber?: string;
+  vehicleMake?: string;
+  bulkIdentificationNumber?: string;
+  bulkCapacity?: string;
+  bulkCalibrationCertificateNumber?: string;
+  bulkCalibrationExpiryDate?: string;
+  driverLicenceClass?: string;
+  inspectionPremises?: string;
+  inspectorName?: string;
+  inspectorSignature?: string;
+}
+
 export interface DailyChecklistItem {
   name: string;
-  result: "pass" | "fail" | "na";
+  result: "unchecked" | "pass" | "fail" | "na";
+  optional?: boolean;
   notes?: string;
   photos?: string[];
 }
