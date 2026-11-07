@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitDailyInspection } from "./server";
 import { buildDefaultDailyChecklist } from "@/lib/daily-checklist";
-import type { DailyChecklistCategory, DailyInspectionVehicleType, DailyPreloadingDetails } from "@/db/schema";
+import type { DailyChecklistCategory, DailyDefectSeverity, DailyInspectionVehicleType, DailyPreloadingDetails } from "@/db/schema";
 import { Button, Card, Field, TextInput, TextArea, Select } from "@/components/ui";
 import { PhotoCapture, type Photo } from "@/components/PhotoCapture";
 import { SignaturePad } from "@/components/SignaturePad";
@@ -67,7 +67,23 @@ export function DailyInspectionForm({
     setChecklist((prev) => {
       const next = [...prev];
       const items = [...next[catIdx].items];
-      items[itemIdx] = { ...items[itemIdx], result };
+      items[itemIdx] = {
+        ...items[itemIdx],
+        result,
+        severity: result === "fail" && items[itemIdx].result === "fail" ? items[itemIdx].severity : undefined,
+        notes: items[itemIdx].result === result ? items[itemIdx].notes : "",
+        photos: items[itemIdx].result === result ? items[itemIdx].photos : [],
+      };
+      next[catIdx] = { ...next[catIdx], items };
+      return next;
+    });
+  }
+
+  function setItemSeverity(catIdx: number, itemIdx: number, severity: DailyDefectSeverity | "") {
+    setChecklist((prev) => {
+      const next = [...prev];
+      const items = [...next[catIdx].items];
+      items[itemIdx] = { ...items[itemIdx], severity: severity || undefined };
       next[catIdx] = { ...next[catIdx], items };
       return next;
     });
@@ -118,7 +134,9 @@ export function DailyInspectionForm({
       return setError("Complete all bulk identification and calibration fields.");
     }
     const pendingItem = checklist.flatMap((cat) => cat.items.map((item) => ({ category: cat.category, item })))
-      .find(({ item }) => item.result === "unchecked" || (item.result === "na" && (!item.optional || !item.notes?.trim())) || (item.result === "fail" && !item.notes?.trim()));
+      .find(({ item }) => item.result === "unchecked" ||
+        (item.result === "na" && (!item.optional || !item.notes?.trim())) ||
+        (item.result === "fail" && (!item.severity || !item.notes?.trim())));
     if (pendingItem) return setError(`Complete or explain the check: ${pendingItem.item.name}`);
 
     startTransition(async () => {
@@ -167,7 +185,7 @@ export function DailyInspectionForm({
             </div>
             <h2 className="text-2xl font-bold text-red-900 mb-2">Vehicle Grounded</h2>
             <p className="text-slate-600 mb-6">
-              Critical defects were found. This vehicle <strong>MUST NOT</strong> leave the yard until repairs are completed and re-inspected.
+              One or more inspection items failed. This vehicle <strong>MUST NOT</strong> leave the yard until the defects are corrected and re-inspected.
             </p>
           </>
         )}
@@ -335,21 +353,55 @@ export function DailyInspectionForm({
                     </div>
                   </div>
 
-                  {(item.result === "fail" || item.result === "na") && (
-                    <div className="mt-2 space-y-2">
-                      <TextInput
-                        placeholder={item.result === "na" ? "Explain why this equipment is not applicable..." : "Describe the defect and required action..."}
-                        value={item.notes || ""}
-                        onChange={(e) => setItemNotes(catIdx, itemIdx, e.target.value)}
-                        className="text-xs"
-                      />
-                      {item.result === "fail" && <PhotoCapture
+                  {item.result === "fail" && (
+                    <div className="mt-3 space-y-3 rounded-lg border border-red-100 bg-red-50/40 p-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(150px,0.35fr)_minmax(0,1fr)]">
+                        <label className="block min-w-0">
+                          <span className="sr-only">Defect severity — {item.name}</span>
+                          <Select
+                            aria-label={`Defect severity: ${item.name}`}
+                            value={item.severity || ""}
+                            onChange={(e) => setItemSeverity(catIdx, itemIdx, e.target.value as DailyDefectSeverity | "")}
+                            required
+                            className="w-full bg-white text-sm"
+                          >
+                            <option value="">Select severity</option>
+                            <option value="minor">Minor</option>
+                            <option value="major">Major</option>
+                            <option value="critical">Critical</option>
+                          </Select>
+                        </label>
+                        <label className="block min-w-0">
+                          <span className="sr-only">Inspector remarks — {item.name}</span>
+                          <TextInput
+                            aria-label={`Inspector remarks: ${item.name}`}
+                            placeholder="Inspector remarks"
+                            value={item.notes || ""}
+                            onChange={(e) => setItemNotes(catIdx, itemIdx, e.target.value)}
+                            maxLength={1000}
+                            required
+                            className="w-full bg-white text-sm"
+                          />
+                        </label>
+                      </div>
+                      <p className="text-xs text-red-700">All failed checks prevent trip clearance, including those classified as Minor.</p>
+                      <PhotoCapture
                         value={(item.photos || []).map((p, i) => ({ id: String(i), dataUrl: p, takenAt: new Date().toISOString() }))}
                         onChange={(photos) => setItemPhotos(catIdx, itemIdx, photos)}
                         label="Photo evidence"
                         maxPhotos={3}
-                      />}
+                      />
                     </div>
+                  )}
+                  {item.result === "na" && (
+                    <TextInput
+                      aria-label={`Reason not applicable: ${item.name}`}
+                      placeholder="Explain why this equipment is not applicable..."
+                      value={item.notes || ""}
+                      onChange={(e) => setItemNotes(catIdx, itemIdx, e.target.value)}
+                      maxLength={1000}
+                      className="mt-2 w-full text-sm"
+                    />
                   )}
                 </div>
               ))}
