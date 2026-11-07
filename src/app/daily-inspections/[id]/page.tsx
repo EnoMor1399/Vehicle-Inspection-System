@@ -75,11 +75,21 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
   const backLabel = isTransporter ? "Back to Transporter Portal" : "Back to Daily Inspections";
 
   return (
-    <div className="p-6 lg:p-10">
-      <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4">
+    <div className="daily-inspection-print-root p-6 lg:p-10">
+      <div className="print-report-header hidden border-b-2 border-slate-900 pb-3 mb-5">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Vehicle Inspection Management System (VIMS)</p>
+        <h1 className="mt-1 text-xl font-extrabold text-slate-950">Daily Pre-Trip / Pre-Loading Inspection Checklist</h1>
+        <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-700">
+          <span>Registration: <strong>{v.registrationNumber}</strong></span>
+          <span>Date: <strong>{formatDate(i.inspectionDate)}</strong></span>
+          <span>Reference: <strong>{preloading.checklistReference || i.id.slice(0, 8)}</strong></span>
+        </div>
+      </div>
+      <Link href={backHref} className="no-print inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-4">
         <ArrowLeft className="h-4 w-4" /> {backLabel}
       </Link>
 
+      <div className="no-print">
       <PageHeader
         eyebrow="Daily Pre-Trip Inspection"
         title={`${v.registrationNumber} · ${formatDate(i.inspectionDate)}`}
@@ -99,6 +109,7 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
           </div>
         }
       />
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
@@ -263,7 +274,7 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
                 </div>
                 <div className="divide-y divide-slate-100">
                   {cat.items.map((item, idx) => (
-                    <div key={idx} className="px-4 py-2.5 flex items-start justify-between gap-3 text-sm">
+                    <div key={idx} className="print-report-item px-4 py-2.5 flex items-start justify-between gap-3 text-sm">
                       <div className="flex-1 min-w-0">
                         <p className="text-slate-900">{item.name}</p>
                         {item.result === "fail" && item.severity && (
