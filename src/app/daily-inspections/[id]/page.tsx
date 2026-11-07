@@ -68,7 +68,7 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
   const preloading = i.preloadingDetails || {};
   const hasPreloading = preloading.vehicleType && preloading.vehicleType !== "general";
   const checklist = (i.checklist || []) as DailyChecklistCategory[];
-  const criticalDefects = (i.criticalDefects || []) as { item: string; notes: string; photo?: string }[];
+  const criticalDefects = (i.criticalDefects || []) as { item: string; notes: string; severity?: "minor" | "major" | "critical"; photo?: string }[];
   const canApprove = canApproveInspection(user);
   const isTransporter = user.role === "transporter_user";
   const backHref = isTransporter ? "/portal#pre-trip" : "/daily-inspections";
@@ -141,7 +141,8 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
                       <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
                       <div>
                         <p className="font-medium">{d.item}</p>
-                        {d.notes && <p className="text-xs italic opacity-80">&ldquo;{d.notes}&rdquo;</p>}
+                        {d.severity && <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-red-900">{d.severity} severity</span>}
+                        {d.notes && <p className="mt-1 text-xs italic opacity-80">Inspector remarks: &ldquo;{d.notes}&rdquo;</p>}
                       </div>
                     </li>
                   ))}
@@ -265,7 +266,20 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
                     <div key={idx} className="px-4 py-2.5 flex items-start justify-between gap-3 text-sm">
                       <div className="flex-1 min-w-0">
                         <p className="text-slate-900">{item.name}</p>
-                        {item.notes && <p className="text-xs text-slate-500 italic mt-0.5">&ldquo;{item.notes}&rdquo;</p>}
+                        {item.result === "fail" && item.severity && (
+                          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+                            item.severity === "critical" ? "bg-red-100 text-red-800"
+                              : item.severity === "major" ? "bg-orange-100 text-orange-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}>
+                            {item.severity} severity
+                          </span>
+                        )}
+                        {item.notes && (
+                          <p className="mt-1 text-xs italic text-slate-600">
+                            {item.result === "fail" ? "Inspector remarks" : "N/A explanation"}: &ldquo;{item.notes}&rdquo;
+                          </p>
+                        )}
                         {(item.photos?.length || 0) > 0 && (
                           <div className="mt-1">
                             <PhotoGallery photos={(item.photos || []).map((photo, index) => ({ id: String(index), dataUrl: photo, takenAt: new Date().toISOString() }))} />
