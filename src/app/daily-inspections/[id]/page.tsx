@@ -14,6 +14,7 @@ import { formatDateTime, formatDate } from "@/lib/utils";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import type { DailyChecklistCategory } from "@/db/schema";
 import { ApproveButton } from "../ApproveButton";
+import { DailyInspectionPrintButton } from "../DailyInspectionPrintButton";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,8 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
         title={`${v.registrationNumber} · ${formatDate(i.inspectionDate)}`}
         description={`${v.make} ${v.model || ""} · Driver: ${i.driverName || "—"} · Ref: ${preloading.checklistReference || i.id.slice(0, 8)}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <DailyInspectionPrintButton />
             <StatusBadge status={i.status} />
             {i.clearedForTrip ? (
               <Badge tone="emerald"><CheckCircle2 className="h-3.5 w-3.5" /> Cleared for Trip</Badge>
@@ -215,6 +217,27 @@ export default async function DailyInspectionDetailPage({ params }: { params: Pr
           )}
         </Card>
       </div>
+
+      <Card className="mb-6 border-slate-200 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <h2 className="text-lg font-bold text-slate-950">Inspection Validation</h2>
+          {i.clearedForTrip ? (
+            <Badge tone="emerald"><CheckCircle2 className="h-3.5 w-3.5" /> PASSED</Badge>
+          ) : (
+            <Badge tone="red"><XCircle className="h-3.5 w-3.5" /> FAILED — NOT CLEARED</Badge>
+          )}
+        </div>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <InfoRow label="Date" value={formatDate(i.inspectionDate)} />
+          <InfoRow label="Premises" value={preloading.inspectionPremises || "Not recorded"} />
+          <InfoRow label="Driver" value={i.driverName || "Not recorded"} />
+          <InfoRow label="Inspector" value={preloading.inspectorName || "Not separately recorded"} />
+        </dl>
+        <p className="mt-4 text-xs leading-6 text-slate-600">
+          Every applicable item must be checked as satisfactory for a PASS. Any failed item prevents automatic trip clearance.
+          Client exceptions require separate written authorization and do not automatically override the recorded failure.
+        </p>
+      </Card>
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold text-slate-950 mb-4 flex items-center gap-2">
