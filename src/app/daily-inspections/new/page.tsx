@@ -36,6 +36,9 @@ export default async function NewDailyInspectionPage({
       registrationNumber: vehicles.registrationNumber,
       make: vehicles.make,
       model: vehicles.model,
+      chassisNumber: vehicles.chassisNumber,
+      vin: vehicles.vin,
+      transporterName: transporters.companyName,
     })
     .from(vehicles)
     .leftJoin(transporters, eq(transporters.id, vehicles.transporterId))
@@ -58,6 +61,8 @@ export default async function NewDailyInspectionPage({
     registrationNumber: v.registrationNumber,
     make: v.make,
     model: v.model || "",
+    chassisNumber: v.chassisNumber || v.vin || "",
+    transporterName: v.transporterName || "",
   }));
 
   return (
@@ -68,7 +73,7 @@ export default async function NewDailyInspectionPage({
       <PageHeader
         eyebrow="Pre-Trip Safety Check"
         title="New Daily Inspection"
-        description="Complete the pre-trip check before the vehicle leaves the yard."
+        description="Complete every applicable vehicle check before departure or loading. Pre-loading inspections include tanker/trailer-specific controls."
       />
 
       <div className="mb-5">
