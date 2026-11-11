@@ -384,12 +384,12 @@ function continuation(doc: jsPDF, data: CertificatePdfData) {
     });
   }
 
-  for (let page = 2; page <= doc.internal.getNumberOfPages(); page++) {
+  for (let page = 2; page <= doc.getNumberOfPages(); page++) {
     doc.setPage(page);
     doc.setDrawColor(...GREEN);
     doc.line(L, 285, R, 285);
     copy(doc, "VIMS CERTIFICATE CONTINUATION - " + data.certificateNumber, L, 290, 8, true, GREEN);
-    copy(doc, "Page " + page + " of " + doc.internal.getNumberOfPages(), R, 290, 7.8, true, INK, { align: "right" });
+    copy(doc, "Page " + page + " of " + doc.getNumberOfPages(), R, 290, 7.8, true, INK, { align: "right" });
   }
 }
 
