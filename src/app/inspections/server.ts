@@ -17,6 +17,7 @@ import {
 import type { InspectionDocument, InspectionSectionData } from "@/db/schema";
 import { emitWebhookEvent } from "@/lib/webhook-delivery";
 import { assertSubscriptionCapacityAvailable, extractSubscriptionCapacityError } from "@/lib/subscription-capacity";
+import { parseBrakeEfficiencyPercent } from "@/lib/brake-efficiency";
 
 async function requireEditor() {
   const user = await getCurrentUser();
@@ -206,10 +207,10 @@ export async function createInspection(data: InspectionFormData) {
     sectionData: data.sectionData,
     serviceBrakeEfficiency: boundedNumber(data.serviceBrakeEfficiency, "Service brake efficiency", 0, 100),
     parkingBrakeEfficiency: boundedNumber(data.parkingBrakeEfficiency, "Parking brake efficiency", 0, 100),
-    trailerHeadServiceBrakeEfficiency: boundedNumber(data.trailerHeadServiceBrakeEfficiency, "Trailer Head service brake efficiency", 0, 100),
-    trailerHeadParkingBrakeEfficiency: boundedNumber(data.trailerHeadParkingBrakeEfficiency, "Trailer Head parking brake efficiency", 0, 100),
-    tankerFlatbedServiceBrakeEfficiency: boundedNumber(data.tankerFlatbedServiceBrakeEfficiency, "Tanker/Flatbed service brake efficiency", 0, 100),
-    tankerFlatbedParkingBrakeEfficiency: boundedNumber(data.tankerFlatbedParkingBrakeEfficiency, "Tanker/Flatbed parking brake efficiency", 0, 100),
+    trailerHeadServiceBrakeEfficiency: parseBrakeEfficiencyPercent(data.trailerHeadServiceBrakeEfficiency, "Trailer Head service brake efficiency"),
+    trailerHeadParkingBrakeEfficiency: parseBrakeEfficiencyPercent(data.trailerHeadParkingBrakeEfficiency, "Trailer Head parking brake efficiency"),
+    tankerFlatbedServiceBrakeEfficiency: parseBrakeEfficiencyPercent(data.tankerFlatbedServiceBrakeEfficiency, "Tanker/Flatbed service brake efficiency"),
+    tankerFlatbedParkingBrakeEfficiency: parseBrakeEfficiencyPercent(data.tankerFlatbedParkingBrakeEfficiency, "Tanker/Flatbed parking brake efficiency"),
     smokeTest: data.smokeTest ?? null,
     noiseLevel: boundedNumber(data.noiseLevel, "Noise level", 0, 250),
     opacityTest: boundedNumber(data.opacityTest, "Opacity", 0, 100),
