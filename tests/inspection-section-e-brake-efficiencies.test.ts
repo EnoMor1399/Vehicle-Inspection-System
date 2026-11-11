@@ -79,3 +79,12 @@ test("measured brake percentages reject invalid, out-of-range and over-precise r
     assert.throws(() => parseBrakeEfficiencyPercent(bad, "Trailer brake"));
   }
 });
+
+test("Section E migration is registered in production upgrades and checked by readiness verification", () => {
+  const runner = read("scripts/apply-enterprise-upgrade.mjs");
+  const verifier = read("scripts/verify-enterprise-upgrade.mjs");
+  assert.ok(runner.includes("migrations/20261111_inspection_section_e_component_brake_efficiencies.sql"));
+  for (const [, , column] of groups) assert.ok(verifier.includes(column), "Verifier omits " + column);
+  assert.match(verifier, /missingBrakeColumns\.length > 0/);
+  assert.match(verifier, /missingBrakeConstraints\.length > 0/);
+});
