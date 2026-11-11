@@ -70,8 +70,12 @@ export default async function InspectionDetailPage({ params }: { params: Promise
             <StatChip label="Critical defects" value={totalCritical} tone="red" />
           </div>
           <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-            <Info label="Service brake efficiency" value={i.serviceBrakeEfficiency ? `${i.serviceBrakeEfficiency}%` : null} />
-            <Info label="Parking brake efficiency" value={i.parkingBrakeEfficiency ? `${i.parkingBrakeEfficiency}%` : null} />
+            <Info label="Service brake efficiency" value={i.serviceBrakeEfficiency != null ? `${i.serviceBrakeEfficiency}%` : null} />
+            <Info label="Parking brake efficiency" value={i.parkingBrakeEfficiency != null ? `${i.parkingBrakeEfficiency}%` : null} />
+            <Info label="Trailer Head service brake efficiency" value={i.trailerHeadServiceBrakeEfficiency != null ? `${i.trailerHeadServiceBrakeEfficiency}%` : null} />
+            <Info label="Trailer Head parking brake efficiency" value={i.trailerHeadParkingBrakeEfficiency != null ? `${i.trailerHeadParkingBrakeEfficiency}%` : null} />
+            <Info label="Tanker/Flatbed service brake efficiency" value={i.tankerFlatbedServiceBrakeEfficiency != null ? `${i.tankerFlatbedServiceBrakeEfficiency}%` : null} />
+            <Info label="Tanker/Flatbed parking brake efficiency" value={i.tankerFlatbedParkingBrakeEfficiency != null ? `${i.tankerFlatbedParkingBrakeEfficiency}%` : null} />
             <Info label="Smoke test" value={i.smokeTest} />
             <Info label="Noise level" value={i.noiseLevel ? `${i.noiseLevel} dB` : null} />
             <Info label="Opacity" value={i.opacityTest ? `${i.opacityTest}%` : null} />

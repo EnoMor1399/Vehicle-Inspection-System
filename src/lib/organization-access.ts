@@ -43,12 +43,16 @@ export function periodAllowsAccess(
   subscription: typeof organizationSubscriptions.$inferSelect,
   now = new Date(),
 ) {
-  if (subscription.status === "trialing" && subscription.trialEndsAt) {
-    return new Date(subscription.trialEndsAt).getTime() >= now.getTime();
+  if (subscription.status === "trialing") {
+    return Boolean(subscription.trialEndsAt)
+      && Number.isFinite(new Date(subscription.trialEndsAt!).getTime())
+      && new Date(subscription.trialEndsAt!).getTime() >= now.getTime();
   }
 
-  if (subscription.status === "grace" && subscription.graceEndsAt) {
-    return new Date(subscription.graceEndsAt).getTime() >= now.getTime();
+  if (subscription.status === "grace") {
+    return Boolean(subscription.graceEndsAt)
+      && Number.isFinite(new Date(subscription.graceEndsAt!).getTime())
+      && new Date(subscription.graceEndsAt!).getTime() >= now.getTime();
   }
 
   if (subscription.currentPeriodEnd && subscription.status === "active") {

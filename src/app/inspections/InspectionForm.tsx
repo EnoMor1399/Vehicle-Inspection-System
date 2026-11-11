@@ -39,6 +39,10 @@ export function InspectionForm({
   const [odometer, setOdometer] = useState("");
   const [serviceBrake, setServiceBrake] = useState("");
   const [parkingBrake, setParkingBrake] = useState("");
+  const [trailerHeadServiceBrake, setTrailerHeadServiceBrake] = useState("");
+  const [trailerHeadParkingBrake, setTrailerHeadParkingBrake] = useState("");
+  const [tankerFlatbedServiceBrake, setTankerFlatbedServiceBrake] = useState("");
+  const [tankerFlatbedParkingBrake, setTankerFlatbedParkingBrake] = useState("");
   const [smokeTest, setSmokeTest] = useState<"pass" | "fail" | "na">("pass");
   const [noiseLevel, setNoiseLevel] = useState("");
   const [opacity, setOpacity] = useState("");
@@ -177,6 +181,10 @@ export function InspectionForm({
       sectionData: sections as InspectionSectionData[],
       serviceBrakeEfficiency: serviceBrake,
       parkingBrakeEfficiency: parkingBrake,
+      trailerHeadServiceBrakeEfficiency: trailerHeadServiceBrake,
+      trailerHeadParkingBrakeEfficiency: trailerHeadParkingBrake,
+      tankerFlatbedServiceBrakeEfficiency: tankerFlatbedServiceBrake,
+      tankerFlatbedParkingBrakeEfficiency: tankerFlatbedParkingBrake,
       smokeTest,
       noiseLevel,
       opacityTest: opacity,
@@ -385,11 +393,51 @@ export function InspectionForm({
             </div>
 
             {active.section === "E" && (
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <h3 className="font-semibold text-slate-950 mb-3">Brake Test Efficiencies</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Service Brake Efficiency %"><TextInput type="number" step="0.01" value={serviceBrake} onChange={(e) => setServiceBrake(e.target.value)} /></Field>
-                  <Field label="Parking Brake Efficiency %"><TextInput type="number" step="0.01" value={parkingBrake} onChange={(e) => setParkingBrake(e.target.value)} /></Field>
+              <div className="mt-6 border-t border-slate-200 pt-6">
+                <h3 className="mb-1 font-semibold text-slate-950">Brake Test Efficiencies</h3>
+                <p className="mb-5 text-xs leading-5 text-slate-500">
+                  Record actual measured brake test percentages (0–100%). Leave unused vehicle-component
+                  readings blank. These values do not automatically determine a pass or fail.
+                </p>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-slate-900">Vehicle / General Brake Test</h4>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Field label="Service Brake Efficiency %">
+                      <TextInput type="number" min="0" max="100" step="0.01" inputMode="decimal" value={serviceBrake} onChange={(e) => setServiceBrake(e.target.value)} />
+                    </Field>
+                    <Field label="Parking Brake Efficiency %">
+                      <TextInput type="number" min="0" max="100" step="0.01" inputMode="decimal" value={parkingBrake} onChange={(e) => setParkingBrake(e.target.value)} />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <h4 className="mb-1 text-sm font-semibold text-slate-950">Trailer Head Brakes</h4>
+                    <p className="mb-3 text-xs leading-5 text-slate-500">Separate tractor/trailer-head brake readings, where tested.</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      <Field label="Trailer Head Service Brake Efficiency %">
+                        <TextInput type="number" min="0" max="100" step="0.01" inputMode="decimal" value={trailerHeadServiceBrake} onChange={(e) => setTrailerHeadServiceBrake(e.target.value)} />
+                      </Field>
+                      <Field label="Trailer Head Parking Brake Efficiency %">
+                        <TextInput type="number" min="0" max="100" step="0.01" inputMode="decimal" value={trailerHeadParkingBrake} onChange={(e) => setTrailerHeadParkingBrake(e.target.value)} />
+                      </Field>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <h4 className="mb-1 text-sm font-semibold text-slate-950">Tanker / Flatbed Brakes</h4>
+                    <p className="mb-3 text-xs leading-5 text-slate-500">Separate tanker or flatbed trailer brake readings, where tested.</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      <Field label="Tanker / Flatbed Service Brake Efficiency %">
+                        <TextInput type="number" min="0" max="100" step="0.01" inputMode="decimal" value={tankerFlatbedServiceBrake} onChange={(e) => setTankerFlatbedServiceBrake(e.target.value)} />
+                      </Field>
+                      <Field label="Tanker / Flatbed Parking Brake Efficiency %">
+                        <TextInput type="number" min="0" max="100" step="0.01" inputMode="decimal" value={tankerFlatbedParkingBrake} onChange={(e) => setTankerFlatbedParkingBrake(e.target.value)} />
+                      </Field>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
