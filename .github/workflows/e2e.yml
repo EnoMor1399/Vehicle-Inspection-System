@@ -17,6 +17,10 @@ jobs:
     name: Browser workflows against PostgreSQL
     # Playwright 1.55 does not support Ubuntu 26.04; pin a supported image.
     runs-on: ubuntu-24.04
+    # Official Playwright image already includes matching Chromium and all OS libraries.
+    # This avoids runtime apt downloads that can fail when Ubuntu mirrors are unavailable.
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
     timeout-minutes: 25
     services:
       postgres:
@@ -34,7 +38,7 @@ jobs:
           --health-retries 12
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/Vehicle-Inspection-Enterprise?sslmode=disable
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/Vehicle-Inspection-Enterprise?sslmode=disable
       EXPECTED_DATABASE_NAME: Vehicle-Inspection-Enterprise
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
@@ -104,9 +108,9 @@ jobs:
           exit 1
 
       - name: Install Playwright runner
-        run: |
-          npm install --no-save --package-lock=false @playwright/test@1.55.0
-          npx playwright install --with-deps chromium
+        # Browser binaries and system dependencies are already present in the
+        # version-matched container, so there is no apt or browser download.
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
 
       - name: Run critical browser workflows
         run: npx playwright test tests/e2e/critical-workflows.spec.ts --browser=chromium --reporter=line
