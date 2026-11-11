@@ -758,6 +758,12 @@ export const inspections = pgTable(
     sectionData: jsonb("section_data").$type<InspectionSectionData[]>().notNull().default([]),
     serviceBrakeEfficiency: numeric("service_brake_efficiency", { precision: 5, scale: 2 }),
     parkingBrakeEfficiency: numeric("parking_brake_efficiency", { precision: 5, scale: 2 }),
+    // Section E: independent brake bench readings for articulated vehicle
+    // components; nullable to preserve legacy inspections and non-trailer types.
+    trailerHeadServiceBrakeEfficiency: numeric("trailer_head_service_brake_efficiency", { precision: 5, scale: 2 }),
+    trailerHeadParkingBrakeEfficiency: numeric("trailer_head_parking_brake_efficiency", { precision: 5, scale: 2 }),
+    tankerFlatbedServiceBrakeEfficiency: numeric("tanker_flatbed_service_brake_efficiency", { precision: 5, scale: 2 }),
+    tankerFlatbedParkingBrakeEfficiency: numeric("tanker_flatbed_parking_brake_efficiency", { precision: 5, scale: 2 }),
     smokeTest: itemResultEnum("smoke_test"),
     noiseLevel: numeric("noise_level", { precision: 6, scale: 2 }),
     exhaustEmission: numeric("exhaust_emission", { precision: 6, scale: 2 }),
