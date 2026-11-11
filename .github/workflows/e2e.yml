@@ -38,7 +38,7 @@ jobs:
           --health-retries 12
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/Vehicle-Inspection-Enterprise?sslmode=disable
+      E2E_DB_PASSWORD: postgres # disposable database fixture, not a production credential
       EXPECTED_DATABASE_NAME: Vehicle-Inspection-Enterprise
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
@@ -74,6 +74,12 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Configure isolated CI PostgreSQL connection
+        shell: bash
+        run: |
+          printf 'DATABASE_URL=%s://%s:%s@%s:5432/%s?sslmode=disable\n' \
+            postgresql postgres "$E2E_DB_PASSWORD" postgres "$EXPECTED_DATABASE_NAME" >> "$GITHUB_ENV"
 
       - name: Build isolated database
         run: |
