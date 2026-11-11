@@ -51,7 +51,7 @@ async function fixture(): Promise<CertificatePdfData> {
 test("readable PDF remains a single A4 portrait page for the supplied inspection example", async () => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: false });
   drawCertificatePdf(doc, await fixture());
-  assert.equal(doc.internal.getNumberOfPages(), 1);
+  assert.equal(doc.getNumberOfPages(), 1);
   assert.ok(doc.internal.pageSize.getWidth() > 209 && doc.internal.pageSize.getWidth() < 211);
   const pdf = doc.output();
   assert.ok(pdf.length > 5000);
@@ -73,7 +73,7 @@ test("failed items, long remarks and extra sections render continuation pages wi
     remarks: "Repair required and re-inspection must be recorded.",
   }));
   drawCertificatePdf(doc, record);
-  assert.ok(doc.internal.getNumberOfPages() >= 2);
+  assert.ok(doc.getNumberOfPages() >= 2);
   assert.ok(doc.output("arraybuffer").byteLength > 5000);
 });
 
