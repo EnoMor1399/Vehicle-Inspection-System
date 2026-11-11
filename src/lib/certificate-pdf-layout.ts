@@ -274,8 +274,12 @@ function drawMainPage(doc: jsPDF, data: CertificatePdfData) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7.1);
       const displayName = s.code + " - " + s.title;
+      let remaining = displayName.length;
       let name = displayName;
-      while (name.length > 1 && doc.getTextWidth(name) > available) name = name.slice(0, -2) + "...";
+      while (remaining > 0 && doc.getTextWidth(name) > available) {
+        remaining -= 1;
+        name = displayName.slice(0, remaining) + (remaining < displayName.length ? "…" : "");
+      }
       copy(doc, name, x + 5.2, y + 3.55, 7.1, true, INK);
       doc.setFont("courier", "bold");
       doc.setFontSize(6.4);
