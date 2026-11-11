@@ -88,3 +88,9 @@ test("Section E migration is registered in production upgrades and checked by re
   assert.match(verifier, /missingBrakeColumns\.length > 0/);
   assert.match(verifier, /missingBrakeConstraints\.length > 0/);
 });
+
+test("saved report preserves actual zero-percent general service and parking brake measurements", () => {
+  const report = read("src/app/inspections/[id]/page.tsx");
+  assert.match(report, /i\.serviceBrakeEfficiency != null/);
+  assert.match(report, /i\.parkingBrakeEfficiency != null/);
+});
