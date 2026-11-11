@@ -1,6 +1,6 @@
 /**
  * Real PostgreSQL race-condition test for subscriber onboarding.
- * Only runs against the ephemeral localhost database built by E2E CI.
+ * Only runs against an ephemeral CI/local database (including the isolated\n * PostgreSQL service hostname when GitHub Actions runs inside a container).
  * Never point this script at a production or preview database.
  */
 import assert from "node:assert/strict";
@@ -16,9 +16,17 @@ import {
 } from "../src/lib/organization-control-plane";
 
 const databaseUrl = process.env.DATABASE_URL;
-const hostname = databaseUrl ? new URL(databaseUrl).hostname : "";
-if (!process.env.E2E_BASE_URL || !["127.0.0.1", "localhost"].includes(hostname)) {
-  throw new Error("Subscriber concurrency tests can run only on the isolated localhost E2E database");
+const databaseTarget = databaseUrl ? new URL(databaseUrl) : null;
+const hostname = databaseTarget?.hostname || "";
+const localhostTarget = ["127.0.0.1", "localhost"].includes(hostname);
+const isolatedCiService = process.env.GITHUB_ACTIONS === "true"
+  && hostname === "postgres"
+  && databaseTarget?.username === "postgres"
+  && databaseTarget?.password === "postgres"
+  && databaseTarget?.pathname === "/Vehicle-Inspection-Enterprise"
+  && process.env.EXPECTED_DATABASE_NAME === "Vehicle-Inspection-Enterprise";
+if (!process.env.E2E_BASE_URL || !(localhostTarget || isolatedCiService)) {
+  throw new Error("Subscriber concurrency tests can run only on an isolated local or GitHub Actions E2E database");
 }
 
 async function main() {
