@@ -560,8 +560,8 @@ try {
         AND contype = 'c'
         AND convalidated = true
         AND conname = ANY($1::text[])
-        AND pg_get_constraintdef(oid) LIKE '%>= 0%'
-        AND pg_get_constraintdef(oid) LIKE '%<= 100%'`,
+        AND pg_get_constraintdef(oid) LIKE '%0%'
+        AND pg_get_constraintdef(oid) LIKE '%100%'`,
     [requiredBrakeConstraints],
   );
   const validBrakeConstraints = new Set(brakeConstraintRows.rows.map((row) => row.conname));
