@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { parseBrakeEfficiencyPercent } from "../src/lib/brake-efficiency";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const groups = [
@@ -30,12 +31,12 @@ test("all four additional readings flow separately from form state to server-sid
   for (const [key, , column] of groups) {
     assert.ok(form.includes(key + ":"), "Form submission omits " + key);
     assert.ok(server.includes(key + "?: string;"), "Server type omits " + key);
-    assert.ok(server.includes(key + ": boundedNumber(data." + key), "Server validation omits " + key);
+    assert.ok(server.includes(key + ": parseBrakeEfficiencyPercent(data." + key), "Server validation omits " + key);
     assert.ok(schema.includes(column + '", { precision: 5, scale: 2 }'), "Schema omits " + column);
     assert.ok(migration.includes(column + " numeric(5,2)"), "Migration omits " + column);
   }
-  assert.match(server, /"Trailer Head service brake efficiency", 0, 100/);
-  assert.match(server, /"Tanker\/Flatbed parking brake efficiency", 0, 100/);
+  assert.match(server, /"Trailer Head service brake efficiency"\)/);
+  assert.match(server, /"Tanker\/Flatbed parking brake efficiency"\)/);
 });
 
 test("saved inspection details show independent component labels, preserving zero readings", () => {
@@ -61,4 +62,20 @@ test("new readings do not silently alter inspection decisions or established bra
   const form = read("src/app/inspections/InspectionForm.tsx");
   assert.match(server, /if \(data.overallResult === "pass" && \(totals.fail > 0 \|\| data.smokeTest === "fail"\)\)/);
   assert.match(form, /These values do not automatically determine a pass or fail/);
+});
+
+test("measured brake percentages accept 0%, 100% and two decimal places without fabricating blank readings", () => {
+  assert.equal(parseBrakeEfficiencyPercent(undefined, "Brake"), null);
+  assert.equal(parseBrakeEfficiencyPercent("", "Brake"), null);
+  assert.equal(parseBrakeEfficiencyPercent(" ", "Brake"), null);
+  assert.equal(parseBrakeEfficiencyPercent("0", "Brake"), "0.00");
+  assert.equal(parseBrakeEfficiencyPercent("100.00", "Brake"), "100.00");
+  assert.equal(parseBrakeEfficiencyPercent("67.25", "Brake"), "67.25");
+  assert.equal(parseBrakeEfficiencyPercent(" 9.5 ", "Brake"), "9.50");
+});
+
+test("measured brake percentages reject invalid, out-of-range and over-precise readings", () => {
+  for (const bad of ["-1", "100.01", "101", "NaN", "1e1", "33.333", "12,34", "abc", "Infinity"]) {
+    assert.throws(() => parseBrakeEfficiencyPercent(bad, "Trailer brake"));
+  }
 });
