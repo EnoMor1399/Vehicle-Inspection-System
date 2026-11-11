@@ -65,6 +65,7 @@ const migrationPaths = [
   "migrations/20261017_subscription_payments_paystack.sql",
   "migrations/20261017_platform_change_notices.sql",
   "migrations/20261025_super_admin_subscription_checkout_control.sql",
+  "migrations/20261111_inspection_section_e_component_brake_efficiencies.sql",
 ];
 
 const client = new pg.Client({
