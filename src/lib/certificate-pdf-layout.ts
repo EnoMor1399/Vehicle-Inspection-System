@@ -99,7 +99,8 @@ function field(doc: jsPDF, x: number, y: number, w: number, h: number, label: st
   ruleBox(doc, x, y, w, h, FAINT);
   copy(doc, label.toUpperCase(), x + 2, y + 3.45, 6.8, true, MUTED);
   const lines = blockLines(doc, value, w - 4, 9.3, 2);
-  lines.forEach((line, i) => copy(doc, line, x + 2, y + 7.4 + i * 3.1, 9.3, true));
+  const baseline = y + (h < 9 ? 6.7 : 7.4);
+  lines.forEach((line, i) => copy(doc, line, x + 2, baseline + i * 3.1, 9.3, true));
 }
 
 function toneColors(tone: PdfCertificateState["tone"]) {
@@ -149,6 +150,7 @@ function header(doc: jsPDF, data: CertificatePdfData) {
   const org = (data.companyName || "Road Safety Limited").toUpperCase();
   doc.setFont("helvetica", "bold");
   let brandSize = 16;
+  doc.setFontSize(brandSize);
   while (brandSize > 10 && doc.getTextWidth(org) > 114) {
     brandSize -= 0.5;
     doc.setFontSize(brandSize);
@@ -173,6 +175,7 @@ function header(doc: jsPDF, data: CertificatePdfData) {
   copy(doc, "CERTIFICATE NO.", x + w / 2, 30.4, 7.4, true, NAVY, { align: "center" });
   doc.setFont("helvetica", "bold");
   let numberSize = 11.6;
+  doc.setFontSize(numberSize);
   while (numberSize > 7.5 && doc.getTextWidth(data.certificateNumber) > w - 4) {
     numberSize -= 0.5;
     doc.setFontSize(numberSize);
@@ -184,6 +187,7 @@ function header(doc: jsPDF, data: CertificatePdfData) {
   copy(doc, "CERTIFICATE STATUS", x + w / 2, 42, 6.8, true, NAVY, { align: "center" });
   doc.setFont("helvetica", "bold");
   let chipSize = 10;
+  doc.setFontSize(chipSize);
   while (chipSize > 7 && doc.getTextWidth(data.state.label) > w - 5) {
     chipSize -= 0.5;
     doc.setFontSize(chipSize);
@@ -215,6 +219,7 @@ function drawMainPage(doc: jsPDF, data: CertificatePdfData) {
   ruleBox(doc, L + 3, oy + 10, ow - 6, 15, tone.bg);
   doc.setFont("helvetica", "bold");
   let outcomeFont = 12.4;
+  doc.setFontSize(outcomeFont);
   while (outcomeFont > 9.5 && doc.getTextWidth(data.state.label) > ow - 12) {
     outcomeFont -= 0.5;
     doc.setFontSize(outcomeFont);
