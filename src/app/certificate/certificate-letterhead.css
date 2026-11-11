@@ -226,3 +226,82 @@
     page-break-inside: avoid !important;
   }
 }
+
+/* Certificate readability upgrade (screen and print).
+   Preserve genuine source data, QR and signatures; do not shrink text to
+   make a visually dense certificate fit an artificially short page. */
+.certificate-document {
+  --cert-ink: #10223a;
+  --cert-muted: #475569;
+  --cert-green-dark: #006534;
+}
+
+.cert-brand h2 { color: #006534; }
+.cert-contact-line p { color: #253449; font-size: 9px; font-weight: 650; white-space: normal; overflow-wrap: anywhere; }
+.cert-top-rule p { color: #10223a; font-size: 9px; }
+.cert-title-row h1 { color: #10223a; font-size: 24px; line-height: 1.15; }
+.cert-kicker { font-size: 9px; color: #006534; }
+.cert-subtitle { font-size: 10px; color: #475569; }
+.cert-state-chip span { font-size: 8px; }
+.cert-state-chip strong { font-size: 12px; }
+.cert-section-heading { background: #006534; }
+.cert-section-heading p { color: #ffffff; font-size: 10px; letter-spacing: .035em; }
+.cert-section-heading span { color: #e2f1e9; font-size: 8.5px; }
+.cert-registration { color: #ffffff; font-size: 14px; }
+.cert-field span, .cert-meta span, .cert-measurement span,
+.cert-signature-card > span, .cert-footer-control span {
+  color: #475569;
+  font-size: 8.5px;
+  line-height: 1.25;
+  letter-spacing: .02em;
+}
+.cert-field { min-height: 12mm; }
+.cert-field strong { font-size: 11px; line-height: 1.3; max-height: none; }
+.cert-field strong.is-mono { font-size: 10px; }
+.cert-mini-heading { font-size: 10px; line-height: 1.3; }
+.cert-outcome-card strong { font-size: 18px; }
+.cert-outcome-card p { font-size: 10px; line-height: 1.4; }
+.cert-certification-statement { font-size: 9px; line-height: 1.45; }
+.cert-meta strong { font-size: 10px; white-space: normal; text-overflow: initial; }
+.cert-verification-code { font-size: 10px; letter-spacing: .02em; }
+.cert-verify-panel > p:last-child { font-size: 9px; }
+.cert-measurement { min-height: 11mm; }
+.cert-measurement strong { font-size: 12px; }
+.cert-summary-head > div:first-child > span { font-size: 9px; }
+.cert-score span { font-size: 8px; }
+.cert-score strong { font-size: 11px; }
+.cert-section-status { min-height: 9mm; }
+.cert-section-name strong {
+  font-size: 9px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+}
+.cert-section-counts { font-size: 7.5px; line-height: 1.15; }
+.cert-historical-note p { font-size: 10px; }
+.cert-defects-box li strong, .cert-remarks-box > p:not(.cert-mini-heading) { font-size: 10px; }
+.cert-defects-box li span, .cert-defects-box small, .cert-remarks-box small { font-size: 9px; }
+.cert-clear-note { font-size: 10px; }
+.cert-signature-card > strong { font-size: 10px; }
+.cert-signature-card > small { font-size: 8px; }
+.cert-footer > div:nth-child(2) strong { font-size: 10px; }
+.cert-footer > div:nth-child(2) p { font-size: 8.5px; line-height: 1.35; }
+.cert-footer-control strong { font-size: 9px; }
+
+/* Long values must remain printable instead of disappearing behind A4
+   containers. Browser printing may naturally use a continuation page. */
+@media print {
+  html, body { height: auto !important; min-height: 297mm !important; overflow: visible !important; }
+  .certificate-screen { height: auto !important; min-height: 297mm !important; overflow: visible !important; }
+  .certificate-document {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 297mm !important;
+    overflow: visible !important;
+  }
+  .cert-contact-line p { font-size: 9px !important; }
+  .cert-field strong { font-size: 11px !important; }
+  .cert-section-heading p { font-size: 10px !important; }
+  .cert-section-name strong { font-size: 9px !important; }
+}
