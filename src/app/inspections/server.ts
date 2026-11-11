@@ -33,6 +33,10 @@ export type InspectionFormData = {
   sectionData: InspectionSectionData[];
   serviceBrakeEfficiency?: string;
   parkingBrakeEfficiency?: string;
+  trailerHeadServiceBrakeEfficiency?: string;
+  trailerHeadParkingBrakeEfficiency?: string;
+  tankerFlatbedServiceBrakeEfficiency?: string;
+  tankerFlatbedParkingBrakeEfficiency?: string;
   smokeTest?: "pass" | "fail" | "na";
   noiseLevel?: string;
   opacityTest?: string;
@@ -202,6 +206,10 @@ export async function createInspection(data: InspectionFormData) {
     sectionData: data.sectionData,
     serviceBrakeEfficiency: boundedNumber(data.serviceBrakeEfficiency, "Service brake efficiency", 0, 100),
     parkingBrakeEfficiency: boundedNumber(data.parkingBrakeEfficiency, "Parking brake efficiency", 0, 100),
+    trailerHeadServiceBrakeEfficiency: boundedNumber(data.trailerHeadServiceBrakeEfficiency, "Trailer Head service brake efficiency", 0, 100),
+    trailerHeadParkingBrakeEfficiency: boundedNumber(data.trailerHeadParkingBrakeEfficiency, "Trailer Head parking brake efficiency", 0, 100),
+    tankerFlatbedServiceBrakeEfficiency: boundedNumber(data.tankerFlatbedServiceBrakeEfficiency, "Tanker/Flatbed service brake efficiency", 0, 100),
+    tankerFlatbedParkingBrakeEfficiency: boundedNumber(data.tankerFlatbedParkingBrakeEfficiency, "Tanker/Flatbed parking brake efficiency", 0, 100),
     smokeTest: data.smokeTest ?? null,
     noiseLevel: boundedNumber(data.noiseLevel, "Noise level", 0, 250),
     opacityTest: boundedNumber(data.opacityTest, "Opacity", 0, 100),
