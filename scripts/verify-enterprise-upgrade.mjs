@@ -344,6 +344,19 @@ const requiredIndexes = [
 
 const redundantIndexes = ["session_token_idx", "api_key_hash_idx"];
 
+const requiredBrakeColumns = [
+  "trailer_head_service_brake_efficiency",
+  "trailer_head_parking_brake_efficiency",
+  "tanker_flatbed_service_brake_efficiency",
+  "tanker_flatbed_parking_brake_efficiency",
+];
+const requiredBrakeConstraints = [
+  "vims_trailer_head_service_brake_range",
+  "vims_trailer_head_parking_brake_range",
+  "vims_tanker_flatbed_service_brake_range",
+  "vims_tanker_flatbed_parking_brake_range",
+];
+
 const client = new pg.Client({
   connectionString: normalizePostgresSslMode(databaseUrl),
   application_name: "vims-db-upgrade-verifier",
@@ -522,6 +535,38 @@ try {
     active_plans: 0,
   };
 
+  // A missing column would break ORM-backed inspection reads after rollout.
+  // Require the exact nullable numeric(5,2) shape and validated range guards.
+  const brakeColumnRows = await client.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'inspections'
+        AND column_name = ANY($1::text[])
+        AND data_type = 'numeric'
+        AND numeric_precision = 5
+        AND numeric_scale = 2
+        AND is_nullable = 'YES'
+        AND column_default IS NULL`,
+    [requiredBrakeColumns],
+  );
+  const validBrakeColumns = new Set(brakeColumnRows.rows.map((row) => row.column_name));
+  const missingBrakeColumns = requiredBrakeColumns.filter((name) => !validBrakeColumns.has(name));
+
+  const brakeConstraintRows = await client.query(
+    `SELECT conname
+       FROM pg_constraint
+      WHERE conrelid = 'inspections'::regclass
+        AND contype = 'c'
+        AND convalidated = true
+        AND conname = ANY($1::text[])
+        AND pg_get_constraintdef(oid) LIKE '%0%'
+        AND pg_get_constraintdef(oid) LIKE '%100%'`,
+    [requiredBrakeConstraints],
+  );
+  const validBrakeConstraints = new Set(brakeConstraintRows.rows.map((row) => row.conname));
+  const missingBrakeConstraints = requiredBrakeConstraints.filter((name) => !validBrakeConstraints.has(name));
+
   const metadata = readiness.rows[0];
   console.log(
     JSON.stringify({
@@ -529,6 +574,10 @@ try {
       serverVersionNum: metadata?.server_version_num ?? null,
       requiredTablesVerified: requiredTables.length - missingTables.length,
       requiredTablesExpected: requiredTables.length,
+      brakeColumnsVerified: requiredBrakeColumns.length - missingBrakeColumns.length,
+      brakeColumnsExpected: requiredBrakeColumns.length,
+      brakeConstraintsVerified: requiredBrakeConstraints.length - missingBrakeConstraints.length,
+      brakeConstraintsExpected: requiredBrakeConstraints.length,
       assessmentColumnsVerified: requiredAssessmentColumns.length - missingAssessmentColumns.length,
       assessmentColumnsExpected: requiredAssessmentColumns.length,
       auditColumnsVerified: requiredAuditColumns.length - missingAuditColumns.length,
@@ -561,6 +610,8 @@ try {
 
   if (
     missingTables.length > 0
+    || missingBrakeColumns.length > 0
+    || missingBrakeConstraints.length > 0
     || missingAssessmentColumns.length > 0
     || missingAuditColumns.length > 0
     || missing.length > 0
@@ -582,6 +633,8 @@ try {
      || !noticeTenantGuardPresent
   ) {
     if (missingTables.length > 0) console.error(`Missing required tables: ${missingTables.join(", ")}`);
+    if (missingBrakeColumns.length > 0) console.error(`Missing or incorrectly typed Section E brake columns: ${missingBrakeColumns.join(", ")}`);
+    if (missingBrakeConstraints.length > 0) console.error(`Missing or invalid Section E brake range constraints: ${missingBrakeConstraints.join(", ")}`);
     if (missingAssessmentColumns.length > 0) console.error(`Missing Driver Training assessment columns: ${missingAssessmentColumns.join(", ")}`);
     if (missingAuditColumns.length > 0) console.error(`Missing audit integrity columns: ${missingAuditColumns.join(", ")}`);
     if (missing.length > 0) console.error(`Missing required indexes: ${missing.join(", ")}`);
